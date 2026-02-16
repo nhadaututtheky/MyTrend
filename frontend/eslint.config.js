@@ -43,6 +43,12 @@ export default tseslint.config(
         SVGGElement: 'readonly',
         FileReader: 'readonly',
         Blob: 'readonly',
+        HTMLCanvasElement: 'readonly',
+        CanvasRenderingContext2D: 'readonly',
+        getComputedStyle: 'readonly',
+        ResizeObserver: 'readonly',
+        IntersectionObserver: 'readonly',
+        crypto: 'readonly',
       },
       parserOptions: {
         extraFileExtensions: ['.svelte'],
