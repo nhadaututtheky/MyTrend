@@ -10,6 +10,7 @@
     disabled?: boolean;
     required?: boolean;
     name?: string;
+    icon?: string;
     oninput?: (e: Event) => void;
     onchange?: (e: Event) => void;
   }
@@ -23,6 +24,7 @@
     disabled = false,
     required = false,
     name,
+    icon,
     oninput,
     onchange,
   }: Props = $props();
@@ -37,6 +39,10 @@
       {#if required}<span class="required" aria-hidden="true">*</span>{/if}
     </label>
   {/if}
+  <div class="input-wrapper" class:has-icon={!!icon}>
+    {#if icon}
+      <span class="input-icon" aria-hidden="true">{icon}</span>
+    {/if}
   <input
     id={inputId}
     class="input"
@@ -52,6 +58,7 @@
     aria-invalid={error ? 'true' : undefined}
     aria-describedby={error ? `${inputId}-error` : undefined}
   />
+  </div>
   {#if error}
     <span id="{inputId}-error" class="error" role="alert">{error}</span>
   {/if}
@@ -110,5 +117,25 @@
     font-size: 0.75rem;
     color: var(--accent-red);
     font-weight: 700;
+  }
+
+  .input-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .has-icon .input {
+    padding-left: calc(var(--spacing-md) + 24px);
+  }
+
+  .input-icon {
+    position: absolute;
+    left: var(--spacing-md);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    color: var(--text-muted);
+    pointer-events: none;
+    line-height: 1;
   }
 </style>

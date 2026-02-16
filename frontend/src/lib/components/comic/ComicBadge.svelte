@@ -7,13 +7,14 @@
   interface Props {
     color?: Color;
     size?: Size;
+    animated?: boolean;
     children?: Snippet;
   }
 
-  const { color = 'green', size = 'md', children }: Props = $props();
+  const { color = 'green', size = 'md', animated = false, children }: Props = $props();
 </script>
 
-<span class="badge badge-{color} badge-{size}" data-testid="comic-badge">
+<span class="badge badge-{color} badge-{size}" class:animated data-testid="comic-badge">
   {#if children}
     {@render children()}
   {/if}
@@ -45,4 +46,8 @@
   .badge-blue { background: var(--accent-blue); color: #1a1a1a; }
   .badge-purple { background: var(--accent-purple); color: #1a1a1a; }
   .badge-orange { background: var(--accent-orange); color: #1a1a1a; }
+
+  .animated {
+    animation: neonPulse 2s ease-in-out infinite;
+  }
 </style>

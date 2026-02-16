@@ -4,12 +4,13 @@
   interface Props {
     open: boolean;
     title?: string;
+    mode?: 'dialog' | 'drawer';
     onclose?: () => void;
     children?: Snippet;
     actions?: Snippet;
   }
 
-  let { open = $bindable(false), title, onclose, children, actions }: Props = $props();
+  let { open = $bindable(false), title, mode = 'dialog', onclose, children, actions }: Props = $props();
 
   function handleBackdrop(e: MouseEvent): void {
     if (e.target === e.currentTarget) {
@@ -37,7 +38,7 @@
     onkeydown={handleKeydown}
     data-testid="comic-dialog"
   >
-    <div class="dialog">
+    <div class="dialog" class:drawer={mode === 'drawer'}>
       {#if title}
         <div class="header">
           <h3 class="title">{title}</h3>
@@ -145,6 +146,34 @@
     to {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+
+  /* Drawer mode: slide from right */
+  .drawer {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    min-width: 360px;
+    max-width: 480px;
+    width: 90vw;
+    max-height: 100vh;
+    border-radius: 0;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+    animation: slideRight 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes slideRight {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
     }
   }
 </style>

@@ -6,18 +6,19 @@
   interface Props {
     variant?: Variant;
     padding?: boolean;
+    neon?: 'green' | 'blue' | 'red' | 'purple' | 'yellow' | 'orange' | false;
     onclick?: (e: MouseEvent) => void;
     children?: Snippet;
   }
 
-  const { variant = 'standard', padding = true, onclick, children }: Props = $props();
+  const { variant = 'standard', padding = true, neon = false, onclick, children }: Props = $props();
 
   const isClickable = $derived(onclick !== undefined);
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
-  class="card card-{variant}"
+  class="card card-{variant} {neon ? `sketch-card-neon-${neon}` : ''}"
   class:clickable={isClickable}
   class:padded={padding}
   role={isClickable ? 'button' : undefined}
