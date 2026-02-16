@@ -9,6 +9,7 @@
   import TokenCounter from '$lib/components/hub/TokenCounter.svelte';
   import DeviceIndicator from '$lib/components/hub/DeviceIndicator.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
   import { goto } from '$app/navigation';
   import { toast } from '$lib/stores/toast';
   import type { HubSession, HubMessage } from '$lib/types';
@@ -77,7 +78,6 @@
       isLoading = false;
     }
 
-    // Real-time sync for this session
     unsubscribe = await pb.collection('hub_sessions').subscribe(sessionId, (e) => {
       if (e.action === 'update') {
         const updated = e.record as unknown as HubSession;
@@ -94,7 +94,6 @@
   async function handleSend(content: string): Promise<void> {
     if (!session) return;
 
-    // Add user message
     const userMsg: HubMessage = {
       role: 'user',
       content,
@@ -142,7 +141,6 @@
         if (parsed.outputTokens > 0) outputTokens = parsed.outputTokens;
       }
 
-      // Add assistant message
       const assistantMsg: HubMessage = {
         role: 'assistant',
         content: fullText,
@@ -152,7 +150,6 @@
       messages = [...messages, assistantMsg];
       streamingText = '';
 
-      // Save to PocketBase
       const estimatedCost =
         (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
 
@@ -165,7 +162,6 @@
         last_message_at: new Date().toISOString(),
       });
 
-      // Update local session state
       session = {
         ...session,
         message_count: messages.length,
@@ -196,7 +192,12 @@
 
 <div class="hub-chat">
   {#if isLoading}
-    <div class="loading">Loading session...</div>
+    <div class="loading-state">
+      <ComicSkeleton variant="text" />
+      <ComicSkeleton variant="card" height="60px" />
+      <ComicSkeleton variant="card" height="60px" />
+      <ComicSkeleton variant="card" height="60px" />
+    </div>
   {:else if !session}
     <div class="not-found">Session not found</div>
   {:else}
@@ -206,6 +207,9 @@
         <div class="session-meta">
           <ComicBadge color="blue" size="sm">{session.model}</ComicBadge>
           <DeviceIndicator devices={session.devices} />
+          {#if isStreaming}
+            <span class="streaming-indicator">streaming...</span>
+          {/if}
         </div>
       </div>
     </div>
@@ -265,7 +269,21 @@
     gap: var(--spacing-sm);
   }
 
-  .loading, .not-found {
+  .streaming-indicator {
+    font-size: 0.7rem;
+    color: var(--accent-purple);
+    animation: neonPulse 1s ease-in-out infinite;
+  }
+
+  .loading-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+  }
+
+  .not-found {
     flex: 1;
     display: flex;
     align-items: center;

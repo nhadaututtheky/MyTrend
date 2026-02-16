@@ -6,6 +6,8 @@
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import { formatRelative } from '$lib/utils/date';
   import type { Conversation } from '$lib/types';
 
@@ -61,20 +63,33 @@
 
 <div class="page">
   <div class="page-header">
-    <h1 class="comic-heading">Conversations</h1>
+    <div>
+      <h1 class="comic-heading">Conversations</h1>
+      <p class="subtitle">{conversations.length} conversations tracked</p>
+    </div>
     <a href="/conversations/import"><ComicButton variant="secondary">Import</ComicButton></a>
   </div>
 
   <ComicTabs tabs={sourceTabs} bind:active={sourceFilter} />
 
   {#if isLoading}
-    <p class="loading">Loading...</p>
+    <div class="skeleton-list">
+      {#each Array(5) as _}
+        <ComicSkeleton variant="card" height="90px" />
+      {/each}
+    </div>
   {:else if filtered.length === 0}
-    <p class="empty">No conversations found.</p>
+    <ComicEmptyState
+      illustration="inbox"
+      message="No conversations found"
+      description="Import your Claude conversations or start new ones in the Hub."
+      actionLabel="Import"
+      actionHref="/conversations/import"
+    />
   {:else}
     <div class="list">
-      {#each filtered as conv (conv.id)}
-        <a href="/conversations/{conv.id}" class="list-link">
+      {#each filtered as conv, i (conv.id)}
+        <a href="/conversations/{conv.id}" class="list-link" style:animation-delay="{i * 30}ms">
           <ComicCard variant="standard">
             <div class="conv-header">
               <h3 class="conv-title">{conv.title}</h3>
@@ -107,9 +122,12 @@
 
 <style>
   .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-  .page-header { display: flex; align-items: center; justify-content: space-between; }
-  .list { display: flex; flex-direction: column; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
-  .list-link { text-decoration: none; color: inherit; }
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
+  .page-header a { text-decoration: none; }
+  .subtitle { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0; }
+  .skeleton-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+  .list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+  .list-link { text-decoration: none; color: inherit; animation: sketchFadeIn 0.3s ease both; }
   .conv-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: 4px; }
   .conv-title { font-size: 0.95rem; font-weight: 700; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .conv-summary { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
@@ -118,5 +136,8 @@
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
   .pagination { display: flex; align-items: center; justify-content: center; gap: var(--spacing-md); }
   .page-info { font-size: 0.8rem; color: var(--text-secondary); }
-  .loading, .empty { text-align: center; color: var(--text-muted); padding: var(--spacing-2xl); }
+
+  @media (max-width: 768px) {
+    .page-header { flex-direction: column; }
+  }
 </style>

@@ -2,8 +2,11 @@
   import { onMount } from 'svelte';
   import pb from '$lib/config/pocketbase';
   import RoughChart from '$lib/components/comic/RoughChart.svelte';
-  import ComicCard from '$lib/components/comic/ComicCard.svelte';
+  import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
+  import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import type { Topic, ChartDataPoint } from '$lib/types';
 
   const ITEMS_PER_PAGE = 20;
@@ -12,7 +15,7 @@
   let isLoading = $state(true);
 
   const topTopics = $derived<ChartDataPoint[]>(
-    topics
+    [...topics]
       .sort((a, b) => b.mention_count - a.mention_count)
       .slice(0, 10)
       .map((t) => ({ label: t.name, value: t.mention_count })),
@@ -40,28 +43,35 @@
   <h1 class="comic-heading">Topic Trends</h1>
 
   {#if isLoading}
-    <p class="loading">Loading topics...</p>
+    <BentoGrid columns={2} gap="md">
+      <ComicSkeleton variant="chart" />
+      <ComicSkeleton variant="card" height="300px" />
+    </BentoGrid>
+  {:else if topics.length === 0}
+    <ComicEmptyState
+      illustration="empty"
+      message="No topics tracked yet"
+      description="Start conversations to see topic trends emerge automatically."
+    />
   {:else}
-    <ComicCard>
-      <h2 class="section-title">Top Topics</h2>
-      <RoughChart type="bar" data={topTopics} title="" color="#A29BFE" width={600} height={300} />
-    </ComicCard>
+    <BentoGrid columns={2} gap="md">
+      <ComicBentoCard title="Top Topics" icon="📊" neonColor="purple" variant="neon">
+        <RoughChart type="bar" data={topTopics} title="" color="#A29BFE" width={600} height={300} />
+      </ComicBentoCard>
 
-    <ComicCard>
-      <h2 class="section-title">All Topics</h2>
-      <div class="topic-cloud">
-        {#each topics as topic (topic.id)}
-          <span
-            class="topic-item"
-            style:font-size="{Math.max(0.75, Math.min(2, topic.mention_count / 5))}rem"
-          >
-            <ComicBadge color="purple" size="md">{topic.name} ({topic.mention_count})</ComicBadge>
-          </span>
-        {:else}
-          <p class="empty">No topics tracked yet. Start conversations to see trends!</p>
-        {/each}
-      </div>
-    </ComicCard>
+      <ComicBentoCard title="Topic Cloud" icon="☁">
+        <div class="topic-cloud">
+          {#each topics as topic (topic.id)}
+            <span
+              class="topic-item"
+              style:font-size="{Math.max(0.75, Math.min(2, topic.mention_count / 5))}rem"
+            >
+              <ComicBadge color="purple" size="md">{topic.name} ({topic.mention_count})</ComicBadge>
+            </span>
+          {/each}
+        </div>
+      </ComicBentoCard>
+    </BentoGrid>
   {/if}
 </div>
 
@@ -70,12 +80,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
-  }
-
-  .section-title {
-    font-size: 1rem;
-    text-transform: uppercase;
-    margin: 0 0 var(--spacing-md);
   }
 
   .topic-cloud {
@@ -87,11 +91,6 @@
 
   .topic-item {
     display: inline-block;
-  }
-
-  .loading, .empty {
-    color: var(--text-muted);
-    text-align: center;
-    padding: var(--spacing-2xl);
+    animation: sketchFadeIn 0.3s ease both;
   }
 </style>

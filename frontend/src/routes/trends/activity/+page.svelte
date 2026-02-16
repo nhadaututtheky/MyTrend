@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import { fetchAggregates } from '$lib/api/activity';
   import RoughChart from '$lib/components/comic/RoughChart.svelte';
-  import ComicCard from '$lib/components/comic/ComicCard.svelte';
+  import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
+  import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
   import type { ActivityAggregate, ChartDataPoint } from '$lib/types';
 
   let period = $state('day');
@@ -33,6 +35,8 @@
     return Object.entries(totals).map(([label, value]) => ({ label, value }));
   });
 
+  const totalActivity = $derived(aggregates.reduce((s, a) => s + a.total_count, 0));
+
   async function loadData(): Promise<void> {
     isLoading = true;
     try {
@@ -49,7 +53,6 @@
   });
 
   $effect(() => {
-    // Re-fetch when period changes
     void period;
     loadData();
   });
@@ -60,24 +63,28 @@
 </svelte:head>
 
 <div class="activity-page">
-  <h1 class="comic-heading">Activity Breakdown</h1>
+  <div class="page-header">
+    <h1 class="comic-heading">Activity Breakdown</h1>
+    <span class="total">{totalActivity} total activities</span>
+  </div>
 
   <ComicTabs tabs={periodTabs} bind:active={period} />
 
   {#if isLoading}
-    <p class="loading">Loading...</p>
+    <BentoGrid columns={2} gap="md">
+      <ComicSkeleton variant="chart" />
+      <ComicSkeleton variant="chart" />
+    </BentoGrid>
   {:else}
-    <div class="charts-grid">
-      <ComicCard>
-        <h2 class="section-title">Activity Over Time</h2>
+    <BentoGrid columns={2} gap="md">
+      <ComicBentoCard title="Activity Over Time" icon="📊" neonColor="green" variant="neon">
         <RoughChart type="bar" data={chartData} title="" color="#00D26A" width={600} height={300} />
-      </ComicCard>
+      </ComicBentoCard>
 
-      <ComicCard>
-        <h2 class="section-title">Activity Type Breakdown</h2>
+      <ComicBentoCard title="Type Breakdown" icon="🍩" neonColor="purple" variant="neon">
         <RoughChart type="donut" data={breakdownData} title="" width={400} height={300} />
-      </ComicCard>
-    </div>
+      </ComicBentoCard>
+    </BentoGrid>
   {/if}
 </div>
 
@@ -88,27 +95,14 @@
     gap: var(--spacing-lg);
   }
 
-  .section-title {
-    font-size: 1rem;
-    text-transform: uppercase;
-    margin: 0 0 var(--spacing-md);
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
-  .charts-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-lg);
-  }
-
-  .loading {
+  .total {
+    font-size: 0.8rem;
     color: var(--text-muted);
-    text-align: center;
-    padding: var(--spacing-2xl);
-  }
-
-  @media (max-width: 768px) {
-    .charts-grid {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

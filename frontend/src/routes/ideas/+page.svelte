@@ -6,11 +6,14 @@
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import type { Idea } from '$lib/types';
 
   let ideas = $state<Idea[]>([]);
   let isLoading = $state(true);
   let statusFilter = $state('all');
+  let viewMode = $state<'grid' | 'list'>('grid');
   let unsubscribe: (() => void) | undefined;
 
   const statusTabs = [
@@ -34,6 +37,15 @@
     statusFilter === 'all' ? ideas : ideas.filter((i) => i.status === statusFilter),
   );
 
+  const NEON_MAP: Record<string, 'green' | 'blue' | 'purple' | 'red' | false> = {
+    green: 'green', blue: 'blue', purple: 'purple', red: 'red',
+  };
+
+  function getNeonForType(type: string): 'green' | 'blue' | 'purple' | 'red' | false {
+    const color = TYPE_COLORS[type];
+    return color ? (NEON_MAP[color] ?? false) : false;
+  }
+
   onMount(async () => {
     try {
       const result = await fetchIdeas();
@@ -55,21 +67,40 @@
 
 <div class="page">
   <div class="page-header">
-    <h1 class="comic-heading">Ideas</h1>
-    <a href="/ideas/new"><ComicButton variant="primary">New Idea</ComicButton></a>
+    <div>
+      <h1 class="comic-heading">Ideas</h1>
+      <p class="subtitle">{ideas.length} ideas captured</p>
+    </div>
+    <div class="header-actions">
+      <div class="view-toggle">
+        <button class="toggle-btn" class:active={viewMode === 'grid'} onclick={() => { viewMode = 'grid'; }} aria-label="Grid view">▦</button>
+        <button class="toggle-btn" class:active={viewMode === 'list'} onclick={() => { viewMode = 'list'; }} aria-label="List view">☰</button>
+      </div>
+      <a href="/ideas/new"><ComicButton variant="primary">New Idea</ComicButton></a>
+    </div>
   </div>
 
   <ComicTabs tabs={statusTabs} bind:active={statusFilter} />
 
   {#if isLoading}
-    <p class="loading">Loading...</p>
+    <div class="skeleton-grid">
+      {#each Array(6) as _}
+        <ComicSkeleton variant="card" height="100px" />
+      {/each}
+    </div>
   {:else if filtered.length === 0}
-    <p class="empty">No ideas yet. <a href="/ideas/new">Add one!</a></p>
+    <ComicEmptyState
+      illustration="empty"
+      message="No ideas yet"
+      description="Capture your next brilliant idea before it slips away."
+      actionLabel="New Idea"
+      actionHref="/ideas/new"
+    />
   {:else}
-    <div class="ideas-list">
-      {#each filtered as idea (idea.id)}
-        <a href="/ideas/{idea.id}" class="idea-link">
-          <ComicCard variant="standard">
+    <div class="ideas-container" class:grid-view={viewMode === 'grid'} class:list-view={viewMode === 'list'}>
+      {#each filtered as idea, i (idea.id)}
+        <a href="/ideas/{idea.id}" class="idea-link" style:animation-delay="{i * 30}ms">
+          <ComicCard variant="standard" neon={getNeonForType(idea.type)}>
             <div class="idea-header">
               <h3 class="idea-title">{idea.title}</h3>
               <div class="badges">
@@ -89,12 +120,66 @@
 
 <style>
   .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-  .page-header { display: flex; align-items: center; justify-content: space-between; }
-  .ideas-list { display: flex; flex-direction: column; gap: var(--spacing-sm); margin-top: var(--spacing-md); }
-  .idea-link { text-decoration: none; color: inherit; }
+
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
+  .page-header a { text-decoration: none; }
+  .subtitle { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0; }
+
+  .header-actions { display: flex; align-items: center; gap: var(--spacing-sm); }
+
+  .view-toggle {
+    display: flex;
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    background: var(--bg-secondary);
+    border: none;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .toggle-btn.active {
+    background: var(--accent-green);
+    color: #1a1a1a;
+  }
+
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .ideas-container.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .ideas-container.list-view {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .idea-link {
+    text-decoration: none;
+    color: inherit;
+    animation: sketchFadeIn 0.3s ease both;
+  }
+
   .idea-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
   .idea-title { font-size: 0.95rem; font-weight: 700; margin: 0; }
-  .badges { display: flex; gap: 4px; }
+  .badges { display: flex; gap: 4px; flex-shrink: 0; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
-  .loading, .empty { text-align: center; color: var(--text-muted); padding: var(--spacing-2xl); }
+
+  @media (max-width: 768px) {
+    .page-header { flex-direction: column; }
+    .ideas-container.grid-view { grid-template-columns: 1fr; }
+  }
 </style>

@@ -3,8 +3,12 @@
   import pb from '$lib/config/pocketbase';
   import { fetchProjects } from '$lib/api/projects';
   import ProjectCard from '$lib/components/dashboard/ProjectCard.svelte';
+  import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
+  import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import type { Project } from '$lib/types';
 
   let projects = $state<Project[]>([]);
@@ -23,6 +27,14 @@
   const filtered = $derived(
     activeFilter === 'all' ? projects : projects.filter((p) => p.status === activeFilter),
   );
+
+  const statusCounts = $derived({
+    all: projects.length,
+    active: projects.filter((p) => p.status === 'active').length,
+    paused: projects.filter((p) => p.status === 'paused').length,
+    archived: projects.filter((p) => p.status === 'archived').length,
+    completed: projects.filter((p) => p.status === 'completed').length,
+  });
 
   onMount(async () => {
     try {
@@ -56,7 +68,13 @@
 
 <div class="projects-page">
   <div class="page-header">
-    <h1 class="comic-heading">Projects</h1>
+    <div>
+      <h1 class="comic-heading">Projects</h1>
+      <p class="subtitle">
+        <ComicBadge color="green" size="sm">{statusCounts.active} active</ComicBadge>
+        <ComicBadge color="blue" size="sm">{statusCounts.all} total</ComicBadge>
+      </p>
+    </div>
     <a href="/projects/new">
       <ComicButton variant="primary">New Project</ComicButton>
     </a>
@@ -65,21 +83,64 @@
   <ComicTabs tabs={filterTabs} bind:active={activeFilter} />
 
   {#if isLoading}
-    <p class="loading">Loading projects...</p>
+    <BentoGrid columns={3} gap="md">
+      {#each Array(6) as _}
+        <ComicSkeleton variant="card" height="160px" />
+      {/each}
+    </BentoGrid>
   {:else if filtered.length === 0}
-    <p class="empty">No {activeFilter === 'all' ? '' : activeFilter} projects. <a href="/projects/new">Create one!</a></p>
+    <ComicEmptyState
+      illustration="empty"
+      message="No {activeFilter === 'all' ? '' : activeFilter + ' '}projects"
+      description="Create your first project to start tracking conversations and ideas."
+      actionLabel="New Project"
+      actionHref="/projects/new"
+    />
   {:else}
     <div class="projects-grid">
-      {#each filtered as project (project.id)}
-        <ProjectCard {project} />
+      {#each filtered as project, i (project.id)}
+        <div class="project-item" style:animation-delay="{i * 40}ms">
+          <ProjectCard {project} />
+        </div>
       {/each}
     </div>
   {/if}
 </div>
 
 <style>
-  .projects-page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-  .page-header { display: flex; align-items: center; justify-content: space-between; }
-  .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--spacing-md); margin-top: var(--spacing-md); }
-  .loading, .empty { text-align: center; color: var(--text-muted); padding: var(--spacing-2xl); }
+  .projects-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+  }
+
+  .page-header a { text-decoration: none; }
+
+  .subtitle {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin: 4px 0 0;
+  }
+
+  .projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+  }
+
+  .project-item {
+    animation: sketchFadeIn 0.3s ease both;
+  }
+
+  @media (max-width: 768px) {
+    .page-header { flex-direction: column; }
+    .projects-grid { grid-template-columns: 1fr; }
+  }
 </style>

@@ -4,6 +4,8 @@
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import type { SearchResult } from '$lib/types';
 
   let query = $state('');
@@ -24,6 +26,8 @@
     idea: '/ideas',
     topic: '/trends/topics',
   };
+
+  const resultCount = $derived(results.length);
 
   const doSearch = debounce(async (q: string) => {
     if (q.length < 2) {
@@ -66,17 +70,27 @@
       type="search"
       placeholder="Search projects, conversations, ideas, topics..."
       oninput={handleInput}
+      icon="🔍"
     />
   </div>
 
   {#if isSearching}
-    <p class="status">Searching...</p>
+    <div class="skeleton-results">
+      {#each Array(3) as _}
+        <ComicSkeleton variant="card" height="90px" />
+      {/each}
+    </div>
   {:else if hasSearched && results.length === 0}
-    <p class="status">No results found for "{query}"</p>
+    <ComicEmptyState
+      illustration="search"
+      message="No results found"
+      description="Try different keywords or check your spelling."
+    />
   {:else if results.length > 0}
+    <p class="result-count">{resultCount} result{resultCount !== 1 ? 's' : ''} found</p>
     <div class="results">
-      {#each results as result (result.type + result.id)}
-        <a href={getLink(result)} class="result-link">
+      {#each results as result, i (result.type + result.id)}
+        <a href={getLink(result)} class="result-link" style:animation-delay="{i * 40}ms">
           <ComicCard variant="standard">
             <div class="result-header">
               <ComicBadge color={TYPE_COLORS[result.type] ?? 'blue'} size="sm">
@@ -118,13 +132,19 @@
   }
 
   .search-bar {
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
   }
 
-  .status {
-    text-align: center;
+  .skeleton-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .result-count {
+    font-size: 0.8rem;
     color: var(--text-muted);
-    padding: var(--spacing-xl);
+    margin: 0;
   }
 
   .results {
@@ -136,6 +156,7 @@
   .result-link {
     text-decoration: none;
     color: inherit;
+    animation: sketchFadeIn 0.3s ease both;
   }
 
   .result-header {

@@ -2,7 +2,11 @@
   import { onMount } from 'svelte';
   import pb from '$lib/config/pocketbase';
   import RoughGraph from '$lib/components/comic/RoughGraph.svelte';
-  import ComicCard from '$lib/components/comic/ComicCard.svelte';
+  import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
+  import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
+  import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import type { Topic } from '$lib/types';
 
   interface GraphNode {
@@ -22,9 +26,15 @@
   let edges = $state<GraphEdge[]>([]);
   let isLoading = $state(true);
 
+  const GROUP_COLORS: Record<string, string> = {
+    project: '#00D26A',
+    conversation: '#4ECDC4',
+    idea: '#FFE66D',
+    topic: '#A29BFE',
+  };
+
   onMount(async () => {
     try {
-      // Fetch topics and build graph from related fields
       const result = await pb.collection('topics').getList<Topic>(1, 50, {
         sort: '-mention_count',
         fields: 'id,name,category,mention_count,related',
@@ -59,29 +69,58 @@
 </svelte:head>
 
 <div class="graph-page">
-  <h1 class="comic-heading">Knowledge Graph</h1>
+  <div class="page-header">
+    <h1 class="comic-heading">Knowledge Graph</h1>
+    <span class="node-count">{nodes.length} nodes, {edges.length} edges</span>
+  </div>
 
   {#if isLoading}
-    <p class="loading">Building graph...</p>
+    <ComicSkeleton variant="chart" height="600px" />
+  {:else if nodes.length === 0}
+    <ComicEmptyState
+      illustration="empty"
+      message="No graph data yet"
+      description="Topics and their relationships will appear here as you create conversations."
+    />
   {:else}
-    <ComicCard padding={false}>
-      <div class="graph-container">
-        <RoughGraph {nodes} {edges} width={900} height={600} />
-      </div>
-    </ComicCard>
+    <BentoGrid columns={3} gap="md">
+      <ComicBentoCard title="Knowledge Graph" icon="🌐" span="full" neonColor="purple" variant="neon">
+        <div class="graph-container">
+          <RoughGraph {nodes} {edges} width={900} height={600} />
+        </div>
+      </ComicBentoCard>
 
-    <div class="legend">
-      <ComicCard>
-        <h3 class="section-title">Legend</h3>
+      <ComicBentoCard title="Legend" icon="🏷" span={2}>
         <div class="legend-items">
-          <span class="legend-item"><span class="dot" style:background="#00D26A"></span> Project</span>
-          <span class="legend-item"><span class="dot" style:background="#4ECDC4"></span> Conversation</span>
-          <span class="legend-item"><span class="dot" style:background="#FFE66D"></span> Idea</span>
-          <span class="legend-item"><span class="dot" style:background="#A29BFE"></span> Topic</span>
+          {#each Object.entries(GROUP_COLORS) as [group, color] (group)}
+            <span class="legend-item">
+              <span class="dot" style:background={color}></span>
+              <span class="legend-label">{group}</span>
+            </span>
+          {/each}
         </div>
         <p class="hint">Node size = mention count. Edges = related topics.</p>
-      </ComicCard>
-    </div>
+      </ComicBentoCard>
+
+      <ComicBentoCard title="Stats" icon="📊" variant="neon" neonColor="green">
+        <div class="graph-stats">
+          <div class="stat-row">
+            <span class="stat-label">Nodes</span>
+            <ComicBadge color="green" size="sm">{nodes.length}</ComicBadge>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Edges</span>
+            <ComicBadge color="blue" size="sm">{edges.length}</ComicBadge>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Density</span>
+            <ComicBadge color="purple" size="sm">
+              {nodes.length > 1 ? Math.round(edges.length / (nodes.length * (nodes.length - 1) / 2) * 100) : 0}%
+            </ComicBadge>
+          </div>
+        </div>
+      </ComicBentoCard>
+    </BentoGrid>
   {/if}
 </div>
 
@@ -92,24 +131,23 @@
     gap: var(--spacing-lg);
   }
 
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .node-count {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
   .graph-container {
     overflow: auto;
-    min-height: 600px;
+    min-height: 500px;
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .loading {
-    text-align: center;
-    color: var(--text-muted);
-    padding: var(--spacing-2xl);
-  }
-
-  .section-title {
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    margin: 0 0 var(--spacing-sm);
   }
 
   .legend-items {
@@ -133,9 +171,30 @@
     border: 2px solid var(--border-color);
   }
 
+  .legend-label {
+    text-transform: capitalize;
+  }
+
   .hint {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: var(--spacing-sm);
+  }
+
+  .graph-stats {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
   }
 </style>
