@@ -1,0 +1,16 @@
+{
+  "name": "MyTrend",
+  "short_name": "MyTrend",
+  "description": "Personal Knowledge & Activity Trend Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFEF9",
+  "theme_color": "#00D26A",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

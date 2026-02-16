@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+.svelte-kit/
+build/
+dist/
+
+# Environment (NEVER commit)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Database (NEVER commit)
+pb_data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Test & coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Misc
+*.log
+*.tsbuildinfo
