@@ -1,14 +1,16 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   type Color = 'green' | 'red' | 'yellow' | 'blue' | 'purple' | 'orange';
   type Size = 'sm' | 'md';
 
   interface Props {
     color?: Color;
     size?: Size;
-    children?: import('svelte').Snippet;
+    children?: Snippet;
   }
 
-  let { color = 'green', size = 'md', children }: Props = $props();
+  const { color = 'green', size = 'md', children }: Props = $props();
 </script>
 
 <span class="badge badge-{color} badge-{size}" data-testid="comic-badge">

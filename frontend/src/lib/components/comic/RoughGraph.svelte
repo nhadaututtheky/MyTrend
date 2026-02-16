@@ -22,12 +22,12 @@
     onNodeClick?: (node: GraphNode) => void;
   }
 
-  let {
+  const {
     nodes = [],
     edges = [],
     width = 600,
     height = 400,
-    onNodeClick,
+    onNodeClick: _onNodeClick,
   }: Props = $props();
 
   let svgElement: SVGSVGElement;
@@ -36,27 +36,40 @@
     if (nodes.length === 0) return;
 
     try {
-      const d3Force = await import('d3-force');
-      const d3Selection = await import('d3-selection');
-      const rough = await import('roughjs');
+      const [d3Force, d3Selection, rough] = await Promise.all([
+        import('d3-force'),
+        import('d3-selection'),
+        import('roughjs'),
+      ]);
 
-      renderGraph(d3Force, d3Selection, rough);
+      renderGraph(d3Force as D3ForceModule, d3Selection as D3SelectionModule, rough as RoughModule);
     } catch {
       renderFallback();
     }
   });
 
+  /* eslint-disable @typescript-eslint/consistent-type-imports */
+  type D3ForceModule = typeof import('d3-force');
+  type D3SelectionModule = typeof import('d3-selection');
+  /* eslint-enable @typescript-eslint/consistent-type-imports */
+  interface RoughModule { default: { svg: (el: SVGSVGElement) => { line: (...args: unknown[]) => SVGElement; circle: (...args: unknown[]) => SVGElement } } }
+
   function renderGraph(
-    d3Force: typeof import('d3-force'),
-    d3Selection: typeof import('d3-selection'),
-    rough: typeof import('roughjs'),
+    d3Force: D3ForceModule,
+    d3Selection: D3SelectionModule,
+    rough: RoughModule,
   ): void {
     if (!svgElement) return;
 
-    const svg = d3Selection.select(svgElement);
+    const svg = d3Selection.select(svgElement) as { selectAll: (s: string) => { remove: () => void } };
     svg.selectAll('*').remove();
 
-    const rc = rough.default.svg(svgElement);
+    const rc = rough.default.svg(svgElement) as {
+      line: (...args: unknown[]) => SVGElement;
+      circle: (...args: unknown[]) => SVGElement;
+    };
+
+    type SimNode = GraphNode & { x: number; y: number };
 
     const simulation = d3Force
       .forceSimulation(nodes.map((n) => ({ ...n, x: width / 2, y: height / 2 })))
@@ -64,11 +77,15 @@
         'link',
         d3Force
           .forceLink(edges.map((e) => ({ ...e })))
-          .id((d: any) => (d as { id?: string }).id ?? '')
+          .id((d: object) => (d as { id?: string }).id ?? '')
           .distance(80),
       )
       .force('charge', d3Force.forceManyBody().strength(-200))
-      .force('center', d3Force.forceCenter(width / 2, height / 2));
+      .force('center', d3Force.forceCenter(width / 2, height / 2)) as {
+        on: (event: string, cb: () => void) => void;
+        nodes: () => SimNode[];
+        alpha: (a: number) => { restart: () => void };
+      };
 
     const GROUP_COLORS: Record<string, string> = {
       project: '#00D26A',
@@ -82,23 +99,20 @@
 
       // Draw edges
       for (const edge of edges) {
-        const source = simulation.nodes().find((n: { id?: string }) => n.id === edge.source);
-        const target = simulation.nodes().find((n: { id?: string }) => n.id === edge.target);
+        const source = simulation.nodes().find((n) => n.id === edge.source);
+        const target = simulation.nodes().find((n) => n.id === edge.target);
         if (source && target) {
-          const line = rc.line(
-            (source as { x: number }).x,
-            (source as { y: number }).y,
-            (target as { x: number }).x,
-            (target as { y: number }).y,
-            { roughness: 1.5, stroke: 'var(--text-muted)', strokeWidth: 1 },
-          );
+          const line = rc.line(source.x, source.y, target.x, target.y, {
+            roughness: 1.5,
+            stroke: 'var(--text-muted)',
+            strokeWidth: 1,
+          });
           svgElement.appendChild(line);
         }
       }
 
       // Draw nodes
-      for (const node of simulation.nodes()) {
-        const n = node as { id?: string; x: number; y: number; group?: string; label?: string; size?: number };
+      for (const n of simulation.nodes()) {
         const nodeColor = GROUP_COLORS[n.group ?? ''] ?? '#888888';
         const radius = n.size ?? 16;
 

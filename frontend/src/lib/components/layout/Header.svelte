@@ -8,7 +8,7 @@
     onToggleSidebar?: () => void;
   }
 
-  let { onToggleSidebar }: Props = $props();
+  const { onToggleSidebar }: Props = $props();
 
   let user = $state<{ display_name?: string; email?: string } | null>(null);
 

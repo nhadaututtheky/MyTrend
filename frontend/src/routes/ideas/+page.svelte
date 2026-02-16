@@ -30,7 +30,7 @@
     feature: 'green', bug: 'red', design: 'purple', architecture: 'blue', optimization: 'orange', question: 'yellow',
   };
 
-  let filtered = $derived(
+  const filtered = $derived(
     statusFilter === 'all' ? ideas : ideas.filter((i) => i.status === statusFilter),
   );
 

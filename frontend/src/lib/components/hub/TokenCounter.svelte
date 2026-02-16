@@ -5,9 +5,9 @@
     estimatedCost: number;
   }
 
-  let { inputTokens, outputTokens, estimatedCost }: Props = $props();
+  const { inputTokens, outputTokens, estimatedCost }: Props = $props();
 
-  let totalTokens = $derived(inputTokens + outputTokens);
+  const totalTokens = $derived(inputTokens + outputTokens);
 
   function formatCost(cost: number): string {
     return cost < 0.01 ? '<$0.01' : `$${cost.toFixed(2)}`;

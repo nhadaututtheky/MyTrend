@@ -16,7 +16,7 @@
     roughness?: number;
   }
 
-  let {
+  const {
     type = 'bar',
     data = [],
     timeseries = [],
@@ -29,11 +29,10 @@
   }: Props = $props();
 
   let container: HTMLDivElement;
-  let chartInstance: unknown;
 
   onMount(() => {
     // Dynamically import rough-viz to avoid SSR issues
-    let cleanup = () => {
+    const cleanup = () => {
       if (container) {
         container.innerHTML = '';
       }
@@ -41,7 +40,7 @@
 
     (async () => {
       try {
-        // @ts-ignore - rough-viz doesn't have type declarations
+        // @ts-expect-error rough-viz doesn't have type declarations
         const roughViz = await import('rough-viz');
         renderChart(roughViz);
       } catch {
@@ -77,16 +76,16 @@
 
     try {
       if (type === 'bar' && typeof roughViz.Bar === 'function') {
-        chartInstance = new (roughViz.Bar as new (opts: typeof commonOpts) => unknown)(commonOpts);
+        new (roughViz.Bar as new (opts: typeof commonOpts) => unknown)(commonOpts);
       } else if (type === 'line' && typeof roughViz.Line === 'function') {
-        chartInstance = new (roughViz.Line as new (opts: typeof commonOpts & { circle?: boolean }) => unknown)({
+        new (roughViz.Line as new (opts: typeof commonOpts & { circle?: boolean }) => unknown)({
           ...commonOpts,
           circle: false,
-        } as any);
+        } as typeof commonOpts & { circle: boolean });
       } else if (type === 'pie' && typeof roughViz.Pie === 'function') {
-        chartInstance = new (roughViz.Pie as new (opts: typeof commonOpts) => unknown)(commonOpts);
+        new (roughViz.Pie as new (opts: typeof commonOpts) => unknown)(commonOpts);
       } else if (type === 'donut' && typeof roughViz.Donut === 'function') {
-        chartInstance = new (roughViz.Donut as new (opts: typeof commonOpts) => unknown)(commonOpts);
+        new (roughViz.Donut as new (opts: typeof commonOpts) => unknown)(commonOpts);
       } else {
         renderFallback();
       }

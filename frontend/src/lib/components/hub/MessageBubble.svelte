@@ -6,15 +6,15 @@
     message: HubMessage;
   }
 
-  let { message }: Props = $props();
+  const { message }: Props = $props();
 
-  let isUser = $derived(message.role === 'user');
+  const isUser = $derived(message.role === 'user');
 </script>
 
 <div class="bubble-wrapper" class:user={isUser} data-testid="message-bubble">
   <div class="bubble" class:user-bubble={isUser} class:assistant-bubble={!isUser}>
     <div class="content">
-      {@html message.content.replace(/\n/g, '<br>')}
+      {message.content}
     </div>
     <div class="meta">
       <span class="time">{formatDateTime(message.timestamp)}</span>
@@ -43,6 +43,7 @@
     font-size: 0.875rem;
     line-height: 1.6;
     word-break: break-word;
+    white-space: pre-wrap;
   }
 
   .user-bubble {

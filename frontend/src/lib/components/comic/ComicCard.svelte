@@ -1,18 +1,21 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   type Variant = 'standard' | 'skewed' | 'interactive';
 
   interface Props {
     variant?: Variant;
     padding?: boolean;
     onclick?: (e: MouseEvent) => void;
-    children?: import('svelte').Snippet;
+    children?: Snippet;
   }
 
-  let { variant = 'standard', padding = true, onclick, children }: Props = $props();
+  const { variant = 'standard', padding = true, onclick, children }: Props = $props();
 
-  let isClickable = $derived(onclick !== undefined);
+  const isClickable = $derived(onclick !== undefined);
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   class="card card-{variant}"
   class:clickable={isClickable}

@@ -9,7 +9,7 @@
     onselect?: (session: HubSession) => void;
   }
 
-  let { sessions, activeId, onselect }: Props = $props();
+  const { sessions, activeId, onselect }: Props = $props();
 
   const STATUS_COLORS: Record<string, 'green' | 'yellow' | 'blue'> = {
     active: 'green',

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   type Variant = 'primary' | 'secondary' | 'danger' | 'outline';
   type Size = 'sm' | 'md' | 'lg';
 
@@ -9,10 +11,10 @@
     loading?: boolean;
     type?: 'button' | 'submit' | 'reset';
     onclick?: (e: MouseEvent) => void;
-    children?: import('svelte').Snippet;
+    children?: Snippet;
   }
 
-  let {
+  const {
     variant = 'primary',
     size = 'md',
     disabled = false,

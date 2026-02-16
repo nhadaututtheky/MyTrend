@@ -6,7 +6,7 @@
     onsend?: (content: string) => void;
   }
 
-  let { disabled = false, onsend }: Props = $props();
+  const { disabled = false, onsend }: Props = $props();
 
   let content = $state('');
   let textareaEl: HTMLTextAreaElement;

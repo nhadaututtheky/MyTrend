@@ -43,7 +43,7 @@
 
     {#if idea.content}
       <ComicCard>
-        <div class="content">{@html idea.content}</div>
+        <div class="content">{idea.content}</div>
       </ComicCard>
     {/if}
 
@@ -65,7 +65,7 @@
   .idea-header h1 { margin: 0 0 var(--spacing-sm); }
   .badges { display: flex; gap: var(--spacing-xs); margin-bottom: 4px; }
   .date { font-size: 0.75rem; color: var(--text-muted); }
-  .content { font-size: 0.875rem; line-height: 1.7; }
+  .content { font-size: 0.875rem; line-height: 1.7; white-space: pre-wrap; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; }
   .section-title { font-size: 0.875rem; text-transform: uppercase; margin: 0 0 var(--spacing-sm); }
   .loading { text-align: center; color: var(--text-muted); padding: var(--spacing-2xl); }

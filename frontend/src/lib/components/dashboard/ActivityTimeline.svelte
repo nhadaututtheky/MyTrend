@@ -8,7 +8,7 @@
     activities: Activity[];
   }
 
-  let { activities }: Props = $props();
+  const { activities }: Props = $props();
 
   const TYPE_LABELS: Record<string, string> = {
     conversation: 'Chat',

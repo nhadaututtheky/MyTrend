@@ -27,7 +27,7 @@
     onchange,
   }: Props = $props();
 
-  let inputId = $derived(name ?? `input-${Math.random().toString(36).slice(2, 8)}`);
+  const inputId = $derived(name ?? `input-${Math.random().toString(36).slice(2, 8)}`);
 </script>
 
 <div class="input-group" data-testid="comic-input">

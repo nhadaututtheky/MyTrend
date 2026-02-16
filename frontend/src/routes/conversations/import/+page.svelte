@@ -6,6 +6,68 @@
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import type { ConversationMessage } from '$lib/types';
 
+  function parseJsonlLine(line: string): ConversationMessage | null {
+    try {
+      const obj = JSON.parse(line);
+      if (!obj.role || !obj.content) return null;
+      return {
+        role: obj.role,
+        content: typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content),
+        timestamp: obj.timestamp ?? new Date().toISOString(),
+        tokens: obj.tokens ?? 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async function importJsonlFile(file: File, text: string): Promise<boolean> {
+    const lines = text.split('\n').filter((l) => l.trim());
+    const messages = lines.map(parseJsonlLine).filter((m): m is ConversationMessage => m !== null);
+
+    if (messages.length === 0) return false;
+
+    await createConversation({
+      title: file.name.replace('.jsonl', ''),
+      source: 'imported',
+      messages,
+      message_count: messages.length,
+      total_tokens: messages.reduce((sum, m) => sum + m.tokens, 0),
+      started_at: messages[0]?.timestamp ?? new Date().toISOString(),
+      topics: [],
+      tags: [],
+    });
+    return true;
+  }
+
+  async function importJsonFile(file: File, text: string): Promise<boolean> {
+    const obj = JSON.parse(text);
+    await createConversation({
+      title: obj.title ?? file.name.replace('.json', ''),
+      source: 'imported',
+      messages: obj.messages ?? [],
+      message_count: obj.messages?.length ?? 0,
+      total_tokens: obj.total_tokens ?? 0,
+      started_at: obj.started_at ?? new Date().toISOString(),
+      topics: obj.topics ?? [],
+      tags: obj.tags ?? [],
+    });
+    return true;
+  }
+
+  async function importFile(file: File): Promise<void> {
+    const text = await file.text();
+    let imported = false;
+
+    if (file.name.endsWith('.jsonl')) {
+      imported = await importJsonlFile(file, text);
+    } else if (file.name.endsWith('.json')) {
+      imported = await importJsonFile(file, text);
+    }
+
+    if (imported) importCount++;
+  }
+
   let fileInput: HTMLInputElement;
   let isImporting = $state(false);
   let importCount = $state(0);
@@ -20,57 +82,7 @@
 
     try {
       for (const file of Array.from(files)) {
-        const text = await file.text();
-
-        if (file.name.endsWith('.jsonl')) {
-          // JSONL format - one JSON object per line
-          const lines = text.split('\n').filter((l) => l.trim());
-          const messages: ConversationMessage[] = [];
-
-          for (const line of lines) {
-            try {
-              const obj = JSON.parse(line);
-              if (obj.role && obj.content) {
-                messages.push({
-                  role: obj.role,
-                  content: typeof obj.content === 'string' ? obj.content : JSON.stringify(obj.content),
-                  timestamp: obj.timestamp ?? new Date().toISOString(),
-                  tokens: obj.tokens ?? 0,
-                });
-              }
-            } catch {
-              // Skip malformed lines
-            }
-          }
-
-          if (messages.length > 0) {
-            await createConversation({
-              title: file.name.replace('.jsonl', ''),
-              source: 'imported',
-              messages,
-              message_count: messages.length,
-              total_tokens: messages.reduce((sum, m) => sum + m.tokens, 0),
-              started_at: messages[0]?.timestamp ?? new Date().toISOString(),
-              topics: [],
-              tags: [],
-            });
-            importCount++;
-          }
-        } else if (file.name.endsWith('.json')) {
-          // JSON format - full conversation object
-          const obj = JSON.parse(text);
-          await createConversation({
-            title: obj.title ?? file.name.replace('.json', ''),
-            source: 'imported',
-            messages: obj.messages ?? [],
-            message_count: obj.messages?.length ?? 0,
-            total_tokens: obj.total_tokens ?? 0,
-            started_at: obj.started_at ?? new Date().toISOString(),
-            topics: obj.topics ?? [],
-            tags: obj.tags ?? [],
-          });
-          importCount++;
-        }
+        await importFile(file);
       }
 
       toast.success(`Imported ${importCount} conversation(s)!`);

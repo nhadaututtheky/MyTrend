@@ -9,7 +9,7 @@
   import ComicToast from '$lib/components/comic/ComicToast.svelte';
   import '../app.css';
 
-  let { children } = $props();
+  const { children } = $props();
 
   let sidebarCollapsed = $state(false);
   let loggedIn = $state(false);
@@ -45,7 +45,7 @@
     sidebarCollapsed = !sidebarCollapsed;
   }
 
-  let isAuthPage = $derived(PUBLIC_ROUTES.includes(currentPath));
+  const isAuthPage = $derived(PUBLIC_ROUTES.includes(currentPath));
 </script>
 
 <a href="#main-content" class="skip-link">Skip to content</a>

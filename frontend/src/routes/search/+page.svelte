@@ -84,8 +84,10 @@
               </ComicBadge>
               <span class="score">{Math.round(result.score * 100)}%</span>
             </div>
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
             <h3 class="result-title">{@html highlightMatch(result.title, query)}</h3>
             {#if result.snippet}
+              <!-- eslint-disable-next-line svelte/no-at-html-tags -->
               <p class="result-snippet">{@html highlightMatch(result.snippet, query)}</p>
             {/if}
           </ComicCard>
@@ -160,6 +162,7 @@
     margin: 0;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

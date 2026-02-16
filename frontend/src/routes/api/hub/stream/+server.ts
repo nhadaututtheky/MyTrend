@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request }) => {
-  const { sessionId, content, model, systemPrompt, history } = await request.json();
+  const { content, model, systemPrompt, history } = await request.json();
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
 

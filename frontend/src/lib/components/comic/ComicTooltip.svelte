@@ -1,13 +1,15 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   type Position = 'top' | 'bottom' | 'left' | 'right';
 
   interface Props {
     text: string;
     position?: Position;
-    children?: import('svelte').Snippet;
+    children?: Snippet;
   }
 
-  let { text, position = 'top', children }: Props = $props();
+  const { text, position = 'top', children }: Props = $props();
 </script>
 
 <div class="tooltip-wrapper" data-testid="comic-tooltip">

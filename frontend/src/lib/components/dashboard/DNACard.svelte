@@ -8,7 +8,7 @@
     projectName?: string;
   }
 
-  let { dna, projectName = 'Project' }: Props = $props();
+  const { dna, projectName = 'Project' }: Props = $props();
 </script>
 
 <ComicCard variant="interactive">

@@ -17,7 +17,7 @@
   let trendData = $state<TimeSeriesPoint[]>([]);
   let isLoading = $state(true);
 
-  let stats = $derived([
+  const stats = $derived([
     { label: 'Projects', value: projects.length, icon: '📁', color: 'var(--accent-green)' },
     {
       label: 'Conversations',

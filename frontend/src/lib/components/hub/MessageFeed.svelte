@@ -10,7 +10,7 @@
     isStreaming?: boolean;
   }
 
-  let { messages, streamingText = '', isStreaming = false }: Props = $props();
+  const { messages, streamingText = '', isStreaming = false }: Props = $props();
 
   let feedEl: HTMLDivElement;
 

@@ -8,7 +8,7 @@
     color?: string;
   }
 
-  let { data, title = 'Activity Trend', color = '#00D26A' }: Props = $props();
+  const { data, title = 'Activity Trend', color = '#00D26A' }: Props = $props();
 </script>
 
 <div class="trend-chart" data-testid="trend-chart">

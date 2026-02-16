@@ -37,16 +37,12 @@
         size: Math.max(10, Math.min(30, t.mention_count * 2)),
       }));
 
-      const topicEdges: GraphEdge[] = [];
-      for (const topic of result.items) {
-        if (topic.related) {
-          for (const relatedId of topic.related) {
-            if (result.items.some((t) => t.id === relatedId)) {
-              topicEdges.push({ source: topic.id, target: relatedId, weight: 1 });
-            }
-          }
-        }
-      }
+      const topicIds = new Set(result.items.map((t) => t.id));
+      const topicEdges: GraphEdge[] = result.items.flatMap((topic) =>
+        (topic.related ?? [])
+          .filter((relatedId: string) => topicIds.has(relatedId))
+          .map((relatedId: string) => ({ source: topic.id, target: relatedId, weight: 1 })),
+      );
 
       nodes = topicNodes;
       edges = topicEdges;

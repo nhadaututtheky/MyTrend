@@ -8,7 +8,7 @@
     project: Project;
   }
 
-  let { project }: Props = $props();
+  const { project }: Props = $props();
 
   const STATUS_COLORS: Record<string, 'green' | 'yellow' | 'blue' | 'red'> = {
     active: 'green',
@@ -90,6 +90,7 @@
     margin: 0 0 var(--spacing-sm);
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }

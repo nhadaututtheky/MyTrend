@@ -5,15 +5,12 @@
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
-  import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import { formatRelative } from '$lib/utils/date';
-  import { debounce } from '$lib/utils/search';
   import type { Conversation } from '$lib/types';
 
   let conversations = $state<Conversation[]>([]);
   let isLoading = $state(true);
-  let searchQuery = $state('');
   let sourceFilter = $state('all');
   let currentPage = $state(1);
   let totalPages = $state(1);
@@ -32,7 +29,7 @@
     cli: 'green', desktop: 'blue', web: 'purple', hub: 'orange', imported: 'yellow',
   };
 
-  let filtered = $derived(
+  const filtered = $derived(
     sourceFilter === 'all' ? conversations : conversations.filter((c) => c.source === sourceFilter),
   );
 
@@ -52,7 +49,7 @@
   onMount(async () => {
     await loadConversations();
     unsubscribe = await pb.collection('conversations').subscribe('*', (e) => {
-      if (e.action === 'create') conversations = [e.record as unknown as Conversation, ...conversations];
+      if (e.action === 'create') conversations = [e.record as unknown as Conversation, ...conversations].slice(0, 100);
       else if (e.action === 'delete') conversations = conversations.filter((c) => c.id !== e.record.id);
     });
   });
@@ -115,7 +112,7 @@
   .list-link { text-decoration: none; color: inherit; }
   .conv-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: 4px; }
   .conv-title { font-size: 0.95rem; font-weight: 700; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .conv-summary { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .conv-summary { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .conv-meta { display: flex; gap: var(--spacing-md); font-size: 0.7rem; color: var(--text-muted); }
   .time { margin-left: auto; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }

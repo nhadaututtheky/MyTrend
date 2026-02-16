@@ -88,28 +88,30 @@ function aggregateActivities(dao, periodType, periodStart, periodEnd) {
     for (var a = 0; a < activities.length; a++) {
       var act = activities[a];
 
-      // Sum duration_minutes
-      var mins = act.getFloat('duration_minutes');
+      // Sum duration_sec (convert to minutes)
+      var durationSec = act.getFloat('duration_sec');
+      var mins = durationSec ? durationSec / 60 : 0;
       if (mins && mins > 0) {
         totalMinutes += mins;
       }
 
-      // Breakdown by activity_type
-      var actType = act.getString('activity_type') || 'unknown';
+      // Breakdown by type
+      var actType = act.getString('type') || 'unknown';
       if (!breakdown[actType]) {
         breakdown[actType] = { count: 0, minutes: 0 };
       }
       breakdown[actType].count += 1;
       breakdown[actType].minutes += (mins || 0);
 
-      // Collect topics
-      var topic = act.getString('topic');
-      if (topic) {
+      // Collect topics from metadata JSON
+      var metadata = act.get('metadata');
+      if (metadata && metadata.topic) {
+        var topic = metadata.topic;
         topicsMap[topic] = (topicsMap[topic] || 0) + 1;
       }
 
       // Collect devices
-      var device = act.getString('device');
+      var device = act.getString('device_name');
       if (device) {
         devicesMap[device] = (devicesMap[device] || 0) + 1;
       }
@@ -153,7 +155,7 @@ function upsertAggregate(dao, userId, periodType, periodStart, data) {
   try {
     existing = dao.findFirstRecordByFilter(
       'activity_aggregates',
-      'user = {:user} && period_type = {:periodType} && period_start = {:periodStart}',
+      'user = {:user} && period = {:periodType} && period_start = {:periodStart}',
       { user: userId, periodType: periodType, periodStart: periodStart }
     );
   } catch (err) {
@@ -176,7 +178,7 @@ function upsertAggregate(dao, userId, periodType, periodStart, data) {
   } else {
     var record = new Record(collection);
     record.set('user', userId);
-    record.set('period_type', periodType);
+    record.set('period', periodType);
     record.set('period_start', periodStart);
     record.set('total_count', data.total_count);
     record.set('total_minutes', data.total_minutes);

@@ -1,5 +1,6 @@
 import pb from '$lib/config/pocketbase';
 import type { Project, PBListResult } from '$lib/types';
+import { sanitizeFilterValue } from '$lib/utils/search';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -7,7 +8,7 @@ export async function fetchProjects(
   page = 1,
   status?: string,
 ): Promise<PBListResult<Project>> {
-  const filter = status ? `status = "${status}"` : '';
+  const filter = status ? `status = "${sanitizeFilterValue(status)}"` : '';
   return pb.collection('projects').getList<Project>(page, ITEMS_PER_PAGE, {
     sort: '-last_activity',
     filter,
@@ -16,7 +17,7 @@ export async function fetchProjects(
 
 export async function fetchProjectBySlug(slug: string): Promise<Project | null> {
   try {
-    return await pb.collection('projects').getFirstListItem<Project>(`slug = "${slug}"`);
+    return await pb.collection('projects').getFirstListItem<Project>(`slug = "${sanitizeFilterValue(slug)}"`);
   } catch {
     return null;
   }

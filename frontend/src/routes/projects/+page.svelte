@@ -20,7 +20,7 @@
     { id: 'completed', label: 'Completed' },
   ];
 
-  let filtered = $derived(
+  const filtered = $derived(
     activeFilter === 'all' ? projects : projects.filter((p) => p.status === activeFilter),
   );
 
@@ -36,7 +36,7 @@
 
     unsubscribe = await pb.collection('projects').subscribe('*', (e) => {
       if (e.action === 'create') {
-        projects = [e.record as unknown as Project, ...projects];
+        projects = [e.record as unknown as Project, ...projects].slice(0, 100);
       } else if (e.action === 'update') {
         projects = projects.map((p) =>
           p.id === e.record.id ? (e.record as unknown as Project) : p,

@@ -11,7 +11,7 @@
   let topics = $state<Topic[]>([]);
   let isLoading = $state(true);
 
-  let topTopics = $derived<ChartDataPoint[]>(
+  const topTopics = $derived<ChartDataPoint[]>(
     topics
       .sort((a, b) => b.mention_count - a.mention_count)
       .slice(0, 10)

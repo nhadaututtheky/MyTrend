@@ -31,7 +31,7 @@
     return unsub;
   });
 
-  let stats = $derived(project ? [
+  const stats = $derived(project ? [
     { label: 'Conversations', value: project.total_conversations, color: 'var(--accent-blue)' },
     { label: 'Ideas', value: project.total_ideas, color: 'var(--accent-yellow)' },
     { label: 'Hours', value: Math.round(project.total_minutes / 60), color: 'var(--accent-purple)' },

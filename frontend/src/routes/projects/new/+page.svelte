@@ -13,8 +13,8 @@
   let techStackStr = $state('');
   let isCreating = $state(false);
 
-  let slug = $derived(name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
-  let color = $derived(getProjectColor(name.length));
+  const slug = $derived(name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+  const color = $derived(getProjectColor(name.length));
 
   async function handleSubmit(e: SubmitEvent): Promise<void> {
     e.preventDefault();

@@ -9,7 +9,7 @@
   let heatmapData = $state<HeatmapDay[]>([]);
   let isLoading = $state(true);
 
-  let stats = $derived([
+  const stats = $derived([
     {
       label: 'Total Activities',
       value: heatmapData.reduce((sum, d) => sum + d.count, 0),

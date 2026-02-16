@@ -1,10 +1,12 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   interface Props {
     open: boolean;
     title?: string;
     onclose?: () => void;
-    children?: import('svelte').Snippet;
-    actions?: import('svelte').Snippet;
+    children?: Snippet;
+    actions?: Snippet;
   }
 
   let { open = $bindable(false), title, onclose, children, actions }: Props = $props();
@@ -25,7 +27,7 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <!-- svelte-ignore a11y_interactive_supports_focus -->
   <div
     class="overlay"
     role="dialog"

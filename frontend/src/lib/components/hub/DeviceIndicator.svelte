@@ -3,7 +3,7 @@
     devices: readonly string[];
   }
 
-  let { devices }: Props = $props();
+  const { devices }: Props = $props();
 </script>
 
 <div class="device-indicator" data-testid="device-indicator">

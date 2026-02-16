@@ -16,14 +16,14 @@
     { id: 'month', label: 'Monthly' },
   ];
 
-  let chartData = $derived<ChartDataPoint[]>(
+  const chartData = $derived<ChartDataPoint[]>(
     aggregates.map((a) => ({
       label: new Date(a.period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       value: a.total_count,
     })),
   );
 
-  let breakdownData = $derived.by(() => {
+  const breakdownData = $derived.by(() => {
     const totals: Record<string, number> = {};
     for (const agg of aggregates) {
       for (const [key, value] of Object.entries(agg.breakdown)) {

@@ -4,11 +4,11 @@
     isStreaming?: boolean;
   }
 
-  let { text, isStreaming = false }: Props = $props();
+  const { text, isStreaming = false }: Props = $props();
 </script>
 
 <div class="streaming-text" data-testid="streaming-text">
-  <span class="text-content">{@html text.replace(/\n/g, '<br>')}</span>
+  <span class="text-content">{text}</span>
   {#if isStreaming}
     <span class="cursor" aria-hidden="true">|</span>
   {/if}
@@ -19,6 +19,7 @@
     font-size: 0.875rem;
     line-height: 1.6;
     word-break: break-word;
+    white-space: pre-wrap;
   }
 
   .cursor {

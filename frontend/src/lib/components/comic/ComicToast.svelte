@@ -1,6 +1,5 @@
 <script lang="ts">
   import { toast } from '$lib/stores/toast';
-  import type { Toast } from '$lib/types';
 
   const ICONS: Record<string, string> = {
     success: '✓',

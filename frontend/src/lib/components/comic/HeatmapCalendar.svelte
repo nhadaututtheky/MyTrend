@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import type { HeatmapDay } from '$lib/types';
   import { getHeatmapColor } from '$lib/utils/colors';
   import { theme } from '$lib/stores/theme';
@@ -9,18 +8,16 @@
     width?: number;
   }
 
-  let { data = [], width = 800 }: Props = $props();
+  const { data = [] }: Props = $props();
 
   const CELL_SIZE = 12;
   const CELL_GAP = 2;
   const WEEKS = 53;
   const DAYS_PER_WEEK = 7;
   const DAY_LABELS = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
-  const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   let svgElement: SVGSVGElement;
   let currentTheme = $state('light');
-  let mounted = $state(false);
 
   $effect(() => {
     const unsub = theme.subscribe((t) => {
@@ -29,14 +26,10 @@
     return unsub;
   });
 
-  onMount(() => {
-    mounted = true;
-  });
-
-  let isDark = $derived(currentTheme === 'dark');
+  const isDark = $derived(currentTheme === 'dark');
 
   // Build calendar grid from data
-  let grid = $derived.by(() => {
+  const grid = $derived.by(() => {
     if (data.length === 0) return [];
 
     const cells: { x: number; y: number; date: string; count: number; level: HeatmapDay['level'] }[] = [];
@@ -60,10 +53,10 @@
     return cells;
   });
 
-  let svgWidth = $derived(WEEKS * (CELL_SIZE + CELL_GAP) + 60);
-  let svgHeight = $derived(DAYS_PER_WEEK * (CELL_SIZE + CELL_GAP) + 40);
+  const svgWidth = $derived(WEEKS * (CELL_SIZE + CELL_GAP) + 60);
+  const svgHeight = $derived(DAYS_PER_WEEK * (CELL_SIZE + CELL_GAP) + 40);
 
-  let totalCount = $derived(data.reduce((sum, d) => sum + d.count, 0));
+  const totalCount = $derived(data.reduce((sum, d) => sum + d.count, 0));
 </script>
 
 <div class="heatmap-wrapper" data-testid="heatmap-calendar">

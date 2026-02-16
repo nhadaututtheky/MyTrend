@@ -34,7 +34,16 @@ function encodeToNeuralMemory(collection, record) {
     };
 
     if (collection === 'conversations') {
-      payload.content = record.getString('content') || '';
+      // Extract content from messages JSON array
+      var messages = record.get('messages') || [];
+      var contentParts = [];
+      for (var i = 0; i < messages.length; i++) {
+        var msg = messages[i];
+        if (msg.role && msg.content) {
+          contentParts.push(msg.role + ': ' + msg.content);
+        }
+      }
+      payload.content = contentParts.join('\n') || '';
       payload.summary = record.getString('summary') || '';
       payload.title = record.getString('title') || '';
       payload.tags = record.get('tags') || [];
@@ -42,7 +51,7 @@ function encodeToNeuralMemory(collection, record) {
     } else if (collection === 'ideas') {
       payload.content = record.getString('content') || '';
       payload.title = record.getString('title') || '';
-      payload.category = record.getString('category') || '';
+      payload.category = record.getString('type') || '';
       payload.tags = record.get('tags') || [];
       payload.priority = record.getInt('priority') || 0;
       payload.project = record.getString('project') || '';

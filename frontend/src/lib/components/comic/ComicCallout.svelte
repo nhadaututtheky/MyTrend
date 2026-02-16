@@ -1,13 +1,15 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   type CalloutType = 'tip' | 'note' | 'important' | 'warning';
 
   interface Props {
     type?: CalloutType;
     title?: string;
-    children?: import('svelte').Snippet;
+    children?: Snippet;
   }
 
-  let { type = 'note', title, children }: Props = $props();
+  const { type = 'note', title, children }: Props = $props();
 
   const LABELS: Record<CalloutType, string> = {
     tip: 'Tip',
@@ -16,7 +18,7 @@
     warning: 'Warning',
   };
 
-  let displayTitle = $derived(title ?? LABELS[type]);
+  const displayTitle = $derived(title ?? LABELS[type]);
 </script>
 
 <div class="callout callout-{type}" role="note" data-testid="comic-callout">

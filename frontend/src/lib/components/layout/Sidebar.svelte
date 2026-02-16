@@ -6,7 +6,7 @@
     collapsed?: boolean;
   }
 
-  let { collapsed = false }: Props = $props();
+  const { collapsed = false }: Props = $props();
 
   const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/', icon: '&#9881;' },
@@ -46,7 +46,7 @@
             class:active={isActive(item.href)}
             aria-current={isActive(item.href) ? 'page' : undefined}
           >
-            <span class="nav-icon">{@html item.icon}</span>
+            <span class="nav-icon">{item.icon}</span>
             {#if !collapsed}
               <span class="nav-label">{item.label}</span>
             {/if}

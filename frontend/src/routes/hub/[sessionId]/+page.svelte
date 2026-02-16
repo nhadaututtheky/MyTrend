@@ -22,6 +22,38 @@
   let isLoading = $state(true);
   let unsubscribe: (() => void) | undefined;
 
+  interface SSEParsed {
+    text: string;
+    inputTokens: number;
+    outputTokens: number;
+  }
+
+  function parseSSEChunk(chunk: string): SSEParsed {
+    const result: SSEParsed = { text: '', inputTokens: 0, outputTokens: 0 };
+    const lines = chunk.split('\n');
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6).trim();
+      if (data === '[DONE]') break;
+      try {
+        const parsed = JSON.parse(data) as {
+          type?: string;
+          text?: string;
+          input_tokens?: number;
+          output_tokens?: number;
+        };
+        if (parsed.type === 'content_block_delta' || parsed.text) {
+          result.text += parsed.text ?? '';
+        }
+        if (parsed.input_tokens) result.inputTokens = parsed.input_tokens;
+        if (parsed.output_tokens) result.outputTokens = parsed.output_tokens;
+      } catch {
+        // Skip non-JSON lines
+      }
+    }
+    return result;
+  }
+
   $effect(() => {
     const unsub = page.subscribe((p) => {
       sessionId = p.params['sessionId'] ?? '';
@@ -103,28 +135,11 @@
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (data === '[DONE]') continue;
-
-          try {
-            const event = JSON.parse(data);
-
-            if (event.type === 'content_block_delta' && event.delta?.text) {
-              fullText += event.delta.text;
-              streamingText = fullText;
-            } else if (event.type === 'message_delta' && event.usage) {
-              outputTokens = event.usage.output_tokens ?? 0;
-            } else if (event.type === 'message_start' && event.message?.usage) {
-              inputTokens = event.message.usage.input_tokens ?? 0;
-            }
-          } catch {
-            // Skip malformed events
-          }
-        }
+        const parsed = parseSSEChunk(chunk);
+        fullText += parsed.text;
+        streamingText = fullText;
+        if (parsed.inputTokens > 0) inputTokens = parsed.inputTokens;
+        if (parsed.outputTokens > 0) outputTokens = parsed.outputTokens;
       }
 
       // Add assistant message

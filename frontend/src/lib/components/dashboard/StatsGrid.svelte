@@ -13,7 +13,7 @@
     stats: StatItem[];
   }
 
-  let { stats }: Props = $props();
+  const { stats }: Props = $props();
 </script>
 
 <div class="stats-grid" data-testid="stats-grid">
