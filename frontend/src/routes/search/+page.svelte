@@ -21,11 +21,18 @@
   };
 
   const TYPE_LINKS: Record<string, string> = {
-    project: '/projects',
+    project: '/projects',     // id = slug (backend returns slug)
     conversation: '/conversations',
     idea: '/ideas',
     topic: '/trends/topics',
   };
+
+  // For topics, link to the topics page (no detail page per topic)
+  function getLink(result: SearchResult): string {
+    if (result.type === 'topic') return '/trends/topics';
+    const base = TYPE_LINKS[result.type] ?? '/';
+    return `${base}/${result.id}`;
+  }
 
   const resultCount = $derived(results.length);
 
@@ -51,10 +58,6 @@
     doSearch(query);
   }
 
-  function getLink(result: SearchResult): string {
-    const base = TYPE_LINKS[result.type] ?? '/';
-    return `${base}/${result.id}`;
-  }
 </script>
 
 <svelte:head>

@@ -1,4 +1,7 @@
-const NM_URL = import.meta.env.VITE_NM_URL || 'http://localhost:8000';
+// In browser: use nginx proxy /nm/. In SSR/server: use docker internal URL.
+const NM_URL = typeof window !== 'undefined'
+  ? '/nm'
+  : (import.meta.env.VITE_NM_URL || 'http://neural-memory:8000');
 
 interface NMQueryResult {
   id: string;
@@ -7,10 +10,17 @@ interface NMQueryResult {
   metadata: Record<string, unknown>;
 }
 
-interface NMEncodePayload {
-  content: string;
+interface NMQueryResponse {
+  answer: string;
+  confidence: number;
+  fibers_matched: string[];
+  context: string;
   metadata: Record<string, unknown>;
-  brain?: string;
+}
+
+interface NMHealthResponse {
+  status: string;
+  version: string;
 }
 
 async function nmFetch<T>(path: string, options?: RequestInit): Promise<T | null> {
@@ -19,6 +29,7 @@ async function nmFetch<T>(path: string, options?: RequestInit): Promise<T | null
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'X-Brain-ID': 'mytrend',
         ...options?.headers,
       },
     });
@@ -35,15 +46,62 @@ async function nmFetch<T>(path: string, options?: RequestInit): Promise<T | null
   }
 }
 
-export async function nmQuery(query: string, brain?: string): Promise<NMQueryResult[]> {
-  const result = await nmFetch<NMQueryResult[]>('/memory/query', {
+/**
+ * Query Neural Memory for semantic search results.
+ * NM returns: { answer, confidence, fibers_matched: string[], context: string }
+ * We parse the context markdown to extract individual memory items.
+ */
+export async function nmQuery(query: string, _brain?: string): Promise<NMQueryResult[]> {
+  const result = await nmFetch<NMQueryResponse>('/memory/query', {
     method: 'POST',
-    body: JSON.stringify({ query, brain, top_k: 10 }),
+    body: JSON.stringify({
+      query,
+      depth: 1,
+      max_tokens: 500,
+    }),
   });
-  return result ?? [];
+
+  if (!result || !result.fibers_matched || result.fibers_matched.length === 0) return [];
+
+  // Parse context markdown to extract memory entries
+  const memories: NMQueryResult[] = [];
+  const contextLines = (result.context || '').split('\n');
+
+  for (const line of contextLines) {
+    // Match lines like "- Some memory content" (skip [concept] entries which are just neurons)
+    const match = line.match(/^- (?!\[concept\])(.+)$/);
+    if (match && match[1].length > 10) {
+      memories.push({
+        id: `nm-${memories.length}`,
+        content: match[1].trim(),
+        score: result.confidence * 0.9,
+        metadata: { type: 'conversation', title: match[1].trim().slice(0, 80) },
+      });
+    }
+  }
+
+  // If no parsed memories but we have an answer, use that
+  if (memories.length === 0 && result.answer && result.answer.length > 10) {
+    memories.push({
+      id: `nm-answer`,
+      content: result.answer,
+      score: result.confidence,
+      metadata: { type: 'conversation', title: result.answer.slice(0, 80) },
+    });
+  }
+
+  return memories;
 }
 
-export async function nmEncode(payload: NMEncodePayload): Promise<boolean> {
+/**
+ * Encode content into Neural Memory.
+ * NM EncodeRequest: { content, timestamp?, metadata?, tags? }
+ */
+export async function nmEncode(payload: {
+  content: string;
+  metadata?: Record<string, unknown>;
+  tags?: string[];
+}): Promise<boolean> {
   const result = await nmFetch('/memory/encode', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -51,7 +109,20 @@ export async function nmEncode(payload: NMEncodePayload): Promise<boolean> {
   return result !== null;
 }
 
+/**
+ * Check if Neural Memory service is available.
+ */
 export async function nmHealthCheck(): Promise<boolean> {
-  const result = await nmFetch<{ status: string }>('/health');
-  return result?.status === 'ok';
+  const result = await nmFetch<NMHealthResponse>('/health');
+  return result?.status === 'healthy';
+}
+
+/**
+ * Get graph data from Neural Memory for knowledge visualization.
+ */
+export async function nmGetGraph(limit = 100): Promise<{
+  nodes: Array<{ id: string; label: string; type: string; size: number }>;
+  edges: Array<{ source: string; target: string; weight: number }>;
+} | null> {
+  return nmFetch(`/api/graph?limit=${limit}`);
 }

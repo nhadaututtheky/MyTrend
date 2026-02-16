@@ -10,11 +10,36 @@ services:
       - ./pocketbase/pb_hooks:/pb/pb_hooks
       - ./pocketbase/pb_migrations:/pb/pb_migrations
       - C:/Users/X/.claude:/pb/import/claude:ro
+    environment:
+      - NM_URL=http://neural-memory:8000
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
+
+  neural-memory:
+    build:
+      context: ../neural-memory
+      dockerfile: Dockerfile
+    container_name: mytrend-nm
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - NEURALMEMORY_DIR=/data
+      - NEURALMEMORY_BRAIN=mytrend
+      - NEURAL_MEMORY_HOST=0.0.0.0
+      - NEURAL_MEMORY_PORT=8000
+      - NEURAL_MEMORY_DEBUG=false
+    volumes:
+      - nm_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   frontend:
     build: ./frontend
@@ -43,6 +68,8 @@ services:
     depends_on:
       - frontend
       - pocketbase
+      - neural-memory
 
 volumes:
   pb_data:
+  nm_data:

@@ -1,94 +1,135 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 // MyTrend - Neural Bridge Hook
-// Bridges to Neural Memory (optional sidecar) for semantic encoding.
-// Sends conversation and idea records to Neural Memory /memory/encode endpoint.
-// Silently fails if Neural Memory is unreachable (it is optional).
+// Encodes conversations and ideas into Neural Memory for semantic search.
+// NM EncodeRequest: { content: string, timestamp?: string, metadata?: object, tags?: string[] }
+// Silently fails if NM is unreachable (optional sidecar).
 
 /**
- * Get the Neural Memory URL from environment or use default.
- */
-function getNeuralMemoryUrl() {
-  var envUrl = $os.getenv('NM_URL');
-  return envUrl || 'http://neural-memory:8000';
-}
-
-/**
- * Encode a record into Neural Memory via POST /memory/encode.
- * Wraps in try/catch so failures are silent (Neural Memory is optional).
- *
- * @param {string} collection - The collection name (e.g. 'conversations', 'ideas')
- * @param {Record} record - The PocketBase record to encode
+ * Encode a record into Neural Memory.
  */
 function encodeToNeuralMemory(collection, record) {
   try {
-    var nmUrl = getNeuralMemoryUrl();
+    var nmUrl = $os.getenv('NM_URL') || 'http://neural-memory:8000';
     var endpoint = nmUrl + '/memory/encode';
 
-    // Build the payload based on collection type
-    var payload = {
-      id: record.getId(),
+    var content = '';
+    var tags = [];
+    var metadata = {
       collection: collection,
+      record_id: record.getId(),
       user: record.getString('user'),
-      created: record.getString('created'),
+      type: 'fact',
     };
 
     if (collection === 'conversations') {
-      // Extract content from messages JSON array
+      var title = record.getString('title') || '';
+      var summary = record.getString('summary') || '';
+
+      // Build content from title + summary + first few messages
+      var parts = [];
+      if (title) parts.push('Title: ' + title);
+      if (summary) parts.push('Summary: ' + summary);
+
       var messages = record.get('messages') || [];
-      var contentParts = [];
-      for (var i = 0; i < messages.length; i++) {
+      var msgCount = 0;
+      for (var i = 0; i < messages.length && msgCount < 10; i++) {
         var msg = messages[i];
-        if (msg.role && msg.content) {
-          contentParts.push(msg.role + ': ' + msg.content);
+        if (msg && msg.role && msg.content) {
+          var msgText = msg.content;
+          if (msgText.length > 500) msgText = msgText.substring(0, 497) + '...';
+          parts.push(msg.role + ': ' + msgText);
+          msgCount++;
         }
       }
-      payload.content = contentParts.join('\n') || '';
-      payload.summary = record.getString('summary') || '';
-      payload.title = record.getString('title') || '';
-      payload.tags = record.get('tags') || [];
-      payload.project = record.getString('project') || '';
+      content = parts.join('\n');
+
+      // Tags from record
+      var recordTags = record.get('tags') || [];
+      for (var t = 0; t < recordTags.length; t++) {
+        tags.push(String(recordTags[t]));
+      }
+      tags.push('conversation');
+
+      metadata.title = title;
+      metadata.source = record.getString('source') || '';
+      metadata.session_id = record.getString('session_id') || '';
+      metadata.message_count = record.getInt('message_count') || 0;
+
     } else if (collection === 'ideas') {
-      payload.content = record.getString('content') || '';
-      payload.title = record.getString('title') || '';
-      payload.category = record.getString('type') || '';
-      payload.tags = record.get('tags') || [];
-      payload.priority = record.getInt('priority') || 0;
-      payload.project = record.getString('project') || '';
+      var ideaTitle = record.getString('title') || '';
+      var ideaContent = record.getString('content') || '';
+
+      content = 'Idea: ' + ideaTitle;
+      if (ideaContent) content += '\n' + ideaContent;
+
+      var ideaTags = record.get('tags') || [];
+      for (var it = 0; it < ideaTags.length; it++) {
+        tags.push(String(ideaTags[it]));
+      }
+      tags.push('idea');
+
+      var ideaType = record.getString('type');
+      if (ideaType) tags.push(ideaType);
+
+      metadata.title = ideaTitle;
+      metadata.idea_type = ideaType || '';
+      metadata.priority = record.getString('priority') || '';
     }
 
-    // Send to Neural Memory using PocketBase built-in $http.send()
+    if (!content || content.length < 10) return;
+
+    // Truncate content to NM max (100k chars)
+    if (content.length > 50000) content = content.substring(0, 50000);
+
+    var payload = {
+      content: content,
+      metadata: metadata,
+      tags: tags,
+    };
+
+    var startedAt = record.getString('started_at') || record.getString('created');
+    if (startedAt) {
+      payload.timestamp = startedAt;
+    }
+
     var res = $http.send({
       url: endpoint,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'mytrend' },
       body: JSON.stringify(payload),
-      timeout: 5, // 5 second timeout
+      timeout: 5,
     });
 
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      console.log('[NeuralBridge] Encoded ' + collection + ' record: ' + record.getId());
+      console.log('[NeuralBridge] Encoded ' + collection + ': ' + record.getId());
     } else {
-      console.log('[NeuralBridge] Encode returned status ' + res.statusCode + ' for ' + collection + ': ' + record.getId());
+      console.log('[NeuralBridge] Status ' + res.statusCode + ' for ' + collection + ': ' + record.getId());
     }
   } catch (err) {
-    // Silently fail -- Neural Memory is an optional sidecar
-    console.log('[NeuralBridge] Neural Memory unreachable or error (this is OK if NM is not deployed):', err);
+    // Silent fail - NM is optional
+    console.log('[NeuralBridge] NM unreachable (OK if not deployed): ' + err);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Hook: Encode conversations into Neural Memory after creation
+// Hooks: Encode on create
 // ---------------------------------------------------------------------------
 onRecordAfterCreateRequest((e) => {
   encodeToNeuralMemory('conversations', e.record);
 }, 'conversations');
 
-// ---------------------------------------------------------------------------
-// Hook: Encode ideas into Neural Memory after creation
-// ---------------------------------------------------------------------------
 onRecordAfterCreateRequest((e) => {
+  encodeToNeuralMemory('ideas', e.record);
+}, 'ideas');
+
+// ---------------------------------------------------------------------------
+// Hooks: Re-encode on update (for title/summary changes)
+// ---------------------------------------------------------------------------
+onRecordAfterUpdateRequest((e) => {
+  encodeToNeuralMemory('conversations', e.record);
+}, 'conversations');
+
+onRecordAfterUpdateRequest((e) => {
   encodeToNeuralMemory('ideas', e.record);
 }, 'ideas');

@@ -154,11 +154,14 @@
     }
   }
 
-  async function handleSync(): Promise<void> {
+  async function handleSync(force = false): Promise<void> {
     isSyncing = true;
     syncResult = null;
     try {
-      const res = await fetch(`${PB_URL}/api/mytrend/sync-claude`, {
+      const url = force
+        ? `${PB_URL}/api/mytrend/sync-claude?force=true`
+        : `${PB_URL}/api/mytrend/sync-claude`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: authHeaders(),
       });
@@ -269,8 +272,11 @@
     {/if}
 
     <div class="sync-actions">
-      <ComicButton variant="primary" onclick={handleSync} disabled={isSyncing}>
+      <ComicButton variant="primary" onclick={() => handleSync(false)} disabled={isSyncing}>
         {isSyncing ? 'Syncing...' : 'Sync Now'}
+      </ComicButton>
+      <ComicButton variant="outline" onclick={() => handleSync(true)} disabled={isSyncing}>
+        Force Re-sync (fix encoding)
       </ComicButton>
       <ComicButton variant="outline" onclick={loadSyncStatus} disabled={isLoadingStatus}>
         Refresh Status

@@ -2,24 +2,29 @@ import pb from '$lib/config/pocketbase';
 import { nmQuery } from '$lib/config/neural-memory';
 import type { SearchResult } from '$lib/types';
 
+// Browser: use relative URL (goes through nginx). SSR: use docker internal URL.
+const PB_URL = typeof window !== 'undefined'
+  ? ''
+  : (import.meta.env.VITE_PB_URL || 'http://pocketbase:8090');
 const MAX_RESULTS = 20;
 
+/**
+ * Hybrid search: PocketBase backend (safe, param-bound) + Neural Memory (optional).
+ */
 export async function hybridSearch(query: string, brain?: string): Promise<SearchResult[]> {
-  // Run FTS5 and Neural Memory in parallel, merge results
-  const [ftsResults, nmResults] = await Promise.allSettled([
-    fts5Search(query),
+  const [backendResults, nmResults] = await Promise.allSettled([
+    backendSearch(query),
     nmQuery(query, brain),
   ]);
 
   const results: SearchResult[] = [];
 
-  if (ftsResults.status === 'fulfilled') {
-    results.push(...ftsResults.value);
+  if (backendResults.status === 'fulfilled') {
+    results.push(...backendResults.value);
   }
 
   if (nmResults.status === 'fulfilled') {
     for (const nm of nmResults.value) {
-      // Avoid duplicates
       const exists = results.some((r) => r.id === nm.id);
       if (!exists) {
         results.push({
@@ -37,68 +42,34 @@ export async function hybridSearch(query: string, brain?: string): Promise<Searc
   return results.sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS);
 }
 
-async function fts5Search(query: string): Promise<SearchResult[]> {
-  const results: SearchResult[] = [];
+/**
+ * Search via PocketBase backend endpoint (safe from SQL injection).
+ */
+async function backendSearch(query: string): Promise<SearchResult[]> {
+  const token = pb.authStore.token;
+  const headers: Record<string, string> = token ? { Authorization: token } : {};
 
-  // Search conversations
-  try {
-    const convs = await pb.collection('conversations').getList(1, 10, {
-      filter: `title ~ "${query}" || summary ~ "${query}"`,
-      fields: 'id,title,summary',
-    });
-    for (const item of convs.items) {
-      results.push({
-        type: 'conversation',
-        id: item['id'] as string,
-        title: item['title'] as string,
-        snippet: (item['summary'] as string) ?? '',
-        score: 0.8,
-        highlight: '',
-      });
-    }
-  } catch {
-    // FTS5 search failed, skip
-  }
+  const res = await fetch(
+    `${PB_URL}/api/mytrend/search?q=${encodeURIComponent(query)}`,
+    { headers },
+  );
 
-  // Search ideas
-  try {
-    const ideas = await pb.collection('ideas').getList(1, 10, {
-      filter: `title ~ "${query}" || content ~ "${query}"`,
-      fields: 'id,title,content',
-    });
-    for (const item of ideas.items) {
-      results.push({
-        type: 'idea',
-        id: item['id'] as string,
-        title: item['title'] as string,
-        snippet: ((item['content'] as string) ?? '').slice(0, 200),
-        score: 0.7,
-        highlight: '',
-      });
-    }
-  } catch {
-    // FTS5 search failed, skip
-  }
+  if (!res.ok) return [];
 
-  // Search projects
-  try {
-    const projects = await pb.collection('projects').getList(1, 10, {
-      filter: `name ~ "${query}" || description ~ "${query}"`,
-      fields: 'id,name,description',
-    });
-    for (const item of projects.items) {
-      results.push({
-        type: 'project',
-        id: item['id'] as string,
-        title: item['name'] as string,
-        snippet: (item['description'] as string) ?? '',
-        score: 0.9,
-        highlight: '',
-      });
-    }
-  } catch {
-    // FTS5 search failed, skip
-  }
+  const data = (await res.json()) as Array<{
+    type: string;
+    id: string;
+    title: string;
+    snippet: string;
+    score: number;
+  }>;
 
-  return results;
+  return data.map((item) => ({
+    type: item.type as SearchResult['type'],
+    id: item.id,
+    title: item.title,
+    snippet: item.snippet,
+    score: item.score,
+    highlight: '',
+  }));
 }

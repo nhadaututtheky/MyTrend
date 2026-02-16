@@ -2,22 +2,43 @@
 
 // MyTrend - Claude Conversation Auto-Sync
 // PocketBase Goja JSVM: $os.readFile returns byte array, not string.
-// Each routerAdd callback has isolated scope - no shared top-level vars.
+// Each routerAdd/cronAdd callback has isolated scope - no shared top-level vars.
+// IMPORTANT: b2s() must decode UTF-8 multi-byte sequences (Vietnamese, CJK, emoji).
 
 // ---------------------------------------------------------------------------
-// Debug endpoint
+// GET /api/mytrend/sync-debug
 // ---------------------------------------------------------------------------
 routerAdd('GET', '/api/mytrend/sync-debug', (c) => {
-  var raw = $os.readFile('/pb/import/claude/history.jsonl');
-  // Convert bytes to string
-  var result = '';
-  var CHUNK = 4096;
-  for (var i = 0; i < raw.length; i += CHUNK) {
-    var end = i + CHUNK < raw.length ? i + CHUNK : raw.length;
-    var chunk = [];
-    for (var j = i; j < end; j++) { chunk.push(raw[j]); }
-    result += String.fromCharCode.apply(null, chunk);
+  // UTF-8 byte-array to string decoder (inline - isolated scope)
+  function b2s(raw) {
+    var s = '';
+    var buf = [];
+    var i = 0;
+    var len = raw.length;
+    while (i < len) {
+      var b = raw[i];
+      var cp;
+      if (b < 0x80) {
+        cp = b; i++;
+      } else if ((b & 0xE0) === 0xC0) {
+        if (i + 1 >= len) break;
+        cp = ((b & 0x1F) << 6) | (raw[i + 1] & 0x3F); i += 2;
+      } else if ((b & 0xF0) === 0xE0) {
+        if (i + 2 >= len) break;
+        cp = ((b & 0x0F) << 12) | ((raw[i + 1] & 0x3F) << 6) | (raw[i + 2] & 0x3F); i += 3;
+      } else if ((b & 0xF8) === 0xF0) {
+        if (i + 3 >= len) break;
+        cp = ((b & 0x07) << 18) | ((raw[i + 1] & 0x3F) << 12) | ((raw[i + 2] & 0x3F) << 6) | (raw[i + 3] & 0x3F); i += 4;
+      } else { i++; continue; }
+      if (cp > 0xFFFF) { cp -= 0x10000; buf.push(0xD800 + (cp >> 10)); buf.push(0xDC00 + (cp & 0x3FF)); } else { buf.push(cp); }
+      if (buf.length >= 4096) { s += String.fromCharCode.apply(null, buf); buf = []; }
+    }
+    if (buf.length > 0) s += String.fromCharCode.apply(null, buf);
+    return s;
   }
+
+  var raw = $os.readFile('/pb/import/claude/history.jsonl');
+  var result = b2s(raw);
   var lines = result.split('\n');
   var firstParsed = null;
   for (var k = 0; k < lines.length; k++) {
@@ -28,6 +49,7 @@ routerAdd('GET', '/api/mytrend/sync-debug', (c) => {
   return c.json(200, {
     rawLen: raw.length, strLen: result.length, lineCount: lines.length,
     firstParsed: firstParsed,
+    sampleUtf8: result.substring(0, 500),
   });
 });
 
@@ -73,29 +95,46 @@ routerAdd('GET', '/api/mytrend/sync-status', (c) => {
 
 // ---------------------------------------------------------------------------
 // POST /api/mytrend/sync-claude
+// Supports ?force=true to re-import (delete + re-create) existing records
 // ---------------------------------------------------------------------------
 routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
   var authRecord = c.get('authRecord');
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
   var userId = authRecord.getId();
-  console.log('[ClaudeSync] Sync triggered by: ' + userId);
+  var forceReimport = c.queryParam('force') === 'true';
+  console.log('[ClaudeSync] Sync triggered by: ' + userId + (forceReimport ? ' (FORCE re-import)' : ''));
 
-  // Byte array to string converter (inline because PB isolates callback scope)
+  // UTF-8 byte-array to string decoder (inline - isolated scope)
   function b2s(raw) {
     var s = '';
-    var CK = 4096;
-    for (var i = 0; i < raw.length; i += CK) {
-      var end = i + CK < raw.length ? i + CK : raw.length;
-      var ch = [];
-      for (var j = i; j < end; j++) { ch.push(raw[j]); }
-      s += String.fromCharCode.apply(null, ch);
+    var buf = [];
+    var i = 0;
+    var len = raw.length;
+    while (i < len) {
+      var b = raw[i];
+      var cp;
+      if (b < 0x80) {
+        cp = b; i++;
+      } else if ((b & 0xE0) === 0xC0) {
+        if (i + 1 >= len) break;
+        cp = ((b & 0x1F) << 6) | (raw[i + 1] & 0x3F); i += 2;
+      } else if ((b & 0xF0) === 0xE0) {
+        if (i + 2 >= len) break;
+        cp = ((b & 0x0F) << 12) | ((raw[i + 1] & 0x3F) << 6) | (raw[i + 2] & 0x3F); i += 3;
+      } else if ((b & 0xF8) === 0xF0) {
+        if (i + 3 >= len) break;
+        cp = ((b & 0x07) << 18) | ((raw[i + 1] & 0x3F) << 12) | ((raw[i + 2] & 0x3F) << 6) | (raw[i + 3] & 0x3F); i += 4;
+      } else { i++; continue; }
+      if (cp > 0xFFFF) { cp -= 0x10000; buf.push(0xD800 + (cp >> 10)); buf.push(0xDC00 + (cp & 0x3FF)); } else { buf.push(cp); }
+      if (buf.length >= 4096) { s += String.fromCharCode.apply(null, buf); buf = []; }
     }
+    if (buf.length > 0) s += String.fromCharCode.apply(null, buf);
     return s;
   }
 
   var dao = $app.dao();
-  var result = { projects_scanned: 0, sessions_found: 0, imported: 0, skipped: 0, errors: [] };
+  var result = { projects_scanned: 0, sessions_found: 0, imported: 0, skipped: 0, updated: 0, errors: [] };
 
   try {
     var collection = dao.findCollectionByNameOrId('conversations');
@@ -138,8 +177,14 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
         result.sessions_found++;
         var sessionId = files[f].name().replace('.jsonl', '');
 
-        // Dedup
-        try { dao.findFirstRecordByFilter('conversations', 'session_id = {:sid}', { sid: sessionId }); result.skipped++; continue; } catch (e) {}
+        // Dedup check
+        var existingRecord = null;
+        try { existingRecord = dao.findFirstRecordByFilter('conversations', 'session_id = {:sid}', { sid: sessionId }); } catch (e) {}
+
+        if (existingRecord && !forceReimport) {
+          result.skipped++;
+          continue;
+        }
 
         // Parse JSONL
         var fileStr;
@@ -203,9 +248,16 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
           try { var s = new Date(startedAt).getTime(), e2 = new Date(endedAt).getTime(); if (!isNaN(s) && !isNaN(e2)) durMin = Math.round((e2 - s) / 60000); } catch (e) {}
         }
 
-        // Save
+        // Save or Update
         try {
-          var record = new Record(collection);
+          var record;
+          if (existingRecord && forceReimport) {
+            record = existingRecord;
+            result.updated++;
+          } else {
+            record = new Record(collection);
+            result.imported++;
+          }
           record.set('user', userId);
           record.set('title', title);
           record.set('source', 'cli');
@@ -223,8 +275,7 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
             record.set('summary', firstUserText.length > 500 ? firstUserText.substring(0, 497) + '...' : firstUserText);
           }
           dao.saveRecord(record);
-          result.imported++;
-          console.log('[ClaudeSync] Imported: ' + sessionId + ' (' + messages.length + ' msgs)');
+          console.log('[ClaudeSync] ' + (existingRecord ? 'Updated' : 'Imported') + ': ' + sessionId + ' (' + messages.length + ' msgs)');
         } catch (err) {
           var es = String(err);
           if (es.indexOf('UNIQUE') >= 0 || es.indexOf('duplicate') >= 0) { result.skipped++; }
@@ -232,7 +283,7 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
         }
       }
     }
-    console.log('[ClaudeSync] Done. Imported: ' + result.imported + ', Skipped: ' + result.skipped);
+    console.log('[ClaudeSync] Done. Imported: ' + result.imported + ', Updated: ' + result.updated + ', Skipped: ' + result.skipped);
   } catch (fatal) {
     console.log('[ClaudeSync] FATAL: ' + fatal);
     result.errors.push('Fatal: ' + String(fatal));
@@ -247,59 +298,120 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
 try {
   cronAdd('claude_auto_sync', '*/30 * * * *', function() {
     console.log('[ClaudeSync] Cron triggered');
+
+    // UTF-8 byte-array to string decoder (inline - isolated scope)
     function b2s(raw) {
       var s = '';
-      for (var i = 0; i < raw.length; i += 4096) {
-        var end = i + 4096 < raw.length ? i + 4096 : raw.length;
-        var ch = [];
-        for (var j = i; j < end; j++) { ch.push(raw[j]); }
-        s += String.fromCharCode.apply(null, ch);
+      var buf = [];
+      var i = 0;
+      var len = raw.length;
+      while (i < len) {
+        var b = raw[i];
+        var cp;
+        if (b < 0x80) {
+          cp = b; i++;
+        } else if ((b & 0xE0) === 0xC0) {
+          if (i + 1 >= len) break;
+          cp = ((b & 0x1F) << 6) | (raw[i + 1] & 0x3F); i += 2;
+        } else if ((b & 0xF0) === 0xE0) {
+          if (i + 2 >= len) break;
+          cp = ((b & 0x0F) << 12) | ((raw[i + 1] & 0x3F) << 6) | (raw[i + 2] & 0x3F); i += 3;
+        } else if ((b & 0xF8) === 0xF0) {
+          if (i + 3 >= len) break;
+          cp = ((b & 0x07) << 18) | ((raw[i + 1] & 0x3F) << 12) | ((raw[i + 2] & 0x3F) << 6) | (raw[i + 3] & 0x3F); i += 4;
+        } else { i++; continue; }
+        if (cp > 0xFFFF) { cp -= 0x10000; buf.push(0xD800 + (cp >> 10)); buf.push(0xDC00 + (cp & 0x3FF)); } else { buf.push(cp); }
+        if (buf.length >= 4096) { s += String.fromCharCode.apply(null, buf); buf = []; }
       }
+      if (buf.length > 0) s += String.fromCharCode.apply(null, buf);
       return s;
     }
+
     var dao = $app.dao();
     var uid = $os.getenv('MYTREND_SYNC_USER_ID') || null;
     if (!uid) { try { var u = dao.findRecordsByFilter('users', '1=1', '', 1, 0); if (u && u.length > 0) uid = u[0].getId(); } catch(e){} }
     if (!uid) { console.log('[ClaudeSync] Cron: no user'); return; }
     var col;
     try { col = dao.findCollectionByNameOrId('conversations'); } catch(e) { return; }
+
     var hist = {};
-    try { var hs = b2s($os.readFile('/pb/import/claude/history.jsonl')); var hl = hs.split('\n'); for(var h=0;h<hl.length;h++){if(!hl[h].trim())continue;try{var ho=JSON.parse(hl[h]);if(ho.sessionId&&!hist[ho.sessionId])hist[ho.sessionId]=ho.display||'';}catch(e){}}} catch(e){}
+    try {
+      var hs = b2s($os.readFile('/pb/import/claude/history.jsonl'));
+      var hl = hs.split('\n');
+      for (var h = 0; h < hl.length; h++) {
+        if (!hl[h].trim()) continue;
+        try { var ho = JSON.parse(hl[h]); if (ho.sessionId && !hist[ho.sessionId]) hist[ho.sessionId] = ho.display || ''; } catch(e) {}
+      }
+    } catch(e) {}
+
     var imp = 0;
     try {
       var pds = $os.readDir('/pb/import/claude/projects');
-      for (var p=0;p<pds.length;p++){
-        if(!pds[p].isDir())continue;
-        var pp='/pb/import/claude/projects/'+pds[p].name();
-        var pts=pds[p].name().split('-');var tg=pts[pts.length-1]||pds[p].name();
-        var fs; try{fs=$os.readDir(pp);}catch(e){continue;}
-        for(var f=0;f<fs.length;f++){
-          if(fs[f].isDir()||!fs[f].name().endsWith('.jsonl'))continue;
-          var sid=fs[f].name().replace('.jsonl','');
-          try{dao.findFirstRecordByFilter('conversations','session_id={:sid}',{sid:sid});continue;}catch(e){}
-          try{
-            var fc=b2s($os.readFile(pp+'/'+fs[f].name()));var ls=fc.split('\n');
-            var ms=[],tt=0,sa=null,ea=null;
-            for(var i=0;i<ls.length;i++){var l=ls[i].trim();if(!l)continue;var o;try{o=JSON.parse(l);}catch(e){continue;}
-            if(!o.type)continue;if(o.timestamp){if(!sa)sa=o.timestamp;ea=o.timestamp;}
-            if(o.type!=='user'&&o.type!=='assistant')continue;var mg=o.message;if(!mg||!mg.role)continue;
-            var tx='';if(typeof mg.content==='string')tx=mg.content;else if(Array.isArray(mg.content)){var tp2=[];for(var t=0;t<mg.content.length;t++){if(mg.content[t]&&mg.content[t].type==='text'&&mg.content[t].text)tp2.push(mg.content[t].text);}tx=tp2.join('\n');}
-            if(!tx||tx.length<2)continue;var mt=0;if(o.type==='assistant'&&mg.usage){mt=mg.usage.output_tokens||0;tt+=(mg.usage.input_tokens||0)+(mg.usage.cache_creation_input_tokens||0)+(mg.usage.cache_read_input_tokens||0)+mt;}
-            ms.push({role:mg.role,content:tx,timestamp:o.timestamp||new Date().toISOString(),tokens:mt||Math.round(tx.length/4)});}
-            if(ms.length<2)continue;
-            var fut='';for(var m=0;m<ms.length;m++){if(ms[m].role==='user'){fut=ms[m].content;break;}}
-            var dt=hist[sid]||fut||'Untitled';var ti=dt.replace(/[#*`_~]/g,'').replace(/\s+/g,' ').trim();if(ti.length>200)ti=ti.substring(0,197)+'...';if(!ti)ti='Untitled';
-            var r=new Record(col);r.set('user',uid);r.set('title',ti);r.set('source','cli');r.set('session_id',sid);r.set('device_name',$os.getenv('HOSTNAME')||'docker');
-            r.set('messages',ms);r.set('message_count',ms.length);r.set('total_tokens',tt);r.set('started_at',sa||new Date().toISOString());r.set('ended_at',ea||'');
-            r.set('topics',[]);r.set('tags',[tg,'claude-cli']);if(fut)r.set('summary',fut.length>500?fut.substring(0,497)+'...':fut);
-            dao.saveRecord(r);imp++;console.log('[ClaudeSync] Cron imported: '+sid);
-          }catch(err){}
+      for (var p = 0; p < pds.length; p++) {
+        if (!pds[p].isDir()) continue;
+        var pp = '/pb/import/claude/projects/' + pds[p].name();
+        var pts = pds[p].name().split('-');
+        var tg = pts[pts.length - 1] || pds[p].name();
+        var fs;
+        try { fs = $os.readDir(pp); } catch(e) { continue; }
+        for (var f = 0; f < fs.length; f++) {
+          if (fs[f].isDir() || !fs[f].name().endsWith('.jsonl')) continue;
+          var sid = fs[f].name().replace('.jsonl', '');
+          try { dao.findFirstRecordByFilter('conversations', 'session_id={:sid}', {sid:sid}); continue; } catch(e) {}
+          try {
+            var fc = b2s($os.readFile(pp + '/' + fs[f].name()));
+            var ls = fc.split('\n');
+            var ms = [], tt = 0, sa = null, ea = null;
+            for (var i = 0; i < ls.length; i++) {
+              var l = ls[i].trim();
+              if (!l) continue;
+              var o;
+              try { o = JSON.parse(l); } catch(e) { continue; }
+              if (!o.type) continue;
+              if (o.timestamp) { if (!sa) sa = o.timestamp; ea = o.timestamp; }
+              if (o.type !== 'user' && o.type !== 'assistant') continue;
+              var mg = o.message;
+              if (!mg || !mg.role) continue;
+              var tx = '';
+              if (typeof mg.content === 'string') tx = mg.content;
+              else if (Array.isArray(mg.content)) {
+                var tp2 = [];
+                for (var t = 0; t < mg.content.length; t++) {
+                  if (mg.content[t] && mg.content[t].type === 'text' && mg.content[t].text) tp2.push(mg.content[t].text);
+                }
+                tx = tp2.join('\n');
+              }
+              if (!tx || tx.length < 2) continue;
+              var mt = 0;
+              if (o.type === 'assistant' && mg.usage) {
+                mt = mg.usage.output_tokens || 0;
+                tt += (mg.usage.input_tokens || 0) + (mg.usage.cache_creation_input_tokens || 0) + (mg.usage.cache_read_input_tokens || 0) + mt;
+              }
+              ms.push({role: mg.role, content: tx, timestamp: o.timestamp || new Date().toISOString(), tokens: mt || Math.round(tx.length / 4)});
+            }
+            if (ms.length < 2) continue;
+            var fut = '';
+            for (var m = 0; m < ms.length; m++) { if (ms[m].role === 'user') { fut = ms[m].content; break; } }
+            var dt = hist[sid] || fut || 'Untitled';
+            var ti = dt.replace(/[#*`_~]/g, '').replace(/\s+/g, ' ').trim();
+            if (ti.length > 200) ti = ti.substring(0, 197) + '...';
+            if (!ti) ti = 'Untitled';
+            var r = new Record(col);
+            r.set('user', uid); r.set('title', ti); r.set('source', 'cli'); r.set('session_id', sid);
+            r.set('device_name', $os.getenv('HOSTNAME') || 'docker');
+            r.set('messages', ms); r.set('message_count', ms.length); r.set('total_tokens', tt);
+            r.set('started_at', sa || new Date().toISOString()); r.set('ended_at', ea || '');
+            r.set('topics', []); r.set('tags', [tg, 'claude-cli']);
+            if (fut) r.set('summary', fut.length > 500 ? fut.substring(0, 497) + '...' : fut);
+            dao.saveRecord(r); imp++;
+            console.log('[ClaudeSync] Cron imported: ' + sid);
+          } catch(err) {}
         }
       }
-    }catch(e){console.log('[ClaudeSync] Cron error: '+e);}
-    console.log('[ClaudeSync] Cron done. Imported: '+imp);
+    } catch(e) { console.log('[ClaudeSync] Cron error: ' + e); }
+    console.log('[ClaudeSync] Cron done. Imported: ' + imp);
   });
   console.log('[ClaudeSync] Cron registered: */30 * * * *');
 } catch (e) {
-  console.log('[ClaudeSync] cronAdd not available');
+  console.log('[ClaudeSync] cronAdd not available: ' + e);
 }

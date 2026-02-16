@@ -6,11 +6,13 @@
   import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import type { ActivityAggregate, ChartDataPoint } from '$lib/types';
 
   let period = $state('day');
   let aggregates = $state<ActivityAggregate[]>([]);
   let isLoading = $state(true);
+  let initialized = $state(false);
 
   const periodTabs = [
     { id: 'day', label: 'Daily' },
@@ -48,11 +50,14 @@
     }
   }
 
-  onMount(() => {
-    loadData();
+  // Only use onMount for initial load, $effect for period changes after init
+  onMount(async () => {
+    await loadData();
+    initialized = true;
   });
 
   $effect(() => {
+    if (!initialized) return;
     void period;
     loadData();
   });
@@ -75,6 +80,12 @@
       <ComicSkeleton variant="chart" />
       <ComicSkeleton variant="chart" />
     </BentoGrid>
+  {:else if aggregates.length === 0}
+    <ComicEmptyState
+      illustration="empty"
+      message="No activity data yet"
+      description="Activities are tracked automatically when you create conversations, ideas, and projects."
+    />
   {:else}
     <BentoGrid columns={2} gap="md">
       <ComicBentoCard title="Activity Over Time" icon="📊" neonColor="green" variant="neon">

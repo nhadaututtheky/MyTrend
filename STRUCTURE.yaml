@@ -1,0 +1,794 @@
+# ============================================================================
+# MyTrend - Project Structure Map
+# Generated: 2026-02-17
+# ============================================================================
+
+project:
+  name: MyTrend
+  description: Personal Knowledge & Activity Trend Platform
+  style: Comic/Sketch hand-drawn UI (Rough.js, Comic Mono)
+  deployment: Docker Compose (PocketBase + SvelteKit + Nginx)
+
+# ============================================================================
+# TECH STACK
+# ============================================================================
+tech_stack:
+  backend:
+    runtime: PocketBase 0.22.27 (Go binary)
+    database: SQLite (built-in) + FTS5
+    hooks_engine: Goja JSVM (ES5.1)
+    auth: PocketBase built-in (email/password)
+  frontend:
+    framework: SvelteKit 5 (adapter-node)
+    language: TypeScript strict
+    reactivity: Svelte 5 runes ($state, $derived, $effect, $props)
+    styling: CSS Custom Properties (no Tailwind)
+    components: Custom Comic design system
+    charts: Rough.js + RoughViz.js
+  infra:
+    services:
+      - pocketbase (port 8090)
+      - frontend (port 3000)
+      - nginx (port 80/443)
+    volumes:
+      - pb_data (PocketBase data)
+      - pb_hooks (JS hooks)
+      - pb_migrations (schema)
+      - "~/.claude:/pb/import/claude:ro"  # Claude CLI data mount
+
+# ============================================================================
+# SIDEBAR NAVIGATION
+# ============================================================================
+sidebar:
+  sections:
+    - title: MAIN
+      items:
+        - label: Dashboard
+          icon: "\U0001F3E0"
+          route: /
+        - label: Projects
+          icon: "\U0001F4C1"
+          route: /projects
+        - label: Conversations
+          icon: "\U0001F4AC"
+          route: /conversations
+        - label: Ideas
+          icon: "\U0001F4A1"
+          route: /ideas
+
+    - title: INSIGHTS
+      items:
+        - label: Trends
+          icon: "\U0001F4C8"
+          route: /trends
+        - label: Graph
+          icon: "\U0001F310"
+          route: /graph
+        - label: Search
+          icon: "\U0001F50D"
+          route: /search
+
+    - title: TOOLS
+      items:
+        - label: Hub
+          icon: "\u26A1"
+          route: /hub
+        - label: Settings
+          icon: "\u2699"
+          route: /settings
+
+# ============================================================================
+# PAGES - DETAILED BREAKDOWN
+# ============================================================================
+pages:
+
+  # --------------------------------------------------------------------------
+  # AUTH (Public routes - no sidebar/header)
+  # --------------------------------------------------------------------------
+  auth:
+    login:
+      route: /auth/login
+      file: routes/auth/login/+page.svelte
+      description: Email/password login form
+      features:
+        - Email + password fields
+        - Error display
+        - Loading state
+        - Redirect to dashboard on success
+        - Link to register page
+      api: pb.collection('users').authWithPassword()
+      status: WORKING
+
+    register:
+      route: /auth/register
+      file: routes/auth/register/+page.svelte
+      description: New user registration form
+      features:
+        - Display name, email, password fields
+        - Password min 8 chars validation
+        - Error display
+        - Redirect to dashboard on success
+      api: pb.collection('users').create()
+      status: WORKING
+
+  # --------------------------------------------------------------------------
+  # MAIN > Dashboard
+  # --------------------------------------------------------------------------
+  dashboard:
+    route: /
+    file: routes/+page.svelte
+    description: Overview dashboard with Bento grid layout
+    sub_tabs: null
+    features:
+      - Welcome greeting with user name
+      - Stats Bento grid (conversations, ideas, hours, streak)
+      - ComicSparkline in stat cards
+      - ActivityTimeline (10 latest activities)
+      - ProjectCard list (active projects)
+      - TrendChart (7-day activity)
+      - HeatmapCalendar (30-day mini heatmap)
+    data_sources:
+      - projects (active, sorted by last_activity)
+      - activities (10 latest)
+      - activity_aggregates (30 days heatmap)
+    realtime: activities collection subscription
+    components:
+      - BentoGrid, ComicBentoCard
+      - StatsGrid, DNACard
+      - ActivityTimeline, ProjectCard
+      - TrendChart, HeatmapCalendar
+      - ComicSparkline, ComicSkeleton
+    status: WORKING
+
+  # --------------------------------------------------------------------------
+  # MAIN > Projects
+  # --------------------------------------------------------------------------
+  projects:
+    list:
+      route: /projects
+      file: routes/projects/+page.svelte
+      description: Project list with status filter tabs
+      sub_tabs:
+        - label: All
+          filter: null
+        - label: Active
+          filter: "status = 'active'"
+        - label: Paused
+          filter: "status = 'paused'"
+        - label: Archived
+          filter: "status = 'archived'"
+        - label: Completed
+          filter: "status = 'completed'"
+      features:
+        - Status filter tabs with count badges
+        - Project cards grid
+        - "New Project" button
+        - Status color coding
+      data_sources:
+        - projects (all, filtered by status tab)
+      realtime: projects collection (create/update/delete)
+      actions:
+        - Navigate to project detail
+        - Create new project
+      status: WORKING
+
+    detail:
+      route: /projects/[slug]
+      file: routes/projects/[slug]/+page.svelte
+      description: Project detail with 4 tabs
+      sub_tabs:
+        - label: Overview
+          content: Project description, stats summary, tech stack badges
+        - label: Conversations
+          content: Related conversations list with pagination
+        - label: Ideas
+          content: Related ideas list with pagination
+        - label: DNA
+          content: Project DNA (vision, stack, phase, challenges, decisions)
+      features:
+        - Project stats (conversations, ideas, hours)
+        - Tech stack badges
+        - Related conversations/ideas with pagination
+        - DNA card (vision, decisions timeline)
+      data_sources:
+        - project (by slug)
+        - conversations (filtered by project)
+        - ideas (filtered by project)
+      status: WORKING
+
+    new:
+      route: /projects/new
+      file: routes/projects/new/+page.svelte
+      description: Create new project form
+      fields:
+        - name (text, required)
+        - description (textarea)
+        - icon (emoji picker)
+        - tech_stack (comma-separated tags)
+      features:
+        - Auto-generate slug from name
+        - Live slug preview
+        - Color auto-assignment
+      api: pb.collection('projects').create()
+      status: WORKING
+
+  # --------------------------------------------------------------------------
+  # MAIN > Conversations
+  # --------------------------------------------------------------------------
+  conversations:
+    list:
+      route: /conversations
+      file: routes/conversations/+page.svelte
+      description: Conversation list with source filter tabs
+      sub_tabs:
+        - label: All
+          filter: null
+        - label: CLI
+          filter: "source = 'cli'"
+        - label: Desktop
+          filter: "source = 'desktop'"
+        - label: Web
+          filter: "source = 'web'"
+        - label: Hub
+          filter: "source = 'hub'"
+        - label: Imported
+          filter: "source = 'imported'"
+      features:
+        - Source filter tabs
+        - Total conversation count
+        - "Import" button (links to /conversations/import)
+        - Pagination controls
+        - Conversation cards (title, source badge, date, message count, tokens)
+      data_sources:
+        - conversations (paginated, filtered by source)
+      realtime: conversations collection (create/delete)
+      status: WORKING
+
+    detail:
+      route: /conversations/[id]
+      file: routes/conversations/[id]/+page.svelte
+      description: Full conversation view with message thread
+      sub_tabs: null
+      features:
+        - Title + source badge
+        - Metadata (timestamp, duration, device, token count)
+        - Summary section
+        - Topic/tag badges
+        - Full message feed (user vs assistant bubbles)
+        - Skeleton loading state
+        - Empty state for no messages
+      data_sources:
+        - conversation (by id, with messages JSON field)
+      status: WORKING
+
+    import:
+      route: /conversations/import
+      file: routes/conversations/import/+page.svelte
+      description: Import conversations from Claude CLI or files
+      sub_tabs: null
+      sections:
+        - title: Claude Auto-Sync
+          features:
+            - Sync status display (total/imported/pending)
+            - Project list with import counts
+            - "Sync Now" button (POST /api/mytrend/sync-claude)
+            - "Refresh Status" button (GET /api/mytrend/sync-status)
+            - Cron badge (every 30 min)
+            - Sync result display (imported/skipped/errors)
+        - title: Manual Import
+          features:
+            - File upload (drag & drop)
+            - Accepts .jsonl and .json files
+            - JSONL parser (role + content)
+            - JSON parser (full conversation object)
+            - Import progress counter
+      api:
+        - "POST /api/mytrend/sync-claude (PB hook)"
+        - "GET /api/mytrend/sync-status (PB hook)"
+        - "createConversation() for manual upload"
+      status: WORKING
+
+  # --------------------------------------------------------------------------
+  # MAIN > Ideas
+  # --------------------------------------------------------------------------
+  ideas:
+    list:
+      route: /ideas
+      file: routes/ideas/+page.svelte
+      description: Ideas board with status filters and view toggle
+      sub_tabs:
+        - label: All
+          filter: null
+        - label: Inbox
+          filter: "status = 'inbox'"
+        - label: Considering
+          filter: "status = 'considering'"
+        - label: Planned
+          filter: "status = 'planned'"
+        - label: In Progress
+          filter: "status = 'in_progress'"
+        - label: Done
+          filter: "status = 'done'"
+      features:
+        - Status filter tabs
+        - View toggle (grid / list)
+        - "New Idea" button
+        - Idea count
+        - Priority color coding
+        - Type badges
+      data_sources:
+        - ideas (all, filtered by status)
+      realtime: ideas collection (create/update/delete)
+      status: WORKING
+
+    detail:
+      route: /ideas/[id]
+      file: routes/ideas/[id]/+page.svelte
+      description: Idea detail with metadata and related ideas
+      sub_tabs: null
+      features:
+        - Title
+        - Type/status/priority badges
+        - Creation date
+        - Content (markdown)
+        - Tag badges
+        - Related ideas links
+      data_sources:
+        - idea (by id)
+      status: WORKING
+
+    new:
+      route: /ideas/new
+      file: routes/ideas/new/+page.svelte
+      description: Create new idea form
+      fields:
+        - title (text, required)
+        - description (textarea, markdown)
+        - type (select: feature, bug, design, architecture, optimization, question)
+        - priority (select: low, medium, high, critical)
+        - project (optional, select from projects)
+        - tags (comma-separated)
+      api: pb.collection('ideas').create()
+      status: WORKING
+
+  # --------------------------------------------------------------------------
+  # INSIGHTS > Trends
+  # --------------------------------------------------------------------------
+  trends:
+    overview:
+      route: /trends
+      file: routes/trends/+page.svelte
+      description: Trends hub with links to sub-pages
+      sub_tabs:
+        - label: Activity
+          route: /trends/activity
+        - label: Topics
+          route: /trends/topics
+        - label: Heatmap
+          route: /trends/heatmap
+      features:
+        - Navigation cards to each trends sub-page
+        - Summary stats preview
+      status: WORKING
+
+    activity:
+      route: /trends/activity
+      file: routes/trends/activity/+page.svelte
+      description: Activity trends with period selector
+      sub_tabs:
+        - label: Daily
+          period: day
+        - label: Weekly
+          period: week
+        - label: Monthly
+          period: month
+      features:
+        - Period selector tabs (daily/weekly/monthly)
+        - Activity line/bar chart over time
+        - Breakdown pie chart (by activity type)
+        - Total activity counter
+      data_sources:
+        - activity_aggregates (filtered by period)
+      chart: RoughChart (hand-drawn style)
+      status: NEEDS_AUDIT  # depends on activity_aggregation hook
+
+    heatmap:
+      route: /trends/heatmap
+      file: routes/trends/heatmap/+page.svelte
+      description: Full-year GitHub-style activity heatmap
+      sub_tabs: null
+      features:
+        - HeatmapCalendar (365 days)
+        - Stats Bento grid (total activities, active days, best day, current streak)
+        - Streak calculation
+      data_sources:
+        - activity_aggregates (365 days, daily)
+      chart: HeatmapCalendar component
+      status: NEEDS_AUDIT  # depends on activity data
+
+    topics:
+      route: /trends/topics
+      file: routes/trends/topics/+page.svelte
+      description: Topic analysis and visualization
+      sub_tabs: null
+      features:
+        - Top 10 topics bar chart
+        - Topic cloud with dynamic sizing (mention count)
+        - Mention count badges
+      data_sources:
+        - topics (top 20, sorted by mention_count)
+      chart: RoughChart
+      status: NEEDS_AUDIT  # depends on topic extraction
+
+  # --------------------------------------------------------------------------
+  # INSIGHTS > Graph
+  # --------------------------------------------------------------------------
+  graph:
+    route: /graph
+    file: routes/graph/+page.svelte
+    description: Network visualization of topic relationships
+    sub_tabs: null
+    features:
+      - D3-force graph (nodes = topics, edges = related)
+      - Node size based on mention_count
+      - Edge connections from related field
+      - Node/edge count display
+      - Category group colors
+    data_sources:
+      - topics (top 50, with related field)
+    chart: RoughGraph (D3-force + Rough.js)
+    status: NEEDS_AUDIT  # depends on topic data
+
+  # --------------------------------------------------------------------------
+  # INSIGHTS > Search
+  # --------------------------------------------------------------------------
+  search:
+    route: /search
+    file: routes/search/+page.svelte
+    description: Unified search across all collections
+    sub_tabs: null
+    features:
+      - Debounced search input (300ms, min 2 chars)
+      - Hybrid search (full-text + semantic)
+      - Result type badges with colors
+      - Result links to detail pages
+      - Result count summary
+    result_types:
+      - projects (link to /projects/[slug])
+      - conversations (link to /conversations/[id])
+      - ideas (link to /ideas/[id])
+      - topics (link to /trends/topics)
+    data_sources:
+      - "GET /api/mytrend/search (PB hook)"
+    status: NEEDS_AUDIT  # depends on search_index hook
+
+  # --------------------------------------------------------------------------
+  # TOOLS > Hub (Claude Chat Interface)
+  # --------------------------------------------------------------------------
+  hub:
+    layout:
+      file: routes/hub/+layout.svelte
+      description: Flex layout wrapper for all hub routes
+
+    main:
+      route: /hub
+      file: routes/hub/+page.svelte
+      description: Hub home with session list
+      sub_tabs: null
+      features:
+        - Session list sidebar (280px)
+        - Welcome card with feature list
+        - "Start New Session" button
+        - Feature overview (API streaming, sync, token tracking)
+      data_sources:
+        - hub_sessions (all, sorted by last_message_at)
+      realtime: hub_sessions collection (create/update/delete)
+      status: NEEDS_AUDIT  # requires ANTHROPIC_API_KEY
+
+    session:
+      route: /hub/[sessionId]
+      file: routes/hub/[sessionId]/+page.svelte
+      description: Chat interface for Claude conversations
+      sub_tabs: null
+      features:
+        - SessionList sidebar
+        - MessageFeed (user/assistant bubbles)
+        - Composer (text input + send)
+        - TokenCounter (input/output tokens)
+        - DeviceIndicator
+        - SSE streaming parser for Claude API
+        - Real-time token counting
+        - Auto-save messages to database
+      components:
+        - SessionList
+        - MessageFeed
+        - MessageBubble
+        - Composer
+        - StreamingText
+        - TokenCounter
+        - DeviceIndicator
+      data_sources:
+        - hub_session (by sessionId)
+        - hub_sessions (for sidebar list)
+      status: NEEDS_AUDIT  # requires ANTHROPIC_API_KEY
+
+    new_session:
+      route: /hub/new
+      file: routes/hub/new/+page.svelte
+      description: Create new Hub session
+      fields:
+        - name (text, optional, auto-generated)
+        - project (select, optional)
+        - model (select: sonnet-4-5, haiku-4-5, opus-4-6)
+        - system_prompt (textarea)
+      api: pb.collection('hub_sessions').create()
+      status: NEEDS_AUDIT
+
+    settings:
+      route: /hub/settings
+      file: routes/hub/settings/+page.svelte
+      description: Hub configuration and environments
+      sections:
+        - title: API Configuration
+          content: Anthropic API key setup info
+        - title: Environments
+          content: Environment list + create form
+      environment_fields:
+        - name (text)
+        - slug (text)
+        - model (select)
+        - system_prompt (textarea)
+        - max_tokens (number)
+        - temperature (number)
+      api: pb.collection('hub_environments').create()
+      status: NEEDS_AUDIT
+
+  # --------------------------------------------------------------------------
+  # TOOLS > Settings
+  # --------------------------------------------------------------------------
+  settings:
+    route: /settings
+    file: routes/settings/+page.svelte
+    description: User profile and app settings
+    sub_tabs: null
+    sections:
+      - title: Profile
+        fields:
+          - display_name (text)
+          - timezone (text)
+      - title: Device
+        fields:
+          - device_name (text, localStorage)
+      - title: Theme
+        features:
+          - Dark/light toggle (ThemeToggle component)
+    api: pb.collection('users').update()
+    status: WORKING
+
+# ============================================================================
+# BACKEND - PocketBase Hooks
+# ============================================================================
+backend_hooks:
+  claude_sync:
+    file: pocketbase/pb_hooks/claude_sync.pb.js
+    description: Auto-sync Claude CLI conversations
+    endpoints:
+      - method: GET
+        path: /api/mytrend/sync-debug
+        auth: false
+        description: Debug endpoint for Claude data inspection
+      - method: GET
+        path: /api/mytrend/sync-status
+        auth: true
+        description: Returns sync status (projects, sessions, imported count)
+      - method: POST
+        path: /api/mytrend/sync-claude
+        auth: true
+        description: Trigger manual sync of Claude CLI sessions
+    cron:
+      name: claude_auto_sync
+      schedule: "*/30 * * * *"
+      description: Auto-import new Claude sessions every 30 min
+    data_source: "/pb/import/claude/projects/*/*.jsonl"
+    status: WORKING
+
+  search_index:
+    file: pocketbase/pb_hooks/search_index.pb.js
+    description: FTS5 full-text search indexing
+    endpoints:
+      - method: GET
+        path: /api/mytrend/search
+        auth: true
+        description: Hybrid search across all collections
+    triggers:
+      - "After create/update on conversations, ideas, projects"
+    status: NEEDS_AUDIT
+
+  activity_aggregation:
+    file: pocketbase/pb_hooks/activity_aggregation.pb.js
+    description: Real-time activity aggregation
+    endpoints:
+      - method: GET
+        path: /api/mytrend/heatmap
+        auth: true
+        description: Returns heatmap data for N days
+    triggers:
+      - "After create on activities"
+    cron: null  # TODO: Should use cronAdd like claude_sync
+    status: NEEDS_AUDIT
+
+  neural_bridge:
+    file: pocketbase/pb_hooks/neural_bridge.pb.js
+    description: Optional Neural Memory semantic encoding bridge
+    endpoints:
+      - method: POST
+        path: /api/mytrend/encode
+        auth: true
+        description: Send content to Neural Memory for semantic encoding
+    status: OPTIONAL
+
+  main:
+    file: pocketbase/pb_hooks/main.pb.js
+    description: Main hooks file (CORS, health check)
+    status: WORKING
+
+# ============================================================================
+# DATABASE COLLECTIONS
+# ============================================================================
+collections:
+  users:
+    type: auth
+    fields: [email, display_name, timezone, preferences]
+
+  projects:
+    fields: [user, name, slug, description, color, icon, dna, tech_stack, status, total_conversations, total_ideas, total_minutes, last_activity]
+    status_values: [active, paused, archived, completed]
+
+  conversations:
+    fields: [user, project, title, summary, source, device_name, session_id, messages, message_count, total_tokens, topics, tags, started_at, ended_at, duration_min]
+    source_values: [cli, desktop, web, imported, hub]
+
+  ideas:
+    fields: [user, project, conversation, title, content, type, status, priority, tags, related_ideas, attachments]
+    type_values: [feature, bug, design, architecture, optimization, question]
+    status_values: [inbox, considering, planned, in_progress, done, rejected]
+
+  activities:
+    fields: [user, project, conversation, type, action, device_name, metadata, timestamp, duration_sec]
+    type_values: [conversation, coding, idea, search, review]
+
+  activity_aggregates:
+    fields: [user, project, period, period_start, total_count, total_minutes, breakdown, top_topics, devices]
+    period_values: [hour, day, week, month]
+
+  topics:
+    fields: [user, name, slug, category, mention_count, first_seen, last_seen, trend_data, related]
+
+  hub_sessions:
+    fields: [user, project, name, status, model, system_prompt, messages, message_count, total_input_tokens, total_output_tokens, estimated_cost, environment, devices, last_message_at]
+
+  hub_environments:
+    fields: [user, name, slug, model, system_prompt, max_tokens, temperature, tools_enabled, api_key_encrypted]
+
+  hub_cron_jobs:
+    fields: [user, project, name, schedule, prompt, environment, enabled, last_run, next_run, run_count, last_result]
+
+# ============================================================================
+# COMPONENT LIBRARY
+# ============================================================================
+components:
+  comic:
+    - ComicButton       # Primary action button (sketch border, hard shadow)
+    - ComicCard         # Content card with sketch border
+    - ComicBadge        # Status/label badge
+    - ComicTabs         # Tab navigation
+    - ComicDialog       # Modal dialog
+    - ComicInput        # Form input
+    - ComicTooltip      # Hover tooltip
+    - ComicToast        # Toast notification system
+    - ComicSkeleton     # Loading skeleton (sketch style)
+    - ComicCallout      # Alert/info callout box
+    - ComicDataTable    # Data table with sorting/pagination
+    - ComicSparkline    # Inline mini chart
+    - ComicEmptyState   # Empty state illustration
+    - BentoGrid         # Bento grid layout
+    - ComicBentoCard    # Bento grid cell card
+    - RoughChart        # Hand-drawn chart (Rough.js)
+    - RoughGraph        # D3-force network graph (Rough.js)
+    - HeatmapCalendar   # GitHub-style activity heatmap
+
+  layout:
+    - Header            # Top bar (search, notifications, theme toggle, AI drawer toggle)
+    - Sidebar           # Left navigation (3 sections: Main, Insights, Tools)
+    - AIDrawer          # Right-side AI copilot panel (toggle)
+    - ThemeToggle       # Dark/light mode switch
+
+  dashboard:
+    - StatsGrid         # KPI stats grid
+    - DNACard           # Project DNA display
+    - ActivityTimeline  # Recent activity feed
+    - TrendChart        # 7-day trend line chart
+    - ProjectCard       # Project summary card
+
+  hub:
+    - SessionList       # Hub session sidebar list
+    - MessageFeed       # Chat message list
+    - MessageBubble     # Single chat message
+    - Composer          # Chat input area
+    - StreamingText     # SSE streaming text display
+    - TokenCounter      # Token usage display
+    - DeviceIndicator   # Device sync indicator
+
+# ============================================================================
+# API LAYER (Frontend)
+# ============================================================================
+api_modules:
+  - file: lib/api/projects.ts
+    collection: projects
+    operations: [list, getBySlug, create, update, delete]
+  - file: lib/api/conversations.ts
+    collection: conversations
+    operations: [list, getById, create, delete]
+  - file: lib/api/ideas.ts
+    collection: ideas
+    operations: [list, getById, create, update, delete]
+  - file: lib/api/activity.ts
+    collection: activities + activity_aggregates
+    operations: [list, getHeatmap, getAggregates]
+  - file: lib/api/search.ts
+    endpoint: /api/mytrend/search
+    operations: [search]
+  - file: lib/api/hub.ts
+    collection: hub_sessions + hub_environments
+    operations: [listSessions, getSession, createSession, sendMessage, listEnvironments]
+
+# ============================================================================
+# STORES (State Management)
+# ============================================================================
+stores:
+  - file: lib/stores/auth.ts
+    purpose: Authentication state (isLoggedIn, currentUser)
+  - file: lib/stores/theme.ts
+    purpose: Theme state (dark/light) + localStorage persistence
+  - file: lib/stores/toast.ts
+    purpose: Toast notification queue
+  - file: lib/stores/sync.ts
+    purpose: Real-time sync subscriptions manager
+
+# ============================================================================
+# AUDIT STATUS SUMMARY
+# ============================================================================
+audit_status:
+  WORKING:
+    - "Dashboard (/)"
+    - "Projects list (/projects)"
+    - "Project detail (/projects/[slug])"
+    - "New project (/projects/new)"
+    - "Conversations list (/conversations)"
+    - "Conversation detail (/conversations/[id])"
+    - "Import (/conversations/import)"
+    - "Ideas list (/ideas)"
+    - "Idea detail (/ideas/[id])"
+    - "New idea (/ideas/new)"
+    - "Settings (/settings)"
+    - "Auth login (/auth/login)"
+    - "Auth register (/auth/register)"
+    - "Claude sync hook (claude_sync.pb.js)"
+    - "Main hook (main.pb.js)"
+
+  NEEDS_AUDIT:
+    - "Trends overview (/trends) - depends on activity data pipeline"
+    - "Activity trends (/trends/activity) - depends on activity_aggregation hook"
+    - "Heatmap (/trends/heatmap) - depends on activity data"
+    - "Topic trends (/trends/topics) - depends on topic extraction"
+    - "Graph (/graph) - depends on topic data with relationships"
+    - "Search (/search) - depends on search_index hook + FTS5"
+    - "Hub main (/hub) - requires ANTHROPIC_API_KEY"
+    - "Hub session (/hub/[sessionId]) - requires API key + streaming"
+    - "Hub new session (/hub/new) - needs testing"
+    - "Hub settings (/hub/settings) - needs testing"
+    - "search_index.pb.js - FTS5 indexing logic"
+    - "activity_aggregation.pb.js - aggregation triggers"
+
+  OPTIONAL:
+    - "neural_bridge.pb.js - Neural Memory integration"
