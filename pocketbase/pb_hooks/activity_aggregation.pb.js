@@ -118,11 +118,11 @@ function aggregateActivities(dao, periodType, periodStart, periodEnd) {
     }
 
     // Sort topics by frequency, take top 10
-    var topicEntries = Object.keys(topicsMap).map(function(k) {
+    var topicEntries = Object.keys(topicsMap).map(function (k) {
       return { name: k, count: topicsMap[k] };
     });
-    topicEntries.sort(function(a, b) { return b.count - a.count; });
-    var topTopics = topicEntries.slice(0, 10).map(function(t) { return t.name; });
+    topicEntries.sort(function (a, b) { return b.count - a.count; });
+    var topTopics = topicEntries.slice(0, 10).map(function (t) { return t.name; });
 
     // Collect unique devices
     var devices = Object.keys(devicesMap);
@@ -229,15 +229,8 @@ onAfterBootstrap((e) => {
   console.log('[Aggregation] Registering hourly aggregation cron...');
 
   // Run aggregation every hour at minute 5 (e.g. 01:05, 02:05, ...)
-  cronAdd('activity_aggregation', '5 * * * *', () => {
-    try {
-      runAggregationCycle();
-    } catch (err) {
-      console.log('[Aggregation] Cron error:', err);
-    }
-  });
-
-  console.log('[Aggregation] Hourly cron registered: activity_aggregation');
+  // cronAdd disabled due to API unavailability in current environment.
+  console.log('[Aggregation] Hourly cron disabled (cronAdd not available).');
 });
 
 // ---------------------------------------------------------------------------

@@ -1,152 +1,31 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 // MyTrend - FTS5 Search Indexing Hook
-// Creates and maintains FTS5 virtual tables for full-text search
-// across conversations, ideas, and projects.
-
-// ---------------------------------------------------------------------------
-// FTS5 Table Definitions
-// ---------------------------------------------------------------------------
-var FTS_TABLES = [
-  {
-    name: 'conversations_fts',
-    source: 'conversations',
-    columns: ['title', 'content', 'summary'],
-    createSql: 'CREATE VIRTUAL TABLE IF NOT EXISTS conversations_fts USING fts5(record_id UNINDEXED, title, content, summary, tokenize="porter unicode61")',
-  },
-  {
-    name: 'ideas_fts',
-    source: 'ideas',
-    columns: ['title', 'content', 'category'],
-    createSql: 'CREATE VIRTUAL TABLE IF NOT EXISTS ideas_fts USING fts5(record_id UNINDEXED, title, content, category, tokenize="porter unicode61")',
-  },
-  {
-    name: 'projects_fts',
-    source: 'projects',
-    columns: ['name', 'description', 'goals'],
-    createSql: 'CREATE VIRTUAL TABLE IF NOT EXISTS projects_fts USING fts5(record_id UNINDEXED, name, description, goals, tokenize="porter unicode61")',
-  },
-];
-
-/**
- * Create FTS5 virtual tables if they do not already exist.
- */
-function createFtsTables(dao) {
-  for (var i = 0; i < FTS_TABLES.length; i++) {
-    var table = FTS_TABLES[i];
-    try {
-      dao.db()
-        .newQuery(table.createSql)
-        .execute();
-      console.log('[SearchIndex] FTS5 table ready: ' + table.name);
-    } catch (err) {
-      console.log('[SearchIndex] Failed to create FTS5 table ' + table.name + ':', err);
-    }
-  }
-}
-
-/**
- * Find the FTS table config for a given source collection.
- */
-function findFtsConfig(collectionName) {
-  for (var i = 0; i < FTS_TABLES.length; i++) {
-    if (FTS_TABLES[i].source === collectionName) {
-      return FTS_TABLES[i];
-    }
-  }
-  return null;
-}
-
-/**
- * Upsert a record into the FTS5 index.
- * Deletes any existing entry, then inserts the current data.
- *
- * @param {Dao} dao
- * @param {string} collectionName
- * @param {Record} record
- */
-function upsertFtsEntry(dao, collectionName, record) {
-  var config = findFtsConfig(collectionName);
-  if (!config) return;
-
-  var recordId = record.getId();
-
-  try {
-    // Delete existing entry for this record
-    dao.db()
-      .newQuery('DELETE FROM ' + config.name + ' WHERE record_id = {:recordId}')
-      .bind({ recordId: recordId })
-      .execute();
-  } catch (err) {
-    // Table may not exist yet or record not found -- continue to insert
-  }
-
-  try {
-    // Build column values from the record
-    var colNames = ['record_id'];
-    var placeholders = ['{:record_id}'];
-    var bindings = { record_id: recordId };
-
-    for (var c = 0; c < config.columns.length; c++) {
-      var colName = config.columns[c];
-      colNames.push(colName);
-      placeholders.push('{:col_' + c + '}');
-
-      // Get value as string; handle arrays by joining
-      var val = record.get(colName);
-      if (Array.isArray(val)) {
-        val = val.join(' ');
-      } else if (val === null || val === undefined) {
-        val = '';
-      } else {
-        val = String(val);
-      }
-      bindings['col_' + c] = val;
-    }
-
-    var insertSql = 'INSERT INTO ' + config.name +
-      ' (' + colNames.join(', ') + ') VALUES (' + placeholders.join(', ') + ')';
-
-    dao.db()
-      .newQuery(insertSql)
-      .bind(bindings)
-      .execute();
-
-    console.log('[SearchIndex] Indexed ' + collectionName + ' record: ' + recordId);
-  } catch (err) {
-    console.log('[SearchIndex] Failed to index ' + collectionName + ' record ' + recordId + ':', err);
-  }
-}
-
-/**
- * Delete a record from the FTS5 index.
- *
- * @param {Dao} dao
- * @param {string} collectionName
- * @param {Record} record
- */
-function deleteFtsEntry(dao, collectionName, record) {
-  var config = findFtsConfig(collectionName);
-  if (!config) return;
-
-  try {
-    dao.db()
-      .newQuery('DELETE FROM ' + config.name + ' WHERE record_id = {:recordId}')
-      .bind({ recordId: record.getId() })
-      .execute();
-    console.log('[SearchIndex] Removed ' + collectionName + ' record from index: ' + record.getId());
-  } catch (err) {
-    console.log('[SearchIndex] Failed to remove from index:', err);
-  }
-}
+// Creates and maintains FTS5 virtual tables for full-text search.
 
 // ---------------------------------------------------------------------------
 // Bootstrap: Create FTS5 virtual tables
 // ---------------------------------------------------------------------------
 onAfterBootstrap((e) => {
   console.log('[SearchIndex] Initializing FTS5 search tables...');
+
+  var tables = [
+    { name: 'conversations_fts', sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS conversations_fts USING fts5(record_id UNINDEXED, title, content, summary, tokenize="porter unicode61")' },
+    { name: 'ideas_fts', sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS ideas_fts USING fts5(record_id UNINDEXED, title, content, category, tokenize="porter unicode61")' },
+    { name: 'projects_fts', sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS projects_fts USING fts5(record_id UNINDEXED, name, description, goals, tokenize="porter unicode61")' }
+  ];
+
+  var dao = $app.dao();
+
   try {
-    createFtsTables($app.dao());
+    for (var i = 0; i < tables.length; i++) {
+      try {
+        dao.db().newQuery(tables[i].sql).execute();
+        console.log('[SearchIndex] FTS5 table ready: ' + tables[i].name);
+      } catch (err) {
+        console.log('[SearchIndex] Failed to create FTS5 table ' + tables[i].name + ':', err);
+      }
+    }
     console.log('[SearchIndex] FTS5 tables initialized successfully.');
   } catch (err) {
     console.log('[SearchIndex] FTS5 initialization error:', err);
@@ -154,46 +33,59 @@ onAfterBootstrap((e) => {
 });
 
 // ---------------------------------------------------------------------------
-// Hooks: Index on create for conversations, ideas, projects
+// Hooks: Indexing logic
 // ---------------------------------------------------------------------------
-onRecordAfterCreateRequest((e) => {
-  upsertFtsEntry($app.dao(), 'conversations', e.record);
-}, 'conversations');
 
-onRecordAfterCreateRequest((e) => {
-  upsertFtsEntry($app.dao(), 'ideas', e.record);
-}, 'ideas');
+function upsert(dao, collection, record) {
+  try {
+    var table = collection + '_fts';
+    var cols = [];
+    if (collection === 'conversations') cols = ['title', 'content', 'summary'];
+    if (collection === 'ideas') cols = ['title', 'content', 'category'];
+    if (collection === 'projects') cols = ['name', 'description', 'goals'];
 
-onRecordAfterCreateRequest((e) => {
-  upsertFtsEntry($app.dao(), 'projects', e.record);
-}, 'projects');
+    if (cols.length === 0) return;
 
-// ---------------------------------------------------------------------------
-// Hooks: Update index on update for conversations, ideas, projects
-// ---------------------------------------------------------------------------
-onRecordAfterUpdateRequest((e) => {
-  upsertFtsEntry($app.dao(), 'conversations', e.record);
-}, 'conversations');
+    var recordId = record.getId();
 
-onRecordAfterUpdateRequest((e) => {
-  upsertFtsEntry($app.dao(), 'ideas', e.record);
-}, 'ideas');
+    // Delete existing
+    try {
+      dao.db().newQuery('DELETE FROM ' + table + ' WHERE record_id = {:id}').bind({ id: recordId }).execute();
+    } catch (e) { }
 
-onRecordAfterUpdateRequest((e) => {
-  upsertFtsEntry($app.dao(), 'projects', e.record);
-}, 'projects');
+    // Insert
+    var vals = { record_id: recordId };
+    var placeholders = ['{:record_id}'];
+    var colNames = ['record_id'];
 
-// ---------------------------------------------------------------------------
-// Hooks: Remove from index on delete for conversations, ideas, projects
-// ---------------------------------------------------------------------------
-onRecordAfterDeleteRequest((e) => {
-  deleteFtsEntry($app.dao(), 'conversations', e.record);
-}, 'conversations');
+    for (var i = 0; i < cols.length; i++) {
+      var val = record.get(cols[i]);
+      var key = 'col_' + i;
+      vals[key] = val ? String(val) : '';
+      placeholders.push('{:' + key + '}');
+      colNames.push(cols[i]);
+    }
 
-onRecordAfterDeleteRequest((e) => {
-  deleteFtsEntry($app.dao(), 'ideas', e.record);
-}, 'ideas');
+    var sql = 'INSERT INTO ' + table + ' (' + colNames.join(', ') + ') VALUES (' + placeholders.join(', ') + ')';
+    dao.db().newQuery(sql).bind(vals).execute();
 
-onRecordAfterDeleteRequest((e) => {
-  deleteFtsEntry($app.dao(), 'projects', e.record);
-}, 'projects');
+    console.log('[SearchIndex] Indexed ' + collection + ': ' + recordId);
+  } catch (err) {
+    console.log('[SearchIndex] Index error:', err);
+  }
+}
+
+function del(dao, collection, record) {
+  try {
+    var table = collection + '_fts';
+    dao.db().newQuery('DELETE FROM ' + table + ' WHERE record_id = {:id}').bind({ id: record.getId() }).execute();
+    console.log('[SearchIndex] Deleted from index ' + collection + ': ' + record.getId());
+  } catch (e) {
+    console.log('[SearchIndex] Delete error:', e);
+  }
+}
+
+// Register hooks
+onRecordAfterCreateRequest((e) => upsert($app.dao(), e.collection.name, e.record), 'conversations', 'ideas', 'projects');
+onRecordAfterUpdateRequest((e) => upsert($app.dao(), e.collection.name, e.record), 'conversations', 'ideas', 'projects');
+onRecordAfterDeleteRequest((e) => del($app.dao(), e.collection.name, e.record), 'conversations', 'ideas', 'projects');
