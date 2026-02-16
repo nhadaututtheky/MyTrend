@@ -8,16 +8,31 @@
 
   const { collapsed = false }: Props = $props();
 
-  const navItems: NavItem[] = [
-    { label: 'Dashboard', href: '/', icon: '&#9881;' },
-    { label: 'Projects', href: '/projects', icon: '&#128196;' },
-    { label: 'Conversations', href: '/conversations', icon: '&#128172;' },
-    { label: 'Ideas', href: '/ideas', icon: '&#128161;' },
-    { label: 'Trends', href: '/trends', icon: '&#128200;' },
-    { label: 'Hub', href: '/hub', icon: '&#9889;' },
-    { label: 'Search', href: '/search', icon: '&#128269;' },
-    { label: 'Graph', href: '/graph', icon: '&#127760;' },
-    { label: 'Settings', href: '/settings', icon: '&#9881;' },
+  const navSections: Array<{ title: string; items: NavItem[] }> = [
+    {
+      title: 'Main',
+      items: [
+        { label: 'Dashboard', href: '/', icon: '🏠' },
+        { label: 'Projects', href: '/projects', icon: '📁' },
+        { label: 'Conversations', href: '/conversations', icon: '💬' },
+        { label: 'Ideas', href: '/ideas', icon: '💡' },
+      ],
+    },
+    {
+      title: 'Insights',
+      items: [
+        { label: 'Trends', href: '/trends', icon: '📈' },
+        { label: 'Graph', href: '/graph', icon: '🌐' },
+        { label: 'Search', href: '/search', icon: '🔍' },
+      ],
+    },
+    {
+      title: 'Tools',
+      items: [
+        { label: 'Hub', href: '/hub', icon: '⚡' },
+        { label: 'Settings', href: '/settings', icon: '⚙' },
+      ],
+    },
   ];
 
   let currentPath = $state('/');
@@ -37,23 +52,35 @@
 
 <aside class="sidebar" class:collapsed data-testid="sidebar">
   <nav aria-label="Main navigation">
-    <ul class="nav-list">
-      {#each navItems as item (item.href)}
-        <li>
-          <a
-            href={item.href}
-            class="nav-link"
-            class:active={isActive(item.href)}
-            aria-current={isActive(item.href) ? 'page' : undefined}
-          >
-            <span class="nav-icon">{item.icon}</span>
-            {#if !collapsed}
-              <span class="nav-label">{item.label}</span>
-            {/if}
-          </a>
-        </li>
-      {/each}
-    </ul>
+    {#each navSections as section, si}
+      {#if si > 0}
+        <div class="section-divider"></div>
+      {/if}
+      {#if !collapsed}
+        <span class="section-title">{section.title}</span>
+      {/if}
+      <ul class="nav-list">
+        {#each section.items as item (item.href)}
+          <li>
+            <a
+              href={item.href}
+              class="nav-link"
+              class:active={isActive(item.href)}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              title={collapsed ? item.label : undefined}
+            >
+              <span class="nav-icon">{item.icon}</span>
+              {#if !collapsed}
+                <span class="nav-label">{item.label}</span>
+              {/if}
+              {#if item.badge && item.badge > 0 && !collapsed}
+                <span class="nav-badge">{item.badge}</span>
+              {/if}
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/each}
   </nav>
 </aside>
 
@@ -66,17 +93,36 @@
     background: var(--bg-card);
     border-right: var(--border-width) solid var(--border-color);
     overflow-y: auto;
-    transition: width 250ms ease;
+    transition: width var(--transition-sketch);
     flex-shrink: 0;
+    padding: var(--spacing-sm) 0;
   }
 
   .collapsed {
     width: 56px;
   }
 
+  .section-title {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    padding: var(--spacing-xs) var(--spacing-md);
+    margin-top: var(--spacing-xs);
+  }
+
+  .section-divider {
+    height: 1px;
+    margin: var(--spacing-xs) var(--spacing-md);
+    background: var(--border-color);
+    opacity: 0.3;
+  }
+
   .nav-list {
     list-style: none;
-    padding: var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
   }
 
   .nav-link {
@@ -88,23 +134,30 @@
     color: var(--text-secondary);
     text-decoration: none;
     font-family: var(--font-comic);
-    font-size: 0.875rem;
+    font-size: 0.85rem;
     font-weight: 700;
     transition:
-      background 150ms ease,
-      color 150ms ease;
+      background var(--transition-fast),
+      color var(--transition-fast),
+      box-shadow var(--transition-fast);
     white-space: nowrap;
   }
 
   .nav-link:hover {
     background: var(--bg-secondary);
     color: var(--text-primary);
+    text-decoration: none;
   }
 
   .nav-link.active {
     background: var(--accent-green);
     color: #1a1a1a;
     box-shadow: var(--shadow-sm);
+  }
+
+  /* Neon glow on active in dark mode */
+  :global([data-theme='dark']) .nav-link.active {
+    box-shadow: var(--shadow-sm), 0 0 10px rgba(0, 210, 106, 0.2);
   }
 
   .nav-icon {
@@ -114,13 +167,24 @@
     flex-shrink: 0;
   }
 
+  .nav-badge {
+    margin-left: auto;
+    font-size: 0.6rem;
+    background: var(--accent-red);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
   @media (max-width: 768px) {
     .sidebar {
       position: fixed;
       left: 0;
       z-index: 50;
       transform: translateX(-100%);
-      transition: transform 250ms ease;
+      transition: transform var(--transition-sketch);
     }
 
     .sidebar:not(.collapsed) {

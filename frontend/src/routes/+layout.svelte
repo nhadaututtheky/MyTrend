@@ -6,12 +6,14 @@
   import { initTheme } from '$lib/stores/theme';
   import Header from '$lib/components/layout/Header.svelte';
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
+  import AIDrawer from '$lib/components/layout/AIDrawer.svelte';
   import ComicToast from '$lib/components/comic/ComicToast.svelte';
   import '../app.css';
 
   const { children } = $props();
 
   let sidebarCollapsed = $state(false);
+  let drawerOpen = $state(false);
   let loggedIn = $state(false);
   let currentPath = $state('/');
 
@@ -57,13 +59,14 @@
     {@render children()}
   </main>
 {:else}
-  <Header onToggleSidebar={toggleSidebar} />
+  <Header onToggleSidebar={toggleSidebar} onToggleDrawer={() => { drawerOpen = !drawerOpen; }} />
   <div class="app-layout">
     <Sidebar collapsed={sidebarCollapsed} />
     <main id="main-content" class="main-content">
       {@render children()}
     </main>
   </div>
+  <AIDrawer bind:open={drawerOpen} />
 {/if}
 
 <style>
