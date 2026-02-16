@@ -4,6 +4,8 @@
   import { fetchIdea } from '$lib/api/ideas';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
+  import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import { formatDate } from '$lib/utils/date';
   import type { Idea } from '$lib/types';
 
@@ -27,12 +29,19 @@
 
 <div class="idea-page">
   {#if isLoading}
-    <p class="loading">Loading...</p>
+    <ComicSkeleton variant="text" />
+    <ComicSkeleton variant="card" height="150px" />
   {:else if !idea}
-    <ComicCard><h2>Idea not found</h2></ComicCard>
+    <ComicEmptyState
+      illustration="error"
+      message="Idea not found"
+      description="This idea may have been deleted."
+      actionLabel="Back to Ideas"
+      actionHref="/ideas"
+    />
   {:else}
     <div class="idea-header">
-      <h1>{idea.title}</h1>
+      <h1 class="comic-heading">{idea.title}</h1>
       <div class="badges">
         <ComicBadge color="blue">{idea.type}</ComicBadge>
         <ComicBadge color="green">{idea.status}</ComicBadge>
@@ -54,7 +63,7 @@
     {#if idea.related_ideas.length > 0}
       <ComicCard>
         <h3 class="section-title">Related Ideas</h3>
-        <ul>{#each idea.related_ideas as relId (relId)}<li><a href="/ideas/{relId}">{relId}</a></li>{/each}</ul>
+        <ul class="related-list">{#each idea.related_ideas as relId (relId)}<li><a href="/ideas/{relId}" class="related-link">{relId}</a></li>{/each}</ul>
       </ComicCard>
     {/if}
   {/if}
@@ -62,11 +71,12 @@
 
 <style>
   .idea-page { display: flex; flex-direction: column; gap: var(--spacing-lg); max-width: 800px; }
-  .idea-header h1 { margin: 0 0 var(--spacing-sm); }
-  .badges { display: flex; gap: var(--spacing-xs); margin-bottom: 4px; }
+  .idea-header { animation: sketchFadeIn 0.3s ease; }
+  .badges { display: flex; gap: var(--spacing-xs); margin: var(--spacing-sm) 0 4px; }
   .date { font-size: 0.75rem; color: var(--text-muted); }
   .content { font-size: 0.875rem; line-height: 1.7; white-space: pre-wrap; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; }
   .section-title { font-size: 0.875rem; text-transform: uppercase; margin: 0 0 var(--spacing-sm); }
-  .loading { text-align: center; color: var(--text-muted); padding: var(--spacing-2xl); }
+  .related-list { padding-left: var(--spacing-lg); font-size: 0.85rem; }
+  .related-link { color: var(--accent-blue); }
 </style>
