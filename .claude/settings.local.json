@@ -27,7 +27,36 @@
       "Bash(npx tsc:*)",
       "Bash(npx vitest:*)",
       "Bash(npx vite build)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "mcp__neuralmemory__nmem_remember",
+      "Bash(docker compose:*)",
+      "Bash(docker exec:*)",
+      "Bash(MSYS_NO_PATHCONV=1 docker exec:*)",
+      "Bash(docker restart:*)",
+      "Bash(python:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfcGJfdXNlcnNfYXV0aF8iLCJleHAiOjE3NzI0NzcwMTYsImlkIjoidTVqam55eXNlbjA4anBiIiwidHlwZSI6ImF1dGhSZWNvcmQifQ.-m4Ic1zakPi1tXYxoZT9KRLjqIKhSXUrpQcu7ZAT4rw\")",
+      "Bash(__NEW_LINE_d2b69d6dc4f31bd5__ curl -s -X POST \"http://localhost:8090/api/mytrend/sync-claude?force=true\" -H \"Authorization: $TOKEN\")",
+      "Bash(__NEW_LINE_69fa4c7802b9157a__ curl -s \"http://localhost:8090/api/collections/conversations/records?perPage=5&sort=-updated&fields=id,title,session_id,source\" -H \"Authorization: $TOKEN\")",
+      "Bash(__NEW_LINE_3cb3323169c96fe3__ curl -s \"http://localhost:8090/api/collections/conversations/records/8j0x0mickwhbj2i\" -H \"Authorization: $TOKEN\")",
+      "Bash(ADMIN_TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI0NzgzMjcsImlkIjoibWdwNGI5bWgwbTF4ajNqIiwidHlwZSI6ImFkbWluIn0.9GxugU0-bds5Dsg4wegeWgOvVvNA6mtmZ-5SdXvIYmA\")",
+      "Bash(AT=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI0Nzg0MTgsImlkIjoibWdwNGI5bWgwbTF4ajNqIiwidHlwZSI6ImFkbWluIn0.cQ6ETQuiq1OuJwa_RZvgXGSkRrYqcqQkTx8oAbthWls\")",
+      "Bash(AT=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzI0Nzg0NTEsImlkIjoibWdwNGI5bWgwbTF4ajNqIiwidHlwZSI6ImFkbWluIn0.bmCOaGfvYDZyoZmwpQWqB0zeGhiCQeS4RoEieq5sBTU\")",
+      "Bash(echo:*)",
+      "Bash(# Try with the credentials from previous session curl -s http://localhost:8090/api/collections/users/auth-with-password -d ''identity=x@mytrend.local&password=Admin123!'')",
+      "Bash(# List PB admin users curl -s http://localhost:8090/api/admins/auth-with-password -d ''identity=admin@admin.com&password=Admin123!'')",
+      "Bash(__NEW_LINE_38dde3a7ea7e805f__ echo \"\")",
+      "Bash(__NEW_LINE_d68a5e791b264367__ echo \"\")",
+      "Bash(__NEW_LINE_4da5aa0f1ef36244__ echo \"\")",
+      "Bash(# Check what rough-viz exports look like in node_modules docker exec mytrend-web sh -c \"\"cat /app/node_modules/rough-viz/package.json\"\")",
+      "Bash(# Check roughjs exports docker exec mytrend-web sh -c \"\"cat /app/node_modules/roughjs/package.json\"\")",
+      "mcp__neuralmemory__nmem_recap",
+      "mcp__neuralmemory__nmem_session",
+      "mcp__neuralmemory__nmem_recall",
+      "Bash(ls:*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "neuralmemory"
+  ]
 }

@@ -38,6 +38,20 @@
   });
 
   const totalActivity = $derived(aggregates.reduce((s, a) => s + a.total_count, 0));
+  const totalMinutes = $derived(aggregates.reduce((s, a) => s + a.total_minutes, 0));
+  const avgPerPeriod = $derived(aggregates.length > 0 ? Math.round(totalActivity / aggregates.length) : 0);
+  const peakDay = $derived.by(() => {
+    if (aggregates.length === 0) return { label: '-', value: 0 };
+    let max: ActivityAggregate | undefined;
+    for (const a of aggregates) {
+      if (!max || a.total_count > max.total_count) max = a;
+    }
+    if (!max) return { label: '-', value: 0 };
+    return {
+      label: new Date(max.period_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      value: max.total_count,
+    };
+  });
 
   async function loadData(): Promise<void> {
     isLoading = true;
@@ -50,7 +64,6 @@
     }
   }
 
-  // Only use onMount for initial load, $effect for period changes after init
   onMount(async () => {
     await loadData();
     initialized = true;
@@ -70,12 +83,16 @@
 <div class="activity-page">
   <div class="page-header">
     <h1 class="comic-heading">Activity Breakdown</h1>
-    <span class="total">{totalActivity} total activities</span>
   </div>
 
   <ComicTabs tabs={periodTabs} bind:active={period} />
 
   {#if isLoading}
+    <BentoGrid columns={4} gap="sm">
+      {#each Array(4) as _}
+        <ComicSkeleton variant="card" height="80px" />
+      {/each}
+    </BentoGrid>
     <BentoGrid columns={2} gap="md">
       <ComicSkeleton variant="chart" />
       <ComicSkeleton variant="chart" />
@@ -87,6 +104,25 @@
       description="Activities are tracked automatically when you create conversations, ideas, and projects."
     />
   {:else}
+    <BentoGrid columns={4} gap="sm">
+      <ComicBentoCard title="Total" icon="📊" neonColor="green" variant="neon">
+        <span class="stat-big">{totalActivity}</span>
+      </ComicBentoCard>
+
+      <ComicBentoCard title="Time Spent" icon="⏱" neonColor="blue" variant="neon">
+        <span class="stat-big">{totalMinutes < 60 ? `${totalMinutes}m` : `${Math.round(totalMinutes / 60)}h`}</span>
+      </ComicBentoCard>
+
+      <ComicBentoCard title="Avg / Period" icon="📈" neonColor="yellow" variant="neon">
+        <span class="stat-big">{avgPerPeriod}</span>
+      </ComicBentoCard>
+
+      <ComicBentoCard title="Peak" icon="🏆" neonColor="orange" variant="neon">
+        <span class="stat-big">{peakDay.value}</span>
+        <span class="stat-sub">{peakDay.label}</span>
+      </ComicBentoCard>
+    </BentoGrid>
+
     <BentoGrid columns={2} gap="md">
       <ComicBentoCard title="Activity Over Time" icon="📊" neonColor="green" variant="neon">
         <RoughChart type="bar" data={chartData} title="" color="#00D26A" width={600} height={300} />
@@ -112,8 +148,16 @@
     justify-content: space-between;
   }
 
-  .total {
-    font-size: 0.8rem;
+  .stat-big {
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+    font-family: var(--font-mono, monospace);
+  }
+
+  .stat-sub {
+    font-size: 0.65rem;
     color: var(--text-muted);
+    margin-top: 2px;
   }
 </style>
