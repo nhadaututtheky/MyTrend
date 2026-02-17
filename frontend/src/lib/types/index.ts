@@ -216,6 +216,37 @@ export interface HubCronJob extends BaseRecord {
   last_result: string;
 }
 
+// Trending Topics (from /api/mytrend/trending-topics)
+export type TrendDirection = 'rising' | 'falling' | 'stable';
+
+export interface TrendingTopic {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  mention_count: number;
+  direction: TrendDirection;
+  change_pct: number;
+  last_7d_count: number;
+  sparkline: number[];
+}
+
+// Topic Trend Series (from /api/mytrend/topic-trends)
+export interface TopicTrendSeries {
+  topic_id: string;
+  name: string;
+  slug: string;
+  color: string;
+  data: TopicTrendPoint[];
+}
+
+export interface TopicTrendResponse {
+  range: string;
+  start: string;
+  end: string;
+  series: TopicTrendSeries[];
+}
+
 // Search
 export interface SearchResult {
   type: 'conversation' | 'idea' | 'project' | 'topic';
@@ -263,7 +294,15 @@ export interface Toast {
   duration: number;
 }
 
-// Claude Tasks (read from ~/.claude/tasks/)
+// Navigation
+export interface NavItem {
+  label: string;
+  href: string;
+  icon: string;
+  badge?: number;
+}
+
+// Claude Task Viewer
 export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
 
 export interface ClaudeTask {
@@ -296,12 +335,4 @@ export interface ClaudeTodoList {
   filename: string;
   sessionId: string;
   todos: ClaudeTodoItem[];
-}
-
-// Navigation
-export interface NavItem {
-  label: string;
-  href: string;
-  icon: string;
-  badge?: number;
 }

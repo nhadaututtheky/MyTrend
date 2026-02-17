@@ -31,12 +31,12 @@
   }
 
   .badge-md {
-    font-size: 0.75rem;
-    padding: 2px 8px;
+    font-size: var(--font-size-sm);
+    padding: 2px var(--spacing-sm);
   }
 
   .badge-sm {
-    font-size: 0.625rem;
+    font-size: var(--font-size-2xs);
     padding: 1px 6px;
   }
 

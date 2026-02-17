@@ -21,6 +21,28 @@
 :root {
   --font-comic: 'Comic Mono', 'Courier New', monospace;
 
+  /* Typography Scale */
+  --font-size-2xs: 0.625rem;
+  --font-size-xs: 0.7rem;
+  --font-size-sm: 0.75rem;
+  --font-size-md: 0.8rem;
+  --font-size-base: 0.875rem;
+  --font-size-lg: 0.95rem;
+  --font-size-xl: 1rem;
+  --font-size-2xl: 1.1rem;
+  --font-size-3xl: 1.25rem;
+  --font-size-4xl: 1.5rem;
+  --font-size-5xl: 2rem;
+  --font-size-6xl: 2.5rem;
+
+  /* Line Height */
+  --leading-tight: 1.2;
+  --leading-snug: 1.3;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+  --leading-loose: 1.75;
+
+  /* Colors */
   --bg-primary: #fffef9;
   --bg-secondary: #f0ede4;
   --bg-card: #ffffff;
@@ -37,27 +59,52 @@
   --accent-orange: #ff9f43;
   --accent-purple: #a29bfe;
 
+  /* Shadows */
   --shadow-sm: 2px 2px 0 #1a1a1a;
   --shadow-md: 4px 4px 0 #1a1a1a;
   --shadow-lg: 6px 6px 0 #1a1a1a;
 
+  /* Border Radius */
   --radius-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
   --radius-sm: 4px;
   --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
 
+  /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
+  --spacing-3xl: 64px;
+  --spacing-4xl: 96px;
 
+  /* Layout */
   --sidebar-width: 260px;
   --header-height: 60px;
+  --max-width-content: 1280px;
+  --max-width-prose: 720px;
+  --touch-target-min: 44px;
 
+  /* Z-Index Scale */
+  --z-base: 1;
+  --z-sticky: 50;
+  --z-header: 100;
+  --z-dropdown: 200;
+  --z-drawer: 300;
+  --z-modal: 1000;
+  --z-toast: 2000;
+  --z-skip: 9999;
+
+  /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
   --transition-sketch: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Neon Sketch Glow tokens (used in dark mode) */
   --glow-green: 0 0 12px rgba(0, 210, 106, 0.15);
@@ -107,7 +154,7 @@ body {
   font-family: var(--font-comic);
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
   min-height: 100vh;
 }
 
@@ -120,20 +167,20 @@ h5,
 h6 {
   font-family: var(--font-comic);
   font-weight: 700;
-  line-height: 1.3;
+  line-height: var(--leading-snug);
 }
 
 h1 {
-  font-size: 2rem;
+  font-size: var(--font-size-5xl);
 }
 h2 {
-  font-size: 1.5rem;
+  font-size: var(--font-size-4xl);
 }
 h3 {
-  font-size: 1.25rem;
+  font-size: var(--font-size-3xl);
 }
 h4 {
-  font-size: 1.1rem;
+  font-size: var(--font-size-2xl);
 }
 
 .comic-heading {
@@ -205,7 +252,7 @@ a:hover {
 .comic-btn {
   font-family: var(--font-comic);
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: var(--font-size-base);
   padding: var(--spacing-sm) var(--spacing-md);
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sketch);
@@ -256,8 +303,9 @@ a:hover {
 /* Inputs */
 .comic-input {
   font-family: var(--font-comic);
-  font-size: 0.875rem;
+  font-size: var(--font-size-base);
   padding: var(--spacing-sm) var(--spacing-md);
+  min-height: var(--touch-target-min);
   border: var(--border-width) solid var(--border-color);
   border-radius: var(--radius-sketch);
   background: var(--bg-card);
@@ -283,7 +331,7 @@ a:hover {
 /* Badges */
 .comic-badge {
   font-family: var(--font-comic);
-  font-size: 0.75rem;
+  font-size: var(--font-size-sm);
   font-weight: 700;
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sketch);
@@ -323,7 +371,7 @@ a:hover {
 
 /* Layout Utilities */
 .container {
-  max-width: 1200px;
+  max-width: var(--max-width-content);
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
 }
@@ -538,10 +586,23 @@ a:hover {
   background: var(--accent-green);
   color: #1a1a1a;
   padding: var(--spacing-sm) var(--spacing-md);
-  z-index: 9999;
+  z-index: var(--z-skip);
   font-weight: 700;
 }
 
 .skip-link:focus {
   top: 0;
+}
+
+/* Screen reader only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

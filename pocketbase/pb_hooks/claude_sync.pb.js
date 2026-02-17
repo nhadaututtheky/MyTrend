@@ -134,7 +134,78 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
   }
 
   var dao = $app.dao();
-  var result = { projects_scanned: 0, sessions_found: 0, imported: 0, skipped: 0, updated: 0, errors: [] };
+  var result = { projects_scanned: 0, projects_created: 0, sessions_found: 0, imported: 0, skipped: 0, updated: 0, errors: [] };
+
+  // Auto-create project from directory name and return project ID
+  function ensureProject(dirName) {
+    // Parse: "C--Users-X-Desktop-Future-MyTrend" -> "MyTrend"
+    var parts = dirName.split('-');
+    var projectName = parts[parts.length - 1] || dirName;
+    if (!projectName || projectName.length < 2) return null;
+
+    var slug = projectName.toLowerCase().replace(/[^a-z0-9\-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    if (!slug) return null;
+
+    // Check existing
+    try {
+      var existing = dao.findFirstRecordByFilter(
+        'projects',
+        'user = {:uid} && slug = {:slug}',
+        { uid: userId, slug: slug }
+      );
+      return existing.getId();
+    } catch (e) { /* not found, create */ }
+
+    try {
+      var projCol = dao.findCollectionByNameOrId('projects');
+      var projRec = new Record(projCol);
+      projRec.set('user', userId);
+      projRec.set('name', projectName);
+      projRec.set('slug', slug);
+      projRec.set('description', 'Auto-created from Claude Code project: ' + dirName);
+      projRec.set('color', '#4ECDC4');
+      projRec.set('icon', '');
+      projRec.set('status', 'active');
+      projRec.set('total_conversations', 0);
+      projRec.set('total_ideas', 0);
+      projRec.set('total_minutes', 0);
+      projRec.set('last_activity', new Date().toISOString());
+      projRec.set('dna', JSON.stringify({}));
+      dao.saveRecord(projRec);
+      result.projects_created++;
+      console.log('[ClaudeSync] Auto-created project: ' + projectName);
+      return projRec.getId();
+    } catch (err) {
+      console.log('[ClaudeSync] Project create error: ' + err);
+      return null;
+    }
+  }
+
+  // Update project metrics after all conversations are synced
+  function updateProjectMetrics(projectId) {
+    if (!projectId) return;
+    try {
+      var convs = dao.findRecordsByFilter(
+        'conversations',
+        'user = {:uid} && project = {:pid}',
+        '', 0, 0,
+        { uid: userId, pid: projectId }
+      );
+      var totalConvs = convs.length;
+      var totalMins = 0;
+      var lastActivity = '';
+      for (var mc = 0; mc < convs.length; mc++) {
+        totalMins += convs[mc].getInt('duration_min') || 0;
+        var sa = convs[mc].getString('started_at') || convs[mc].getString('created');
+        if (sa > lastActivity) lastActivity = sa;
+      }
+      var projRec2 = dao.findRecordById('projects', projectId);
+      projRec2.set('total_conversations', totalConvs);
+      projRec2.set('total_minutes', totalMins);
+      if (lastActivity) projRec2.set('last_activity', lastActivity);
+      dao.saveRecord(projRec2);
+    } catch (e) { /* skip */ }
+  }
 
   try {
     var collection = dao.findCollectionByNameOrId('conversations');
@@ -168,6 +239,9 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
       var parts = projName.split('-');
       var tag = parts[parts.length - 1] || projName;
       result.projects_scanned++;
+
+      // Auto-create project from directory name
+      var projectId = ensureProject(projName);
 
       var files;
       try { files = $os.readDir(projPath); } catch (e) { continue; }
@@ -249,7 +323,6 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
         }
 
         // Detect source from project path
-        // Home dir only (e.g. C--Users-X) = desktop, project dir = cli
         var source = 'cli';
         var pathDepth = projName.split('-').length;
         if (projName.match(/^C--Users-[^-]+$/) || pathDepth <= 3) {
@@ -279,6 +352,7 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
           record.set('duration_min', durMin);
           record.set('topics', []);
           record.set('tags', [tag, 'claude-' + source]);
+          if (projectId) record.set('project', projectId);
           if (firstUserText) {
             record.set('summary', firstUserText.length > 500 ? firstUserText.substring(0, 497) + '...' : firstUserText);
           }
@@ -291,7 +365,15 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
         }
       }
     }
-    console.log('[ClaudeSync] Done. Imported: ' + result.imported + ', Updated: ' + result.updated + ', Skipped: ' + result.skipped);
+    // Update project metrics for all auto-created projects
+    try {
+      var allProjects = dao.findRecordsByFilter('projects', 'user = {:uid}', '', 0, 0, { uid: userId });
+      for (var mp = 0; mp < allProjects.length; mp++) {
+        updateProjectMetrics(allProjects[mp].getId());
+      }
+    } catch (e) { /* skip */ }
+
+    console.log('[ClaudeSync] Done. Imported: ' + result.imported + ', Updated: ' + result.updated + ', Projects: ' + result.projects_created + ', Skipped: ' + result.skipped);
   } catch (fatal) {
     console.log('[ClaudeSync] FATAL: ' + fatal);
     result.errors.push('Fatal: ' + String(fatal));
@@ -352,6 +434,27 @@ try {
       }
     } catch(e) {}
 
+    // Auto-create project in cron scope
+    function cronEnsureProject(dirName) {
+      var cparts = dirName.split('-');
+      var cname = cparts[cparts.length - 1] || dirName;
+      if (!cname || cname.length < 2) return null;
+      var cslug = cname.toLowerCase().replace(/[^a-z0-9\-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      if (!cslug) return null;
+      try { var ex = dao.findFirstRecordByFilter('projects', 'user = {:uid} && slug = {:slug}', { uid: uid, slug: cslug }); return ex.getId(); } catch (e) {}
+      try {
+        var pc = dao.findCollectionByNameOrId('projects');
+        var pr = new Record(pc);
+        pr.set('user', uid); pr.set('name', cname); pr.set('slug', cslug);
+        pr.set('description', 'Auto-created from Claude Code'); pr.set('color', '#4ECDC4');
+        pr.set('status', 'active'); pr.set('total_conversations', 0);
+        pr.set('total_ideas', 0); pr.set('total_minutes', 0);
+        pr.set('last_activity', new Date().toISOString()); pr.set('dna', JSON.stringify({}));
+        dao.saveRecord(pr); console.log('[ClaudeSync] Cron: auto-created project: ' + cname);
+        return pr.getId();
+      } catch (err) { return null; }
+    }
+
     var imp = 0;
     try {
       var pds = $os.readDir('/pb/import/claude/projects');
@@ -360,6 +463,7 @@ try {
         var pp = '/pb/import/claude/projects/' + pds[p].name();
         var pts = pds[p].name().split('-');
         var tg = pts[pts.length - 1] || pds[p].name();
+        var cronProjId = cronEnsureProject(pds[p].name());
         var fs;
         try { fs = $os.readDir(pp); } catch(e) { continue; }
         for (var f = 0; f < fs.length; f++) {
@@ -413,6 +517,7 @@ try {
             r.set('messages', ms); r.set('message_count', ms.length); r.set('total_tokens', tt);
             r.set('started_at', sa || new Date().toISOString()); r.set('ended_at', ea || '');
             r.set('topics', []); r.set('tags', [tg, 'claude-' + src]);
+            if (cronProjId) r.set('project', cronProjId);
             if (fut) r.set('summary', fut.length > 500 ? fut.substring(0, 497) + '...' : fut);
             dao.saveRecord(r); imp++;
             console.log('[ClaudeSync] Cron imported: ' + sid);

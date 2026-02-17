@@ -190,9 +190,9 @@
   }
 
   .greeting {
-    font-size: 0.85rem;
+    font-size: var(--font-size-md);
     color: var(--text-secondary);
-    margin: 4px 0 0;
+    margin: var(--spacing-xs) 0 0;
   }
 
   .quick-actions {
@@ -219,17 +219,17 @@
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: var(--font-size-4xl);
     font-weight: 700;
-    line-height: 1.2;
+    line-height: var(--leading-tight);
   }
 
   .stat-label {
-    font-size: 0.7rem;
+    font-size: var(--font-size-xs);
     text-transform: uppercase;
     color: var(--text-muted);
     letter-spacing: 0.05em;
-    margin-bottom: 4px;
+    margin-bottom: var(--spacing-xs);
   }
 
   /* Streak */
@@ -241,14 +241,14 @@
   }
 
   .streak-number {
-    font-size: 2.5rem;
+    font-size: var(--font-size-6xl);
     font-weight: 700;
-    line-height: 1;
+    line-height: var(--leading-tight);
     color: var(--accent-orange);
   }
 
   .streak-unit {
-    font-size: 0.85rem;
+    font-size: var(--font-size-md);
     color: var(--text-muted);
     text-transform: uppercase;
   }
@@ -279,7 +279,7 @@
   }
 
   .see-all {
-    font-size: 0.8rem;
+    font-size: var(--font-size-md);
     color: var(--accent-blue);
     text-decoration: none;
     font-weight: 700;
@@ -291,7 +291,7 @@
 
   .empty {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
   }
 
   @media (max-width: 768px) {
