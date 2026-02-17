@@ -56,6 +56,30 @@ services:
       pocketbase:
         condition: service_healthy
 
+  companion:
+    image: node:22-bookworm-slim
+    container_name: mytrend-companion
+    restart: unless-stopped
+    working_dir: /app
+    command: ["npx", "-y", "the-companion@latest"]
+    ports:
+      - "${COMPANION_PORT:-3456}:3456"
+    volumes:
+      - C:/Users/X/.claude:/root/.claude:ro
+      - C:/Users/X/Desktop/Future:/root/projects:rw
+      - companion_data:/tmp/vibe-sessions
+    environment:
+      - COMPANION_PORT=3456
+      - COMPANION_RECORD=0
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3456').then(r=>{if(!r.ok)throw 1}).catch(()=>{process.exit(1)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    profiles:
+      - companion
+
   nginx:
     image: nginx:alpine
     container_name: mytrend-nginx
@@ -65,6 +89,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - frontend
       - pocketbase
@@ -73,3 +98,4 @@ services:
 volumes:
   pb_data:
   nm_data:
+  companion_data:

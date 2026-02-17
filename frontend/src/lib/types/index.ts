@@ -263,6 +263,41 @@ export interface Toast {
   duration: number;
 }
 
+// Claude Tasks (read from ~/.claude/tasks/)
+export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface ClaudeTask {
+  id: string;
+  subject: string;
+  description: string;
+  activeForm: string;
+  status: ClaudeTaskStatus;
+  blocks: readonly string[];
+  blockedBy: readonly string[];
+}
+
+export interface ClaudeTaskSession {
+  sessionId: string;
+  subject: string;
+  highwatermark: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  total: number;
+}
+
+export interface ClaudeTodoItem {
+  content: string;
+  status: ClaudeTaskStatus;
+  activeForm: string;
+}
+
+export interface ClaudeTodoList {
+  filename: string;
+  sessionId: string;
+  todos: ClaudeTodoItem[];
+}
+
 // Navigation
 export interface NavItem {
   label: string;

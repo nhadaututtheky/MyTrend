@@ -30,6 +30,8 @@
       title: 'Tools',
       items: [
         { label: 'Hub', href: '/hub', icon: '⚡' },
+        { label: 'Vibe', href: '/vibe', icon: '🎸' },
+        { label: 'Tasks', href: '/tasks', icon: '📋' },
         { label: 'Settings', href: '/settings', icon: '⚙' },
       ],
     },
