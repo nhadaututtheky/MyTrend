@@ -54,10 +54,14 @@
 
   onMount(async () => {
     await loadConversations();
-    unsubscribe = await pb.collection('conversations').subscribe('*', (e) => {
-      if (e.action === 'create') conversations = [e.record as unknown as Conversation, ...conversations].slice(0, 100);
-      else if (e.action === 'delete') conversations = conversations.filter((c) => c.id !== e.record.id);
-    });
+    try {
+      unsubscribe = await pb.collection('conversations').subscribe('*', (e) => {
+        if (e.action === 'create') conversations = [e.record as unknown as Conversation, ...conversations].slice(0, 100);
+        else if (e.action === 'delete') conversations = conversations.filter((c) => c.id !== e.record.id);
+      });
+    } catch (err: unknown) {
+      console.error('[Conversations] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => { unsubscribe?.(); });

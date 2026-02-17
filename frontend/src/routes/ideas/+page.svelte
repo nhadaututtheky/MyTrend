@@ -53,11 +53,15 @@
     } catch (err: unknown) { console.error('[Ideas]', err); }
     finally { isLoading = false; }
 
-    unsubscribe = await pb.collection('ideas').subscribe('*', (e) => {
-      if (e.action === 'create') ideas = [e.record as unknown as Idea, ...ideas];
-      else if (e.action === 'update') ideas = ideas.map((i) => i.id === e.record.id ? (e.record as unknown as Idea) : i);
-      else if (e.action === 'delete') ideas = ideas.filter((i) => i.id !== e.record.id);
-    });
+    try {
+      unsubscribe = await pb.collection('ideas').subscribe('*', (e) => {
+        if (e.action === 'create') ideas = [e.record as unknown as Idea, ...ideas];
+        else if (e.action === 'update') ideas = ideas.map((i) => i.id === e.record.id ? (e.record as unknown as Idea) : i);
+        else if (e.action === 'delete') ideas = ideas.filter((i) => i.id !== e.record.id);
+      });
+    } catch (err: unknown) {
+      console.error('[Ideas] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => { unsubscribe?.(); });

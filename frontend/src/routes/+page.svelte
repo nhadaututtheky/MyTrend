@@ -95,11 +95,15 @@
       isLoading = false;
     }
 
-    unsubscribe = await pb.collection('activities').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        activities = [e.record as unknown as Activity, ...activities].slice(0, 10);
-      }
-    });
+    try {
+      unsubscribe = await pb.collection('activities').subscribe('*', (e) => {
+        if (e.action === 'create') {
+          activities = [e.record as unknown as Activity, ...activities].slice(0, 10);
+        }
+      });
+    } catch (err: unknown) {
+      console.error('[Dashboard] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => { unsubscribe?.(); });
