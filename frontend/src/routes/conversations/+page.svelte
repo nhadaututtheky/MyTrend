@@ -18,14 +18,18 @@
   let totalPages = $state(1);
   let unsubscribe: (() => void) | undefined;
 
-  const sourceTabs = [
-    { id: 'all', label: 'All' },
-    { id: 'cli', label: 'CLI' },
-    { id: 'desktop', label: 'Desktop' },
-    { id: 'web', label: 'Web' },
-    { id: 'hub', label: 'Hub' },
-    { id: 'imported', label: 'Imported' },
-  ];
+  function countBySource(source: string): number {
+    return conversations.filter((c) => c.source === source).length;
+  }
+
+  const sourceTabs = $derived([
+    { id: 'all', label: 'All', badge: conversations.length },
+    { id: 'cli', label: 'CLI', badge: countBySource('cli') },
+    { id: 'desktop', label: 'Desktop', badge: countBySource('desktop') },
+    { id: 'web', label: 'Web', badge: countBySource('web') },
+    { id: 'hub', label: 'Hub', badge: countBySource('hub') },
+    { id: 'imported', label: 'Imported', badge: countBySource('imported') },
+  ]);
 
   const SOURCE_COLORS: Record<string, 'green' | 'blue' | 'purple' | 'orange' | 'yellow'> = {
     cli: 'green', desktop: 'blue', web: 'purple', hub: 'orange', imported: 'yellow',

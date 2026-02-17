@@ -302,6 +302,77 @@ export interface NavItem {
   badge?: number;
 }
 
+// Insights API
+export interface WeeklyInsights {
+  period: { start: string; end: string };
+  activity_summary: {
+    total: number;
+    hours: number;
+    avg_per_day: number;
+    vs_last_week_pct: number;
+    breakdown: Record<string, number>;
+  };
+  top_topics: Array<{ name: string; count: number }>;
+  peak_hours: Array<{ hour: number; count: number }>;
+  focus_breakdown: Array<{
+    project_id: string;
+    project_name: string;
+    minutes: number;
+    count: number;
+    pct: number;
+  }>;
+  streak: { current: number; longest: number };
+  new_ideas_count: number;
+  conversation_stats: {
+    total: number;
+    avg_messages: number;
+    avg_tokens: number;
+  };
+}
+
+export interface InsightPatterns {
+  productive_hours: Array<{ hour: number; count: number }>;
+  productive_days: Array<{ day: number; name: string; count: number }>;
+  topic_velocity: Array<{
+    topic: string;
+    this_month: number;
+    last_month: number;
+    growth_pct: number;
+  }>;
+  session_patterns: {
+    avg_session_minutes: number;
+    sessions_per_day: number;
+    total_sessions: number;
+  };
+}
+
+export interface PeriodComparison {
+  this_period: number;
+  last_period: number;
+  change_pct: number;
+}
+
+export interface WeekComparison {
+  period: string;
+  days: number;
+  activities: PeriodComparison;
+  hours: PeriodComparison;
+  conversations: PeriodComparison;
+  ideas: PeriodComparison;
+}
+
+export interface AskResult {
+  answer: string;
+  sources: Array<{
+    type: string;
+    id: string;
+    title: string;
+    snippet: string;
+    relevance: number;
+  }>;
+  query: string;
+}
+
 // Claude Task Viewer
 export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
 

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Topic, TrendingTopic, TopicTrendSeries, HeatmapDay } from '$lib/types';
+  import type { Topic, TrendingTopic, TopicTrendSeries, HeatmapDay, InsightPatterns } from '$lib/types';
   import { fetchTopicTrends, fetchTrendingTopics, fetchAllTopics } from '$lib/api/topics';
   import { fetchHeatmapData } from '$lib/api/activity';
+  import { fetchPatterns } from '$lib/api/insights';
+  import ComicCallout from '$lib/components/comic/ComicCallout.svelte';
   import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
   import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
   import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
@@ -34,6 +36,17 @@
   let isLoadingHeatmap = $state(true);
   let isLoadingTopics = $state(true);
   let chartWidth = $state(800);
+  let patterns = $state<InsightPatterns | null>(null);
+
+  const autoInsight = $derived.by((): string | null => {
+    if (!patterns || !trendingTopics.length) return null;
+    const rising = trendingTopics.filter((t) => t.direction === 'rising');
+    if (rising.length === 0) return null;
+    const top = rising[0];
+    if (!top) return null;
+    const pctText = top.change_pct > 0 ? `+${top.change_pct}%` : `${top.change_pct}%`;
+    return `${top.name} is your hottest topic (${pctText} this week)`;
+  });
 
   const TIME_RANGES: Array<{ id: TimeRange; label: string }> = [
     { id: '7d', label: '7D' },
@@ -58,10 +71,11 @@
 
   onMount(async () => {
     // Parallel fetch
-    const [trendingResult, heatmapResult, topicsResult] = await Promise.allSettled([
+    const [trendingResult, heatmapResult, topicsResult, patternsResult] = await Promise.allSettled([
       fetchTrendingTopics(20),
       fetchHeatmapData(),
       fetchAllTopics(1, 20, '-mention_count'),
+      fetchPatterns(),
     ]);
 
     if (trendingResult.status === 'fulfilled') {
@@ -87,6 +101,10 @@
       allTopicsTotal = topicsResult.value.totalItems;
     }
     isLoadingTopics = false;
+
+    if (patternsResult.status === 'fulfilled') {
+      patterns = patternsResult.value;
+    }
   });
 
   // Fetch comparison data when topics or range change
@@ -187,6 +205,13 @@
       {/each}
     </div>
   </div>
+
+  <!-- Auto Insight -->
+  {#if autoInsight}
+    <ComicCallout type="tip" title="Insight">
+      <p class="auto-insight">{autoInsight}</p>
+    </ComicCallout>
+  {/if}
 
   <!-- Topic Search -->
   <TopicSearchBar

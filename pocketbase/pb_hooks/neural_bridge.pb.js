@@ -56,6 +56,29 @@ function encodeToNeuralMemory(collection, record) {
       metadata.session_id = record.getString('session_id') || '';
       metadata.message_count = record.getInt('message_count') || 0;
 
+      // Add project context
+      var projId = record.getString('project');
+      if (projId) {
+        try {
+          var proj = $app.dao().findRecordById('projects', projId);
+          var projName = proj.getString('name');
+          if (projName) {
+            tags.push('project:' + projName);
+            metadata.project_name = projName;
+            content = 'Project: ' + projName + '\n' + content;
+          }
+        } catch (e) { /* skip */ }
+      }
+
+      // Add topic names from topics list
+      var topicsList = record.get('topics') || [];
+      for (var tp = 0; tp < topicsList.length && tp < 10; tp++) {
+        var topicName = String(topicsList[tp]);
+        if (topicName) {
+          tags.push('topic:' + topicName);
+        }
+      }
+
     } else if (collection === 'ideas') {
       var ideaTitle = record.getString('title') || '';
       var ideaContent = record.getString('content') || '';
