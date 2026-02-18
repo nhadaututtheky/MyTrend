@@ -128,3 +128,32 @@ export async function backfillPlans(): Promise<{
   if (!response.ok) throw new Error(`Backfill failed: ${response.status}`);
   return response.json();
 }
+
+export async function syncPlanFiles(force = false): Promise<{
+  files_found: number;
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const url = `${getPbUrl()}/api/mytrend/sync-plans${force ? '?force=true' : ''}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: pb.authStore.token },
+  });
+  if (!response.ok) throw new Error(`Plan sync failed: ${response.status}`);
+  return response.json();
+}
+
+export async function syncPlanFilesStatus(): Promise<{
+  total_files: number;
+  imported: number;
+  pending: number;
+  files: Array<{ filename: string; slug: string; imported: boolean; plan_id: string }>;
+}> {
+  const response = await fetch(`${getPbUrl()}/api/mytrend/sync-plans/status`, {
+    headers: { Authorization: pb.authStore.token },
+  });
+  if (!response.ok) throw new Error(`Plan sync status failed: ${response.status}`);
+  return response.json();
+}

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import pb from '$lib/config/pocketbase';
-  import { fetchPlans } from '$lib/api/plans';
+  import { fetchPlans, syncPlanFiles } from '$lib/api/plans';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
@@ -9,10 +9,12 @@
   import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
   import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import { formatRelative } from '$lib/utils/date';
+  import { toast } from '$lib/stores/toast';
   import type { Plan, PlanStatus, PlanType } from '$lib/types';
 
   let plans = $state<Plan[]>([]);
   let isLoading = $state(true);
+  let isSyncing = $state(false);
   let statusFilter = $state('all');
   let currentPage = $state(1);
   let totalPages = $state(1);
@@ -93,6 +95,25 @@
   });
 
   onDestroy(() => { unsubscribe?.(); });
+
+  async function handleSyncPlanFiles(): Promise<void> {
+    isSyncing = true;
+    try {
+      const result = await syncPlanFiles();
+      if (result.imported > 0) {
+        toast.success(`Synced ${result.imported} plan files`);
+        await loadPlans();
+      } else if (result.skipped > 0) {
+        toast.success(`All ${result.files_found} plan files already imported`);
+      } else {
+        toast.success('No plan files found');
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Sync failed');
+    } finally {
+      isSyncing = false;
+    }
+  }
 </script>
 
 <svelte:head><title>Plans - MyTrend</title></svelte:head>
@@ -103,7 +124,12 @@
       <h1 class="comic-heading">Plans</h1>
       <p class="subtitle">{totalItems} plans tracked</p>
     </div>
-    <a href="/plans/new"><ComicButton variant="primary">New Plan</ComicButton></a>
+    <div class="header-actions">
+      <ComicButton variant="outline" disabled={isSyncing} onclick={handleSyncPlanFiles}>
+        {isSyncing ? 'Syncing...' : 'Sync Claude Files'}
+      </ComicButton>
+      <a href="/plans/new"><ComicButton variant="primary">New Plan</ComicButton></a>
+    </div>
   </div>
 
   <ComicTabs tabs={statusTabs} bind:active={statusFilter} />
@@ -180,6 +206,7 @@
   .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
   .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
   .page-header a { text-decoration: none; }
+  .header-actions { display: flex; gap: var(--spacing-sm); align-items: center; flex-shrink: 0; }
   .subtitle { font-size: var(--font-size-md); color: var(--text-muted); margin: var(--spacing-xs) 0 0; }
   .skeleton-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
   .list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
