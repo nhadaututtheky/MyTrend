@@ -6,6 +6,8 @@
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
   import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
+  import TelegramFileList from '$lib/components/telegram/TelegramFileList.svelte';
+  import TelegramFileUpload from '$lib/components/telegram/TelegramFileUpload.svelte';
   import { formatDate } from '$lib/utils/date';
   import type { Idea } from '$lib/types';
 
@@ -59,6 +61,14 @@
     {#if idea.tags.length > 0}
       <div class="tags">{#each idea.tags as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}</div>
     {/if}
+
+    <!-- Telegram Files -->
+    <TelegramFileList linkedCollection="ideas" linkedRecordId={ideaId} editable />
+
+    <ComicCard>
+      <h3 class="section-title">Add Files</h3>
+      <TelegramFileUpload linkedCollection="ideas" linkedRecordId={ideaId} />
+    </ComicCard>
 
     {#if idea.related_ideas.length > 0}
       <ComicCard>

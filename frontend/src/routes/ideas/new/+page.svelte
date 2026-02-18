@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { createIdea } from '$lib/api/ideas';
   import { fetchProjects } from '$lib/api/projects';
+  import { uploadToTelegram } from '$lib/api/telegram';
   import { toast } from '$lib/stores/toast';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
@@ -17,10 +18,24 @@
   let tagsStr = $state('');
   let isCreating = $state(false);
   let projects = $state<Project[]>([]);
+  let pendingFiles = $state<File[]>([]);
+  let fileInput: HTMLInputElement | undefined = $state();
 
   onMount(async () => {
     try { const r = await fetchProjects(); projects = r.items; } catch { /* optional */ }
   });
+
+  function handleFileSelect(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files) {
+      pendingFiles = [...pendingFiles, ...Array.from(input.files)];
+      input.value = '';
+    }
+  }
+
+  function removePendingFile(index: number): void {
+    pendingFiles = pendingFiles.filter((_, i) => i !== index);
+  }
 
   async function handleSubmit(e: SubmitEvent): Promise<void> {
     e.preventDefault();
@@ -32,6 +47,24 @@
         title, content, type: type as 'feature', priority: priority as 'medium',
         project: projectId || null, tags, status: 'inbox', related_ideas: [],
       });
+
+      // Upload pending files to Telegram
+      if (pendingFiles.length > 0) {
+        let uploaded = 0;
+        for (const file of pendingFiles) {
+          try {
+            await uploadToTelegram(file, {
+              linkedCollection: 'ideas',
+              linkedRecordId: idea.id,
+            });
+            uploaded++;
+          } catch {
+            toast.error(`Failed to upload ${file.name}`);
+          }
+        }
+        if (uploaded > 0) toast.info(`${uploaded} file(s) uploaded to Telegram`);
+      }
+
       toast.success('Idea created!');
       await goto(`/ideas/${idea.id}`);
     } catch (err: unknown) { console.error('[Ideas/New]', err); toast.error('Failed to create idea'); }
@@ -76,6 +109,37 @@
           </select>
         </div>
         <ComicInput bind:value={tagsStr} label="Tags" placeholder="svelte, performance, ux (comma-separated)" />
+
+        <!-- File attachments -->
+        <div class="field">
+          <label class="label">Attachments (Telegram Storage)</label>
+          <div
+            class="upload-zone"
+            role="button"
+            tabindex="0"
+            onclick={() => fileInput?.click()}
+            onkeydown={(e) => { if (e.key === 'Enter') fileInput?.click(); }}
+          >
+            <input
+              bind:this={fileInput}
+              type="file"
+              multiple
+              class="file-input"
+              onchange={handleFileSelect}
+            />
+            <span class="upload-text">+ Drop files or click (max 50MB each)</span>
+          </div>
+          {#if pendingFiles.length > 0}
+            <div class="pending-files">
+              {#each pendingFiles as file, i (file.name + i)}
+                <div class="pending-file">
+                  <span class="pending-name">{file.name}</span>
+                  <button type="button" class="pending-remove" onclick={() => removePendingFile(i)}>x</button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
       <div class="actions">
         <ComicButton variant="primary" type="submit" loading={isCreating}>Create Idea</ComicButton>
@@ -93,4 +157,47 @@
   .textarea { resize: vertical; min-height: 80px; font-family: var(--font-comic); line-height: 1.5; }
   .row { display: flex; gap: var(--spacing-md); }
   .actions { display: flex; gap: var(--spacing-sm); }
+  .upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: 6px;
+    padding: var(--spacing-md);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .upload-zone:hover { border-color: var(--accent-blue); }
+  .file-input { display: none; }
+  .upload-text {
+    font-family: var(--font-comic);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+  .pending-files { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .pending-file {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-card);
+  }
+  .pending-name {
+    font-family: var(--font-comic);
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .pending-remove {
+    background: none;
+    border: none;
+    color: var(--accent-red);
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0 4px;
+  }
 </style>

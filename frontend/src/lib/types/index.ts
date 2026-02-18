@@ -377,6 +377,55 @@ export interface PBListResult<T> {
   items: T[];
 }
 
+// Telegram File
+export type TelegramFileSource = 'upload' | 'webhook' | 'import';
+
+export interface TelegramFile extends BaseRecord {
+  user: string;
+  file_id: string;
+  file_unique_id: string;
+  telegram_msg_id: number;
+  channel_id: string;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+  linked_collection: string;
+  linked_record_id: string;
+  source: TelegramFileSource;
+  caption: string;
+}
+
+export interface TelegramStatus {
+  configured: boolean;
+  bot_token_set: boolean;
+  channel_id_set: boolean;
+  channel_id: string | null;
+  bot_info: {
+    id: number;
+    username: string;
+    first_name: string;
+  } | null;
+  total_files: number;
+  total_size: number;
+  error: string | null;
+}
+
+export interface TelegramUploadResult {
+  id: string;
+  file_id: string;
+  filename: string;
+  mime_type: string;
+  file_size: number;
+  telegram_msg_id: number;
+  created: string;
+}
+
+export interface TelegramChannel {
+  id: string;
+  title: string;
+  type: string;
+}
+
 // Toast
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 

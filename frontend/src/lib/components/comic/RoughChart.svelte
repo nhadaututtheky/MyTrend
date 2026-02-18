@@ -223,7 +223,8 @@
     // X labels
     for (let i = 0; i < chartData.labels.length; i++) {
       const x = MARGIN.left + (plotW / (chartData.labels.length - 1 || 1)) * i;
-      const lbl = chartData.labels[i].length > 8 ? chartData.labels[i].slice(0, 7) + '..' : chartData.labels[i];
+      const rawLbl = chartData.labels[i] ?? '';
+      const lbl = rawLbl.length > 8 ? rawLbl.slice(0, 7) + '..' : rawLbl;
       addSvgText(lbl, x, MARGIN.top + plotH + 16, { size: '10', fill: '#888' });
     }
   }
@@ -242,7 +243,7 @@
 
     let angle = -Math.PI / 2;
     for (let i = 0; i < chartData.values.length; i++) {
-      const sliceAngle = (chartData.values[i] / total) * Math.PI * 2;
+      const sliceAngle = ((chartData.values[i] ?? 0) / total) * Math.PI * 2;
       const startAngle = angle;
       const endAngle = angle + sliceAngle;
       const sliceColor = colors[i % colors.length];
@@ -265,8 +266,9 @@
       const labelR = outerR + 16;
       const lx = cx + labelR * Math.cos(midAngle);
       const ly = cy + labelR * Math.sin(midAngle);
-      const pct = Math.round((chartData.values[i] / total) * 100);
-      const lbl = chartData.labels[i].length > 10 ? chartData.labels[i].slice(0, 9) + '..' : chartData.labels[i];
+      const pct = Math.round(((chartData.values[i] ?? 0) / total) * 100);
+      const rawDonutLbl = chartData.labels[i] ?? '';
+      const lbl = rawDonutLbl.length > 10 ? rawDonutLbl.slice(0, 9) + '..' : rawDonutLbl;
       addSvgText(`${lbl} ${pct}%`, lx, ly, {
         size: '10', fill: '#aaa', anchor: midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'end' : 'start',
       });
