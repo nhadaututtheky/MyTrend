@@ -12,9 +12,7 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-  build: {
-    rollupOptions: {
-      external: ['rough-viz'],
-    },
+  optimizeDeps: {
+    include: ['roughjs', 'd3-force', 'd3-selection', 'd3-scale', 'd3-drag', 'd3-zoom'],
   },
 });

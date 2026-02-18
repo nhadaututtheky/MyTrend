@@ -99,3 +99,36 @@ onRecordAfterCreateRequest((e) => {
     console.log('[ActivityTracking] Error tracking project: ' + err);
   }
 }, 'projects');
+
+// ---------------------------------------------------------------------------
+// Track plan creation
+// ---------------------------------------------------------------------------
+onRecordAfterCreateRequest((e) => {
+  var record = e.record;
+  var userId = record.getString('user');
+  if (!userId) return;
+
+  var dao = $app.dao();
+  try {
+    var col = dao.findCollectionByNameOrId('activities');
+    var activity = new Record(col);
+    activity.set('user', userId);
+    var proj = record.getString('project');
+    if (proj) activity.set('project', proj);
+    activity.set('type', 'plan');
+    var title = record.getString('title') || '';
+    activity.set('action', 'Created plan: ' + title.substring(0, 200));
+    activity.set('device_name', '');
+    activity.set('metadata', JSON.stringify({
+      plan_type: record.getString('plan_type') || '',
+      status: record.getString('status') || '',
+      extraction_source: record.getString('extraction_source') || '',
+    }));
+    activity.set('timestamp', new Date().toISOString());
+    activity.set('duration_sec', 0);
+    dao.saveRecord(activity);
+    console.log('[ActivityTracking] Tracked plan: ' + record.getId());
+  } catch (err) {
+    console.log('[ActivityTracking] Error tracking plan: ' + err);
+  }
+}, 'plans');

@@ -56,6 +56,33 @@ function encodeToNeuralMemory(collection, record) {
       metadata.session_id = record.getString('session_id') || '';
       metadata.message_count = record.getInt('message_count') || 0;
 
+    } else if (collection === 'plans') {
+      var planTitle = record.getString('title') || '';
+      var planType = record.getString('plan_type') || '';
+      var planContent = record.getString('content') || '';
+      var planTrigger = record.getString('trigger') || '';
+      var planReasoning = record.getString('reasoning') || '';
+
+      var planParts = [];
+      if (planTitle) planParts.push('Plan: ' + planTitle);
+      if (planType) planParts.push('Type: ' + planType);
+      if (planTrigger) planParts.push('Trigger: ' + planTrigger.substring(0, 1000));
+      if (planContent) planParts.push(planContent);
+      if (planReasoning) planParts.push('Reasoning: ' + planReasoning.substring(0, 1000));
+      content = planParts.join('\n');
+
+      var planTags = record.get('tags') || [];
+      for (var pt = 0; pt < planTags.length; pt++) {
+        tags.push(String(planTags[pt]));
+      }
+      tags.push('plan');
+      if (planType) tags.push(planType);
+
+      metadata.title = planTitle;
+      metadata.plan_type = planType;
+      metadata.status = record.getString('status') || '';
+      metadata.priority = record.getString('priority') || '';
+
     } else if (collection === 'ideas') {
       var ideaTitle = record.getString('title') || '';
       var ideaContent = record.getString('content') || '';
@@ -123,6 +150,10 @@ onRecordAfterCreateRequest((e) => {
   encodeToNeuralMemory('ideas', e.record);
 }, 'ideas');
 
+onRecordAfterCreateRequest((e) => {
+  encodeToNeuralMemory('plans', e.record);
+}, 'plans');
+
 // ---------------------------------------------------------------------------
 // Hooks: Re-encode on update (for title/summary changes)
 // ---------------------------------------------------------------------------
@@ -133,3 +164,7 @@ onRecordAfterUpdateRequest((e) => {
 onRecordAfterUpdateRequest((e) => {
   encodeToNeuralMemory('ideas', e.record);
 }, 'ideas');
+
+onRecordAfterUpdateRequest((e) => {
+  encodeToNeuralMemory('plans', e.record);
+}, 'plans');

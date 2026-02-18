@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import pb from '$lib/config/pocketbase';
   import { fetchProjects } from '$lib/api/projects';
+  import { fetchPlans } from '$lib/api/plans';
   import { fetchActivities, fetchHeatmapData } from '$lib/api/activity';
   import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
   import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
@@ -12,13 +13,27 @@
   import TrendChart from '$lib/components/dashboard/TrendChart.svelte';
   import HeatmapCalendar from '$lib/components/comic/HeatmapCalendar.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
-  import type { Project, Activity, HeatmapDay, TimeSeriesPoint } from '$lib/types';
+  import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import { formatNumber } from '$lib/utils/format';
+  import { formatRelative } from '$lib/utils/date';
+  import type { Project, Activity, HeatmapDay, TimeSeriesPoint, Plan, PlanStatus } from '$lib/types';
 
   let projects = $state<Project[]>([]);
+  let activePlans = $state<Plan[]>([]);
   let activities = $state<Activity[]>([]);
   let heatmapData = $state<HeatmapDay[]>([]);
   let trendData = $state<TimeSeriesPoint[]>([]);
   let isLoading = $state(true);
+
+  const PLAN_STATUS_COLORS: Record<PlanStatus, 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> = {
+    draft: 'yellow',
+    approved: 'blue',
+    in_progress: 'orange',
+    review: 'purple',
+    completed: 'green',
+    abandoned: 'red',
+    superseded: 'red',
+  };
 
   const totalConversations = $derived(projects.reduce((sum, p) => sum + p.total_conversations, 0));
   const totalIdeas = $derived(projects.reduce((sum, p) => sum + p.total_ideas, 0));
@@ -48,14 +63,20 @@
 
   onMount(async () => {
     try {
-      const [projectsResult, activitiesResult, heatmap] = await Promise.allSettled([
+      const [projectsResult, plansResult, activitiesResult, heatmap] = await Promise.allSettled([
         fetchProjects(1, 'active'),
+        fetchPlans(1, { sort: '-updated' }),
         fetchActivities(1),
         fetchHeatmapData(),
       ]);
 
       if (projectsResult.status === 'fulfilled') {
         projects = projectsResult.value.items;
+      }
+      if (plansResult.status === 'fulfilled') {
+        activePlans = plansResult.value.items
+          .filter((p) => p.status !== 'completed' && p.status !== 'abandoned' && p.status !== 'superseded')
+          .slice(0, 5);
       }
       if (activitiesResult.status === 'fulfilled') {
         activities = activitiesResult.value.items.slice(0, 10);
@@ -153,7 +174,33 @@
         <ActivityTimeline {activities} />
       </ComicBentoCard>
 
-      <!-- Row 3: Heatmap (full width) -->
+      <!-- Row 3: Active Plans (full width) -->
+      {#if activePlans.length > 0}
+        <ComicBentoCard title="Active Plans" icon="📋" span="full">
+          {#snippet footer()}
+            <a href="/plans" class="see-all">View all plans →</a>
+          {/snippet}
+          <div class="plans-list">
+            {#each activePlans as plan (plan.id)}
+              <a href="/plans/{plan.id}" class="plan-row">
+                <span class="plan-title">{plan.title}</span>
+                <div class="plan-badges">
+                  <ComicBadge color={PLAN_STATUS_COLORS[plan.status]} size="sm">{plan.status.replace('_', ' ')}</ComicBadge>
+                  {#if plan.plan_type}
+                    <ComicBadge color="blue" size="sm">{plan.plan_type}</ComicBadge>
+                  {/if}
+                  {#if plan.priority === 'critical' || plan.priority === 'high'}
+                    <ComicBadge color={plan.priority === 'critical' ? 'red' : 'orange'} size="sm">{plan.priority}</ComicBadge>
+                  {/if}
+                </div>
+                <span class="plan-time">{formatRelative(plan.updated)}</span>
+              </a>
+            {/each}
+          </div>
+        </ComicBentoCard>
+      {/if}
+
+      <!-- Row 4: Heatmap (full width) -->
       <ComicBentoCard title="Activity Heatmap" icon="🗓" span="full">
         <HeatmapCalendar data={heatmapData} />
       </ComicBentoCard>
@@ -190,9 +237,9 @@
   }
 
   .greeting {
-    font-size: 0.85rem;
+    font-size: var(--font-size-md);
     color: var(--text-secondary);
-    margin: 4px 0 0;
+    margin: var(--spacing-xs) 0 0;
   }
 
   .quick-actions {
@@ -219,17 +266,17 @@
   }
 
   .stat-value {
-    font-size: 1.5rem;
+    font-size: var(--font-size-4xl);
     font-weight: 700;
-    line-height: 1.2;
+    line-height: var(--leading-tight);
   }
 
   .stat-label {
-    font-size: 0.7rem;
+    font-size: var(--font-size-xs);
     text-transform: uppercase;
     color: var(--text-muted);
     letter-spacing: 0.05em;
-    margin-bottom: 4px;
+    margin-bottom: var(--spacing-xs);
   }
 
   /* Streak */
@@ -241,14 +288,14 @@
   }
 
   .streak-number {
-    font-size: 2.5rem;
+    font-size: var(--font-size-6xl);
     font-weight: 700;
-    line-height: 1;
+    line-height: var(--leading-tight);
     color: var(--accent-orange);
   }
 
   .streak-unit {
-    font-size: 0.85rem;
+    font-size: var(--font-size-md);
     color: var(--text-muted);
     text-transform: uppercase;
   }
@@ -279,7 +326,7 @@
   }
 
   .see-all {
-    font-size: 0.8rem;
+    font-size: var(--font-size-md);
     color: var(--accent-blue);
     text-decoration: none;
     font-weight: 700;
@@ -291,7 +338,51 @@
 
   .empty {
     color: var(--text-muted);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
+  }
+
+  /* Plans */
+  .plans-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .plan-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--transition-fast);
+    cursor: pointer;
+  }
+
+  .plan-row:hover {
+    background: var(--bg-secondary);
+  }
+
+  .plan-title {
+    flex: 1;
+    font-weight: 700;
+    font-size: var(--font-size-md);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .plan-badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .plan-time {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    flex-shrink: 0;
   }
 
   @media (max-width: 768px) {

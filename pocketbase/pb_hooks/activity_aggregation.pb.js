@@ -82,9 +82,7 @@ function aggregateActivities(dao, periodType, periodStart, periodEnd) {
       if (mins > 0) totalMinutes += mins;
 
       var actType = act.getString('type') || 'unknown';
-      if (!breakdown[actType]) breakdown[actType] = { count: 0, minutes: 0 };
-      breakdown[actType].count += 1;
-      breakdown[actType].minutes += (mins || 0);
+      breakdown[actType] = (breakdown[actType] || 0) + 1;
 
       var metadata = act.get('metadata');
       if (metadata && metadata.topic) {

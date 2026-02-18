@@ -104,8 +104,101 @@ export interface Idea extends BaseRecord {
   attachments: readonly string[];
 }
 
+// Plan
+export type PlanType =
+  | 'implementation'
+  | 'architecture'
+  | 'design'
+  | 'refactor'
+  | 'bugfix'
+  | 'investigation'
+  | 'migration';
+
+export type PlanStatus =
+  | 'draft'
+  | 'approved'
+  | 'in_progress'
+  | 'review'
+  | 'completed'
+  | 'abandoned'
+  | 'superseded';
+
+export type Complexity = 'trivial' | 'simple' | 'moderate' | 'complex' | 'epic';
+export type ExtractionSource = 'auto' | 'manual' | 'idea_promotion';
+
+export interface PlanStageTransition {
+  from: PlanStatus | 'none';
+  to: PlanStatus;
+  timestamp: string;
+  note: string;
+  conversation_id?: string;
+}
+
+export interface Plan extends BaseRecord {
+  user: string;
+  project: string | null;
+  title: string;
+  slug: string;
+  plan_type: PlanType;
+  status: PlanStatus;
+  content: string;
+  trigger: string;
+  reasoning: string;
+  alternatives: string;
+  outcome: string;
+  source_conversations: readonly string[];
+  source_ideas: readonly string[];
+  parent_plan: string;
+  superseded_by: string;
+  stage_history: readonly PlanStageTransition[];
+  tags: readonly string[];
+  priority: Priority;
+  complexity: Complexity;
+  estimated_effort: string;
+  extraction_source: ExtractionSource;
+  extraction_confidence: number;
+  signal_phrase: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface PlanTimelineResponse {
+  plan: Plan;
+  stage_history: PlanStageTransition[];
+  conversations: Array<{
+    id: string;
+    title: string;
+    started_at: string;
+    snippet: string;
+  }>;
+  ideas: Array<{
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+  }>;
+  related_plans: Array<{
+    id: string;
+    title: string;
+    status: string;
+    relation: 'parent' | 'child' | 'superseded_by';
+  }>;
+}
+
+export interface PlanStats {
+  total: number;
+  by_status: Record<PlanStatus, number>;
+  by_type: Record<PlanType, number>;
+  recent_completed: Array<{
+    id: string;
+    title: string;
+    plan_type: PlanType;
+    completed_at: string;
+  }>;
+}
+
 // Activity
-export type ActivityType = 'conversation' | 'coding' | 'idea' | 'search' | 'review';
+export type ActivityType = 'conversation' | 'coding' | 'idea' | 'search' | 'review' | 'plan';
 
 export interface Activity extends BaseRecord {
   user: string;
@@ -216,9 +309,40 @@ export interface HubCronJob extends BaseRecord {
   last_result: string;
 }
 
+// Trending Topics (from /api/mytrend/trending-topics)
+export type TrendDirection = 'rising' | 'falling' | 'stable';
+
+export interface TrendingTopic {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  mention_count: number;
+  direction: TrendDirection;
+  change_pct: number;
+  last_7d_count: number;
+  sparkline: number[];
+}
+
+// Topic Trend Series (from /api/mytrend/topic-trends)
+export interface TopicTrendSeries {
+  topic_id: string;
+  name: string;
+  slug: string;
+  color: string;
+  data: TopicTrendPoint[];
+}
+
+export interface TopicTrendResponse {
+  range: string;
+  start: string;
+  end: string;
+  series: TopicTrendSeries[];
+}
+
 // Search
 export interface SearchResult {
-  type: 'conversation' | 'idea' | 'project' | 'topic';
+  type: 'conversation' | 'idea' | 'project' | 'topic' | 'plan';
   id: string;
   title: string;
   snippet: string;

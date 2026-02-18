@@ -124,18 +124,18 @@
   .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
   .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
   .page-header a { text-decoration: none; }
-  .subtitle { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0; }
+  .subtitle { font-size: var(--font-size-md); color: var(--text-muted); margin: var(--spacing-xs) 0 0; }
   .skeleton-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
   .list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
   .list-link { text-decoration: none; color: inherit; animation: sketchFadeIn 0.3s ease both; }
-  .conv-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: 4px; }
-  .conv-title { font-size: 0.95rem; font-weight: 700; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .conv-summary { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-  .conv-meta { display: flex; gap: var(--spacing-md); font-size: 0.7rem; color: var(--text-muted); }
+  .conv-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-xs); }
+  .conv-title { font-size: var(--font-size-lg); font-weight: 700; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conv-summary { font-size: var(--font-size-md); color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .conv-meta { display: flex; gap: var(--spacing-md); font-size: var(--font-size-xs); color: var(--text-muted); }
   .time { margin-left: auto; }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
   .pagination { display: flex; align-items: center; justify-content: center; gap: var(--spacing-md); }
-  .page-info { font-size: 0.8rem; color: var(--text-secondary); }
+  .page-info { font-size: var(--font-size-md); color: var(--text-secondary); }
 
   @media (max-width: 768px) {
     .page-header { flex-direction: column; }

@@ -76,7 +76,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: var(--z-modal);
     animation: fadeIn 0.2s ease;
   }
 
@@ -103,18 +103,23 @@
   .title {
     font-family: var(--font-comic);
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: var(--font-size-2xl);
     margin: 0;
   }
 
   .close-btn {
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: var(--font-size-4xl);
     cursor: pointer;
     color: var(--text-secondary);
     line-height: 1;
-    padding: 4px;
+    padding: var(--spacing-xs);
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .close-btn:hover {

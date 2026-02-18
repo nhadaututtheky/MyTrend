@@ -16,6 +16,7 @@
         { label: 'Projects', href: '/projects', icon: '📁' },
         { label: 'Conversations', href: '/conversations', icon: '💬' },
         { label: 'Ideas', href: '/ideas', icon: '💡' },
+        { label: 'Plans', href: '/plans', icon: '📋' },
       ],
     },
     {

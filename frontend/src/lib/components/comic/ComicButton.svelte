@@ -49,12 +49,13 @@
     box-shadow: var(--shadow-sm);
     cursor: pointer;
     transition:
-      transform 150ms ease,
-      box-shadow 150ms ease;
+      transform var(--transition-fast),
+      box-shadow var(--transition-fast);
     text-transform: uppercase;
     letter-spacing: 0.03em;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: var(--spacing-sm);
     white-space: nowrap;
   }
@@ -95,18 +96,21 @@
   }
 
   .size-sm {
-    font-size: 0.75rem;
-    padding: 4px 8px;
+    font-size: var(--font-size-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: var(--touch-target-min);
   }
 
   .size-md {
-    font-size: 0.875rem;
-    padding: 8px 16px;
+    font-size: var(--font-size-base);
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: var(--touch-target-min);
   }
 
   .size-lg {
-    font-size: 1rem;
-    padding: 12px 24px;
+    font-size: var(--font-size-xl);
+    padding: var(--spacing-md) var(--spacing-lg);
+    min-height: var(--touch-target-min);
   }
 
   .spinner {

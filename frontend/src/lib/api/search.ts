@@ -2,10 +2,15 @@ import pb from '$lib/config/pocketbase';
 import { nmQuery } from '$lib/config/neural-memory';
 import type { SearchResult } from '$lib/types';
 
-// Browser: use relative URL (goes through nginx). SSR: use docker internal URL.
-const PB_URL = typeof window !== 'undefined'
-  ? ''
-  : (import.meta.env.VITE_PB_URL || 'http://pocketbase:8090');
+// Use PB SDK's baseUrl so it works regardless of how the frontend is accessed
+function getPbUrl(): string {
+  if (typeof window !== 'undefined') {
+    // Browser: use PB SDK's configured URL (works from any port)
+    return pb.baseUrl;
+  }
+  return import.meta.env.VITE_PB_URL || 'http://pocketbase:8090';
+}
+
 const MAX_RESULTS = 20;
 
 /**
@@ -50,7 +55,7 @@ async function backendSearch(query: string): Promise<SearchResult[]> {
   const headers: Record<string, string> = token ? { Authorization: token } : {};
 
   const res = await fetch(
-    `${PB_URL}/api/mytrend/search?q=${encodeURIComponent(query)}`,
+    `${getPbUrl()}/api/mytrend/search?q=${encodeURIComponent(query)}`,
     { headers },
   );
 

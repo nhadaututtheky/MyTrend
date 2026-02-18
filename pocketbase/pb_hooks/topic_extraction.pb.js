@@ -77,10 +77,11 @@ function upsertTopic(dao, userId, topicName, category) {
   } catch (e) { /* not found */ }
 
   if (existing) {
-    // Increment mention_count
+    // Increment mention_count + trend_data
     var count = existing.getInt('mention_count') || 0;
     existing.set('mention_count', count + 1);
     existing.set('last_seen', new Date().toISOString());
+    appendTrendData(existing, dao);
     try {
       dao.saveRecord(existing);
       return existing.getId();
@@ -92,6 +93,7 @@ function upsertTopic(dao, userId, topicName, category) {
 
   // Create new topic
   try {
+    var today = new Date().toISOString().substring(0, 10);
     var col = dao.findCollectionByNameOrId('topics');
     var record = new Record(col);
     record.set('user', userId);
@@ -101,8 +103,8 @@ function upsertTopic(dao, userId, topicName, category) {
     record.set('mention_count', 1);
     record.set('first_seen', new Date().toISOString());
     record.set('last_seen', new Date().toISOString());
-    record.set('trend_data', []);
-    record.set('related', []);
+    record.set('trend_data', JSON.stringify([{ date: today, count: 1 }]));
+    record.set('related', JSON.stringify([]));
     dao.saveRecord(record);
     console.log('[TopicExtraction] Created topic: ' + topicName);
     return record.getId();
@@ -122,7 +124,20 @@ function linkRelatedTopics(dao, topicIds) {
     var tid = topicIds[i];
     try {
       var rec = dao.findRecordById('topics', tid);
-      var related = rec.get('related') || [];
+      // Decode related field (handles Goja byte-array bug)
+      var rawRel = rec.get('related');
+      var related = [];
+      if (Array.isArray(rawRel) && rawRel.length > 0 && typeof rawRel[0] === 'string') {
+        related = rawRel;
+      } else if (Array.isArray(rawRel) && rawRel.length > 0 && typeof rawRel[0] === 'number') {
+        try {
+          var s = '';
+          for (var b = 0; b < rawRel.length; b++) s += String.fromCharCode(rawRel[b]);
+          var p = JSON.parse(s);
+          if (Array.isArray(p)) related = p.filter(function(x) { return typeof x === 'string'; });
+        } catch (e) { related = []; }
+      }
+
       var relatedSet = {};
       for (var r = 0; r < related.length; r++) { relatedSet[related[r]] = true; }
 
@@ -136,13 +151,85 @@ function linkRelatedTopics(dao, topicIds) {
       }
 
       if (changed) {
-        // Keep max 50 related topics
         if (related.length > 50) related = related.slice(related.length - 50);
-        rec.set('related', related);
+        rec.set('related', JSON.stringify(related));
         dao.saveRecord(rec);
       }
     } catch (e) { /* skip */ }
   }
+}
+
+/**
+ * Decode a JSON array field safely (handles Goja byte-array bug).
+ */
+function decodeJsonArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') return raw;
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'number') {
+    try {
+      var s = '';
+      for (var b = 0; b < raw.length; b++) s += String.fromCharCode(raw[b]);
+      var p = JSON.parse(s);
+      if (Array.isArray(p)) return p;
+    } catch (e) { /* fall through */ }
+  }
+  if (typeof raw === 'string') {
+    try { var p2 = JSON.parse(raw); if (Array.isArray(p2)) return p2; } catch (e) { /* */ }
+  }
+  return [];
+}
+
+/**
+ * Decode trend_data field: returns array of {date, count} objects.
+ */
+function decodeTrendData(raw) {
+  var arr = decodeJsonArray(raw);
+  // Validate entries are {date, count} objects
+  var result = [];
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] && typeof arr[i].date === 'string' && typeof arr[i].count === 'number') {
+      result.push(arr[i]);
+    }
+  }
+  return result;
+}
+
+/**
+ * Append or increment today's count in trend_data.
+ */
+function appendTrendData(record, dao) {
+  var trendData = decodeTrendData(record.get('trend_data'));
+  var today = new Date().toISOString().substring(0, 10);
+  var last = trendData.length > 0 ? trendData[trendData.length - 1] : null;
+  if (last && last.date === today) {
+    last.count = (last.count || 0) + 1;
+  } else {
+    trendData.push({ date: today, count: 1 });
+  }
+  // Cap at 365 days
+  if (trendData.length > 365) trendData = trendData.slice(trendData.length - 365);
+  record.set('trend_data', JSON.stringify(trendData));
+}
+
+/**
+ * Safely get tags as string array (handles Goja byte-array bug).
+ */
+function getTagsArray(record) {
+  var raw = record.get('tags');
+  if (!raw) return [];
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') return raw;
+  if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'number') {
+    try {
+      var s = '';
+      for (var b = 0; b < raw.length; b++) s += String.fromCharCode(raw[b]);
+      var p = JSON.parse(s);
+      if (Array.isArray(p)) return p;
+    } catch (e) { /* fall through */ }
+  }
+  if (typeof raw === 'string') {
+    try { var p2 = JSON.parse(raw); if (Array.isArray(p2)) return p2; } catch (e) { /* */ }
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -156,8 +243,8 @@ onRecordAfterCreateRequest((e) => {
   var dao = $app.dao();
   var topicIds = [];
 
-  // 1. Extract from tags
-  var tags = record.get('tags') || [];
+  // 1. Extract from tags (safe getter handles byte arrays)
+  var tags = getTagsArray(record);
   for (var i = 0; i < tags.length; i++) {
     var tag = String(tags[i]).trim();
     if (tag && tag.length >= 2 && tag !== 'claude-cli') {
@@ -210,8 +297,8 @@ onRecordAfterCreateRequest((e) => {
   var dao = $app.dao();
   var topicIds = [];
 
-  // 1. Extract from tags
-  var tags = record.get('tags') || [];
+  // 1. Extract from tags (safe getter handles byte arrays)
+  var tags = getTagsArray(record);
   for (var i = 0; i < tags.length; i++) {
     var tag = String(tags[i]).trim();
     if (tag && tag.length >= 2) {
@@ -242,3 +329,47 @@ onRecordAfterCreateRequest((e) => {
 
   console.log('[TopicExtraction] Extracted ' + topicIds.length + ' topics from idea: ' + record.getId());
 }, 'ideas');
+
+// ---------------------------------------------------------------------------
+// Extract topics from plans
+// ---------------------------------------------------------------------------
+onRecordAfterCreateRequest((e) => {
+  var record = e.record;
+  var userId = record.getString('user');
+  if (!userId) return;
+
+  var dao = $app.dao();
+  var topicIds = [];
+
+  // 1. Extract from tags
+  var tags = getTagsArray(record);
+  for (var i = 0; i < tags.length; i++) {
+    var tag = String(tags[i]).trim();
+    if (tag && tag.length >= 2 && tag !== 'auto-extracted' && tag !== 'backfill') {
+      var id = upsertTopic(dao, userId, tag, 'tag');
+      if (id) topicIds.push(id);
+    }
+  }
+
+  // 2. Extract from plan_type as category
+  var planType = record.getString('plan_type');
+  if (planType) {
+    var id2 = upsertTopic(dao, userId, planType, 'plan-type');
+    if (id2 && topicIds.indexOf(id2) === -1) topicIds.push(id2);
+  }
+
+  // 3. Extract keywords from title
+  var title = record.getString('title') || '';
+  var keywords = extractKeywords(title);
+  for (var k = 0; k < keywords.length; k++) {
+    var id3 = upsertTopic(dao, userId, keywords[k], 'keyword');
+    if (id3 && topicIds.indexOf(id3) === -1) topicIds.push(id3);
+  }
+
+  // 4. Link related
+  if (topicIds.length >= 2) {
+    linkRelatedTopics(dao, topicIds);
+  }
+
+  console.log('[TopicExtraction] Extracted ' + topicIds.length + ' topics from plan: ' + record.getId());
+}, 'plans');

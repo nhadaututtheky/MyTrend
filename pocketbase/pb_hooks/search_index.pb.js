@@ -37,6 +37,13 @@ function upsertIndex(dao, collection, record) {
       dao.db().newQuery(
         'INSERT INTO projects_fts (record_id, name, description) VALUES ({:rid}, {:name}, {:desc})'
       ).bind({ rid: recordId, name: pName, desc: desc }).execute();
+    } else if (collection === 'plans') {
+      var plTitle = record.getString('title') || '';
+      var plContent = record.getString('content') || '';
+      var plReasoning = record.getString('reasoning') || '';
+      dao.db().newQuery(
+        'INSERT INTO plans_fts (record_id, title, content, reasoning) VALUES ({:rid}, {:title}, {:content}, {:reasoning})'
+      ).bind({ rid: recordId, title: plTitle, content: plContent, reasoning: plReasoning }).execute();
     }
   } catch (err) {
     console.log('[SearchIndex] Index error for ' + collection + ':' + record.getId() + ': ' + err);
@@ -68,6 +75,10 @@ onAfterBootstrap((e) => {
     {
       name: 'projects_fts',
       sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS projects_fts USING fts5(record_id UNINDEXED, name, description, tokenize="porter unicode61")'
+    },
+    {
+      name: 'plans_fts',
+      sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS plans_fts USING fts5(record_id UNINDEXED, title, content, reasoning, tokenize="porter unicode61")'
     }
   ];
 
@@ -98,11 +109,14 @@ onAfterBootstrap((e) => {
       } else if (coll === 'projects') {
         d.db().newQuery('INSERT INTO projects_fts (record_id, name, description) VALUES ({:rid}, {:n}, {:d})')
           .bind({ rid: rid, n: rec.getString('name') || '', d: rec.getString('description') || '' }).execute();
+      } else if (coll === 'plans') {
+        d.db().newQuery('INSERT INTO plans_fts (record_id, title, content, reasoning) VALUES ({:rid}, {:t}, {:c}, {:r})')
+          .bind({ rid: rid, t: rec.getString('title') || '', c: rec.getString('content') || '', r: rec.getString('reasoning') || '' }).execute();
       }
     } catch (e) {}
   }
 
-  var collections = ['conversations', 'ideas', 'projects'];
+  var collections = ['conversations', 'ideas', 'projects', 'plans'];
   for (var c = 0; c < collections.length; c++) {
     try {
       var records = dao.findRecordsByFilter(collections[c], '1=1', '', 0, 0);
@@ -123,9 +137,9 @@ onAfterBootstrap((e) => {
 // ---------------------------------------------------------------------------
 // Hooks: Index on create/update/delete (onRecord* CAN access file-level vars)
 // ---------------------------------------------------------------------------
-onRecordAfterCreateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects');
-onRecordAfterUpdateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects');
-onRecordAfterDeleteRequest((e) => { deleteIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects');
+onRecordAfterCreateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans');
+onRecordAfterUpdateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans');
+onRecordAfterDeleteRequest((e) => { deleteIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans');
 
 // ---------------------------------------------------------------------------
 // GET /api/mytrend/search?q=...
@@ -196,6 +210,25 @@ routerAdd('GET', '/api/mytrend/search', (c) => {
         title: projects[k].getString('name'),
         snippet: (projects[k].getString('description') || '').substring(0, 200),
         score: 0.9,
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Search plans
+  try {
+    var plans = dao.findRecordsByFilter(
+      'plans',
+      'user = {:uid} && (title ~ {:q} || content ~ {:q} || reasoning ~ {:q})',
+      '-created', 10, 0,
+      { uid: userId, q: q }
+    );
+    for (var pl = 0; pl < plans.length; pl++) {
+      results.push({
+        type: 'plan',
+        id: plans[pl].getId(),
+        title: plans[pl].getString('title'),
+        snippet: (plans[pl].getString('content') || '').substring(0, 200),
+        score: 0.85,
       });
     }
   } catch (e) { /* skip */ }

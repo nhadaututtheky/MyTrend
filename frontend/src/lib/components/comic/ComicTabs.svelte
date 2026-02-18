@@ -45,16 +45,17 @@
 <style>
   .tabs {
     display: flex;
-    gap: 4px;
+    gap: var(--spacing-xs);
     border-bottom: var(--border-width) solid var(--border-color);
     overflow-x: auto;
   }
 
   .tab {
     font-family: var(--font-comic);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     font-weight: 700;
     padding: var(--spacing-sm) var(--spacing-md);
+    min-height: var(--touch-target-min);
     background: transparent;
     border: none;
     border-bottom: 3px solid transparent;
@@ -62,8 +63,8 @@
     cursor: pointer;
     white-space: nowrap;
     transition:
-      color 150ms ease,
-      border-color 150ms ease;
+      color var(--transition-fast),
+      border-color var(--transition-fast);
   }
 
   .tab:hover {
@@ -80,7 +81,7 @@
   }
 
   .badge {
-    font-size: 0.625rem;
+    font-size: var(--font-size-2xs);
     background: var(--accent-green);
     color: #1a1a1a;
     padding: 1px 6px;

@@ -68,13 +68,13 @@
   .input-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--spacing-xs);
     width: 100%;
   }
 
   .label {
     font-family: var(--font-comic);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     font-weight: 700;
     color: var(--text-primary);
   }
@@ -85,14 +85,15 @@
 
   .input {
     font-family: var(--font-comic);
-    font-size: 0.875rem;
+    font-size: var(--font-size-base);
     padding: var(--spacing-sm) var(--spacing-md);
+    min-height: var(--touch-target-min);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-sketch);
     background: var(--bg-card);
     color: var(--text-primary);
     width: 100%;
-    transition: box-shadow 150ms ease;
+    transition: box-shadow var(--transition-fast);
   }
 
   .input:focus {
@@ -114,7 +115,7 @@
   }
 
   .error {
-    font-size: 0.75rem;
+    font-size: var(--font-size-sm);
     color: var(--accent-red);
     font-weight: 700;
   }
@@ -133,7 +134,7 @@
     left: var(--spacing-md);
     top: 50%;
     transform: translateY(-50%);
-    font-size: 1rem;
+    font-size: var(--font-size-xl);
     color: var(--text-muted);
     pointer-events: none;
     line-height: 1;

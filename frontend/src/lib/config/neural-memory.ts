@@ -70,12 +70,13 @@ export async function nmQuery(query: string, _brain?: string): Promise<NMQueryRe
   for (const line of contextLines) {
     // Match lines like "- Some memory content" (skip [concept] entries which are just neurons)
     const match = line.match(/^- (?!\[concept\])(.+)$/);
-    if (match && match[1].length > 10) {
+    const matchContent = match?.[1];
+    if (matchContent && matchContent.length > 10) {
       memories.push({
         id: `nm-${memories.length}`,
-        content: match[1].trim(),
+        content: matchContent.trim(),
         score: result.confidence * 0.9,
-        metadata: { type: 'conversation', title: match[1].trim().slice(0, 80) },
+        metadata: { type: 'conversation', title: matchContent.trim().slice(0, 80) },
       });
     }
   }

@@ -24,12 +24,12 @@
     project: '/projects',     // id = slug (backend returns slug)
     conversation: '/conversations',
     idea: '/ideas',
-    topic: '/trends/topics',
+    topic: '/trends',
   };
 
   // For topics, link to the topics page (no detail page per topic)
   function getLink(result: SearchResult): string {
-    if (result.type === 'topic') return '/trends/topics';
+    if (result.type === 'topic') return '/trends';
     const base = TYPE_LINKS[result.type] ?? '/';
     return `${base}/${result.id}`;
   }
