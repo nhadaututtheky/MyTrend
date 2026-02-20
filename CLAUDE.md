@@ -14,6 +14,7 @@ Comic/sketch hand-drawn UI style (Rough.js, Wired Elements). Single docker-compo
 ## Project Structure
 - `pocketbase/` - PocketBase backend with hooks and migrations
 - `frontend/` - SvelteKit frontend application
+- `companion/` - Bun + Hono WebSocket bridge for Vibe Terminal (Claude Code CLI control)
 - `nginx/` - Nginx reverse proxy config
 - `scripts/` - Setup, backup, seed scripts
 
@@ -25,11 +26,15 @@ docker-compose up
 # Frontend dev (standalone)
 cd frontend && npm run dev
 
+# Companion service (Vibe Terminal bridge)
+cd companion && bun run dev
+
 # Validate before commit
 cd frontend && npm run validate
 
 # Type check
 cd frontend && npm run check
+cd companion && bunx tsc --noEmit
 
 # Lint
 cd frontend && npm run lint
@@ -52,7 +57,55 @@ cd frontend && npm run test
 
 ## PocketBase Collections
 users, projects, conversations, ideas, activities, activity_aggregates, topics,
-hub_sessions, hub_environments, hub_cron_jobs
+hub_sessions, hub_environments, hub_cron_jobs, claude_tasks
+
+## Vibe Terminal Architecture
+Browser-based Claude Code control via WebSocket bridge:
+
+```
+Browser (SvelteKit)  ←WS JSON→  Companion (Bun+Hono :3457)  ←WS NDJSON→  Claude Code CLI (--sdk-url)
+```
+
+### Companion Service (`companion/`)
+- **Runtime**: Bun + Hono
+- **Port**: 3457
+- **Key files**:
+  - `src/index.ts` - Server bootstrap, WS upgrade routing
+  - `src/ws-bridge.ts` - Bidirectional message routing (CLI ↔ Browser), keep-alive, persistence
+  - `src/cli-launcher.ts` - Spawns `claude` with `--sdk-url`, validates args, detects early exit
+  - `src/session-store.ts` - JSON file persistence in `companion/data/`
+  - `src/session-types.ts` - All TypeScript types (CLI messages, browser messages, session state)
+  - `src/project-profiles.ts` - Project configs (dir, model, permissionMode)
+  - `src/routes.ts` - REST API (health, sessions CRUD, projects)
+
+### CLI Launch Flags
+```bash
+claude --sdk-url ws://localhost:3457/ws/cli/{sessionId} \
+  --print --output-format stream-json --input-format stream-json \
+  --verbose --model sonnet --permission-mode bypasstool
+```
+- Valid permission modes: `ask`, `allow-all`, `bypasstool`, `plan`
+- NO `-p ""` flag — SDK mode handles I/O via WebSocket
+
+### WebSocket Protocol
+- **CLI → Bridge**: NDJSON (system/init, assistant, result, stream_event, control_request, tool_progress, keep_alive)
+- **Bridge → Browser**: JSON (session_init, assistant, stream_event, result, permission_request, status_change, error, cli_connected/disconnected, message_history)
+- **Browser → Bridge**: JSON (user_message, permission_response, interrupt, set_model)
+- **Keep-alive**: Bridge sends heartbeat to CLI every 15s
+- **Reconnect**: Browser auto-reconnects with exponential backoff (1s→30s, max 10 attempts)
+
+### Frontend Components (`frontend/src/lib/components/vibe/`)
+| Component | Purpose |
+|-----------|---------|
+| VibeTerminal.svelte | Main terminal: session create/select, chat, status bar |
+| SessionSidebar.svelte | Left panel: session list with progress bars |
+| VibeMessage.svelte | Chat message display (user/assistant) |
+| VibeComposer.svelte | Input textarea + send/interrupt buttons |
+| VibePermission.svelte | Tool permission approve/deny cards |
+| KanbanBoard.svelte | 3-column task board (pending/in-progress/done) |
+| TaskCard.svelte | Individual task with model/project badges |
+| ContextMeter.svelte | Token usage meter |
+| ModelRouter.svelte | Keyword → model suggestion engine |
 
 ## Design System
 Comic hand-drawn style with:
