@@ -1,0 +1,598 @@
+import type { ServerWebSocket } from "bun";
+import type {
+  CLIMessage,
+  CLISystemInitMessage,
+  CLIAssistantMessage,
+  CLIResultMessage,
+  CLIStreamEventMessage,
+  CLIToolProgressMessage,
+  CLIControlRequestMessage,
+  BrowserOutgoingMessage,
+  BrowserIncomingMessage,
+  PermissionRequest,
+  PersistedSession,
+  SessionState,
+  SessionStatus,
+} from "./session-types.js";
+import { SessionStore } from "./session-store.js";
+
+// ─── Socket data tags ────────────────────────────────────────────────────────
+
+export interface CLISocketData {
+  role: "cli";
+  sessionId: string;
+}
+
+export interface BrowserSocketData {
+  role: "browser";
+  sessionId: string;
+}
+
+export type SocketData = CLISocketData | BrowserSocketData;
+
+// ─── Active session in memory ────────────────────────────────────────────────
+
+interface ActiveSession {
+  id: string;
+  state: SessionState;
+  cliSocket: ServerWebSocket<SocketData> | null;
+  browserSockets: Set<ServerWebSocket<SocketData>>;
+  pendingMessages: string[];
+  pendingPermissions: Map<string, PermissionRequest>;
+  messageHistory: BrowserIncomingMessage[];
+}
+
+// ─── Bridge ──────────────────────────────────────────────────────────────────
+
+export class WsBridge {
+  private sessions = new Map<string, ActiveSession>();
+  private store: SessionStore;
+
+  /** Callback when session status changes (for REST API/events). */
+  onStatusChange?: (sessionId: string, status: SessionStatus) => void;
+
+  constructor(store: SessionStore) {
+    this.store = store;
+  }
+
+  // ── Session lifecycle ────────────────────────────────────────────────────
+
+  /** Create or restore an active session. */
+  ensureSession(sessionId: string): ActiveSession {
+    let session = this.sessions.get(sessionId);
+    if (session) return session;
+
+    // Try restore from disk
+    const persisted = this.store.load(sessionId);
+    const state: SessionState = persisted?.state ?? {
+      session_id: sessionId,
+      model: "",
+      cwd: "",
+      tools: [],
+      permissionMode: "default",
+      claude_code_version: "",
+      mcp_servers: [],
+      total_cost_usd: 0,
+      num_turns: 0,
+      total_lines_added: 0,
+      total_lines_removed: 0,
+      status: "starting",
+    };
+
+    session = {
+      id: sessionId,
+      state,
+      cliSocket: null,
+      browserSockets: new Set(),
+      pendingMessages: persisted?.pendingPermissions
+        ? []
+        : [],
+      pendingPermissions: new Map(persisted?.pendingPermissions ?? []),
+      messageHistory: persisted?.messageHistory ?? [],
+    };
+
+    this.sessions.set(sessionId, session);
+    return session;
+  }
+
+  getSession(sessionId: string): ActiveSession | undefined {
+    return this.sessions.get(sessionId);
+  }
+
+  getAllSessions(): ActiveSession[] {
+    return [...this.sessions.values()];
+  }
+
+  // ── CLI WebSocket handlers ───────────────────────────────────────────────
+
+  handleCLIOpen(ws: ServerWebSocket<SocketData>, sessionId: string): void {
+    const session = this.ensureSession(sessionId);
+    session.cliSocket = ws;
+
+    console.log(`[ws-bridge] CLI connected for session ${sessionId}`);
+
+    // Notify browsers
+    this.broadcastToBrowsers(session, { type: "cli_connected" });
+
+    // Flush queued messages
+    if (session.pendingMessages.length > 0) {
+      console.log(
+        `[ws-bridge] Flushing ${session.pendingMessages.length} queued message(s)`
+      );
+      const queued = session.pendingMessages.splice(0);
+      for (const ndjson of queued) {
+        this.sendToCLI(session, ndjson);
+      }
+    }
+  }
+
+  handleCLIMessage(
+    ws: ServerWebSocket<SocketData>,
+    raw: string | Buffer
+  ): void {
+    const data = typeof raw === "string" ? raw : raw.toString("utf-8");
+    const socketData = ws.data as CLISocketData;
+    const session = this.sessions.get(socketData.sessionId);
+    if (!session) {
+      console.warn(
+        `[ws-bridge] CLI message for unknown session: ${socketData.sessionId}`
+      );
+      return;
+    }
+
+    // NDJSON: split on newlines, parse each line
+    const lines = data.split("\n").filter((l) => l.trim());
+    for (const line of lines) {
+      let msg: CLIMessage;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        console.warn(
+          `[ws-bridge] Failed to parse CLI message: ${line.substring(0, 200)}`
+        );
+        continue;
+      }
+      this.routeCLIMessage(session, msg);
+    }
+
+    // Persist session state
+    this.persistSession(session);
+  }
+
+  handleCLIClose(ws: ServerWebSocket<SocketData>): void {
+    const socketData = ws.data as CLISocketData;
+    const session = this.sessions.get(socketData.sessionId);
+    if (!session) return;
+
+    session.cliSocket = null;
+    console.log(
+      `[ws-bridge] CLI disconnected for session ${socketData.sessionId}`
+    );
+
+    // Notify browsers
+    this.broadcastToBrowsers(session, { type: "cli_disconnected" });
+
+    // Cancel pending permissions
+    for (const [requestId] of session.pendingPermissions) {
+      this.broadcastToBrowsers(session, {
+        type: "permission_cancelled",
+        request_id: requestId,
+      });
+    }
+    session.pendingPermissions.clear();
+
+    this.persistSession(session);
+  }
+
+  // ── Browser WebSocket handlers ───────────────────────────────────────────
+
+  handleBrowserOpen(ws: ServerWebSocket<SocketData>, sessionId: string): void {
+    const session = this.ensureSession(sessionId);
+    session.browserSockets.add(ws);
+
+    console.log(
+      `[ws-bridge] Browser connected to session ${sessionId} (${session.browserSockets.size} viewer(s))`
+    );
+
+    // Send session init + message history
+    this.sendToBrowser(ws, {
+      type: "session_init",
+      session: session.state,
+    });
+
+    if (session.messageHistory.length > 0) {
+      this.sendToBrowser(ws, {
+        type: "message_history",
+        messages: session.messageHistory,
+      });
+    }
+
+    // Send pending permissions
+    for (const [, perm] of session.pendingPermissions) {
+      this.sendToBrowser(ws, {
+        type: "permission_request",
+        request: perm,
+      });
+    }
+  }
+
+  handleBrowserMessage(
+    ws: ServerWebSocket<SocketData>,
+    raw: string | Buffer
+  ): void {
+    const data = typeof raw === "string" ? raw : raw.toString("utf-8");
+    const socketData = ws.data as BrowserSocketData;
+    const session = this.sessions.get(socketData.sessionId);
+    if (!session) return;
+
+    let msg: BrowserOutgoingMessage;
+    try {
+      msg = JSON.parse(data);
+    } catch {
+      console.warn(`[ws-bridge] Invalid browser message: ${data.substring(0, 200)}`);
+      return;
+    }
+
+    this.routeBrowserMessage(session, msg);
+  }
+
+  handleBrowserClose(ws: ServerWebSocket<SocketData>): void {
+    const socketData = ws.data as BrowserSocketData;
+    const session = this.sessions.get(socketData.sessionId);
+    if (!session) return;
+
+    session.browserSockets.delete(ws);
+    console.log(
+      `[ws-bridge] Browser disconnected from session ${socketData.sessionId} (${session.browserSockets.size} remaining)`
+    );
+  }
+
+  // ── CLI message routing ──────────────────────────────────────────────────
+
+  private routeCLIMessage(session: ActiveSession, msg: CLIMessage): void {
+    switch (msg.type) {
+      case "system":
+        if ("subtype" in msg && msg.subtype === "init") {
+          this.handleSystemInit(session, msg as CLISystemInitMessage);
+        } else if ("subtype" in msg && msg.subtype === "status") {
+          this.handleSystemStatus(session, msg);
+        }
+        break;
+      case "assistant":
+        this.handleAssistant(session, msg as CLIAssistantMessage);
+        break;
+      case "result":
+        this.handleResult(session, msg as CLIResultMessage);
+        break;
+      case "stream_event":
+        this.handleStreamEvent(session, msg as CLIStreamEventMessage);
+        break;
+      case "control_request":
+        this.handleControlRequest(session, msg as CLIControlRequestMessage);
+        break;
+      case "tool_progress":
+        this.handleToolProgress(session, msg as CLIToolProgressMessage);
+        break;
+      case "keep_alive":
+        // silent
+        break;
+      default:
+        // Unknown message type - log but don't crash
+        console.log(
+          `[ws-bridge] Unknown CLI message type: ${(msg as Record<string, unknown>).type}`
+        );
+    }
+  }
+
+  private handleSystemInit(
+    session: ActiveSession,
+    msg: CLISystemInitMessage
+  ): void {
+    session.state = {
+      ...session.state,
+      session_id: msg.session_id,
+      model: msg.model,
+      cwd: msg.cwd,
+      tools: msg.tools,
+      permissionMode: msg.permissionMode,
+      claude_code_version: msg.claude_code_version,
+      mcp_servers: msg.mcp_servers,
+      status: "idle",
+    };
+
+    console.log(
+      `[ws-bridge] Session ${session.id} initialized: model=${msg.model}, cwd=${msg.cwd}`
+    );
+
+    this.broadcastToBrowsers(session, {
+      type: "session_init",
+      session: session.state,
+    });
+
+    this.updateStatus(session, "idle");
+  }
+
+  private handleSystemStatus(
+    session: ActiveSession,
+    msg: CLIMessage
+  ): void {
+    const statusMsg = msg as { status: string | null };
+    if (statusMsg.status === "compacting") {
+      this.updateStatus(session, "compacting");
+    } else {
+      this.updateStatus(session, "idle");
+    }
+  }
+
+  private handleAssistant(
+    session: ActiveSession,
+    msg: CLIAssistantMessage
+  ): void {
+    const browserMsg: BrowserIncomingMessage = {
+      type: "assistant",
+      message: msg.message,
+      parent_tool_use_id: msg.parent_tool_use_id,
+      timestamp: Date.now(),
+    };
+
+    session.messageHistory.push(browserMsg);
+    this.broadcastToBrowsers(session, browserMsg);
+    this.updateStatus(session, "busy");
+  }
+
+  private handleResult(
+    session: ActiveSession,
+    msg: CLIResultMessage
+  ): void {
+    // Update cumulative stats
+    session.state.total_cost_usd = msg.total_cost_usd;
+    session.state.num_turns = msg.num_turns;
+    if (msg.total_lines_added !== undefined) {
+      session.state.total_lines_added = msg.total_lines_added;
+    }
+    if (msg.total_lines_removed !== undefined) {
+      session.state.total_lines_removed = msg.total_lines_removed;
+    }
+
+    const browserMsg: BrowserIncomingMessage = {
+      type: "result",
+      data: msg,
+    };
+
+    session.messageHistory.push(browserMsg);
+    this.broadcastToBrowsers(session, browserMsg);
+    this.updateStatus(session, "idle");
+  }
+
+  private handleStreamEvent(
+    session: ActiveSession,
+    msg: CLIStreamEventMessage
+  ): void {
+    // Pass through to browsers (real-time streaming text)
+    this.broadcastToBrowsers(session, {
+      type: "stream_event",
+      event: msg.event,
+      parent_tool_use_id: msg.parent_tool_use_id,
+    });
+  }
+
+  private handleControlRequest(
+    session: ActiveSession,
+    msg: CLIControlRequestMessage
+  ): void {
+    if (msg.request.subtype === "can_use_tool") {
+      const perm: PermissionRequest = {
+        request_id: msg.request_id,
+        tool_name: msg.request.tool_name,
+        input: msg.request.input,
+        permission_suggestions: msg.request.permission_suggestions,
+        description: msg.request.description,
+        tool_use_id: msg.request.tool_use_id,
+        timestamp: Date.now(),
+      };
+
+      session.pendingPermissions.set(msg.request_id, perm);
+
+      this.broadcastToBrowsers(session, {
+        type: "permission_request",
+        request: perm,
+      });
+    }
+  }
+
+  private handleToolProgress(
+    session: ActiveSession,
+    msg: CLIToolProgressMessage
+  ): void {
+    this.broadcastToBrowsers(session, {
+      type: "tool_progress",
+      tool_use_id: msg.tool_use_id,
+      tool_name: msg.tool_name,
+      elapsed_time_seconds: msg.elapsed_time_seconds,
+    });
+  }
+
+  // ── Browser message routing ──────────────────────────────────────────────
+
+  private routeBrowserMessage(
+    session: ActiveSession,
+    msg: BrowserOutgoingMessage
+  ): void {
+    switch (msg.type) {
+      case "user_message":
+        this.handleUserMessage(session, msg.content);
+        break;
+      case "permission_response":
+        this.handlePermissionResponse(session, msg);
+        break;
+      case "interrupt":
+        this.handleInterrupt(session);
+        break;
+      case "set_model":
+        this.handleSetModel(session, msg.model);
+        break;
+    }
+  }
+
+  private handleUserMessage(session: ActiveSession, content: string): void {
+    // Record in history
+    const historyMsg: BrowserIncomingMessage = {
+      type: "user_message",
+      content,
+      timestamp: Date.now(),
+    };
+    session.messageHistory.push(historyMsg);
+
+    // Also broadcast to other browsers
+    this.broadcastToBrowsers(session, historyMsg);
+
+    // Send to CLI as NDJSON
+    const ndjson = JSON.stringify({
+      type: "user",
+      content,
+    });
+    this.sendToCLI(session, ndjson);
+    this.updateStatus(session, "busy");
+  }
+
+  private handlePermissionResponse(
+    session: ActiveSession,
+    msg: {
+      request_id: string;
+      behavior: "allow" | "deny";
+      updated_permissions?: unknown[];
+    }
+  ): void {
+    session.pendingPermissions.delete(msg.request_id);
+
+    let ndjson: string;
+    if (msg.behavior === "allow") {
+      ndjson = JSON.stringify({
+        type: "control_response",
+        response: {
+          subtype: "success",
+          request_id: msg.request_id,
+          response: {
+            behavior: "allow",
+            updatedInput: {},
+            ...(msg.updated_permissions
+              ? { updatedPermissions: msg.updated_permissions }
+              : {}),
+          },
+        },
+      });
+    } else {
+      ndjson = JSON.stringify({
+        type: "control_response",
+        response: {
+          subtype: "success",
+          request_id: msg.request_id,
+          response: {
+            behavior: "deny",
+            message: "Denied by user",
+          },
+        },
+      });
+    }
+
+    this.sendToCLI(session, ndjson);
+
+    // Notify other browsers the permission was handled
+    this.broadcastToBrowsers(session, {
+      type: "permission_cancelled",
+      request_id: msg.request_id,
+    });
+  }
+
+  private handleInterrupt(session: ActiveSession): void {
+    const ndjson = JSON.stringify({
+      type: "control_request",
+      request: { subtype: "interrupt" },
+    });
+    this.sendToCLI(session, ndjson);
+  }
+
+  private handleSetModel(session: ActiveSession, model: string): void {
+    const ndjson = JSON.stringify({
+      type: "control_request",
+      request: { subtype: "set_model", model },
+    });
+    this.sendToCLI(session, ndjson);
+    session.state.model = model;
+
+    this.broadcastToBrowsers(session, {
+      type: "session_update",
+      session: { model },
+    });
+  }
+
+  // ── Transport helpers ────────────────────────────────────────────────────
+
+  private sendToCLI(session: ActiveSession, ndjson: string): void {
+    if (!session.cliSocket) {
+      console.log(
+        `[ws-bridge] CLI not connected for ${session.id}, queuing message`
+      );
+      session.pendingMessages.push(ndjson);
+      return;
+    }
+
+    try {
+      session.cliSocket.send(ndjson + "\n");
+    } catch (err) {
+      console.error(`[ws-bridge] Failed to send to CLI:`, err);
+      session.pendingMessages.push(ndjson);
+    }
+  }
+
+  private sendToBrowser(
+    ws: ServerWebSocket<SocketData>,
+    msg: BrowserIncomingMessage
+  ): void {
+    try {
+      ws.send(JSON.stringify(msg));
+    } catch {
+      // browser disconnected
+    }
+  }
+
+  private broadcastToBrowsers(
+    session: ActiveSession,
+    msg: BrowserIncomingMessage
+  ): void {
+    const payload = JSON.stringify(msg);
+    for (const ws of session.browserSockets) {
+      try {
+        ws.send(payload);
+      } catch {
+        session.browserSockets.delete(ws);
+      }
+    }
+  }
+
+  private updateStatus(session: ActiveSession, status: SessionStatus): void {
+    if (session.state.status === status) return;
+    session.state.status = status;
+
+    this.broadcastToBrowsers(session, {
+      type: "status_change",
+      status: status === "busy" ? "running" : status === "compacting" ? "compacting" : "idle",
+    });
+
+    this.onStatusChange?.(session.id, status);
+  }
+
+  // ── Persistence ──────────────────────────────────────────────────────────
+
+  private persistSession(session: ActiveSession): void {
+    const persisted: PersistedSession = {
+      id: session.id,
+      state: session.state,
+      messageHistory: session.messageHistory,
+      pendingPermissions: [...session.pendingPermissions.entries()],
+      startedAt:
+        this.store.load(session.id)?.startedAt ?? Date.now(),
+    };
+    this.store.save(persisted);
+  }
+}

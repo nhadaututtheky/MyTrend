@@ -8,6 +8,7 @@
   import ContextMeter from '$lib/components/vibe/ContextMeter.svelte';
   import ContextPanel from '$lib/components/vibe/ContextPanel.svelte';
   import ModelRouter from '$lib/components/vibe/ModelRouter.svelte';
+  import VibeTerminal from '$lib/components/vibe/VibeTerminal.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import type { ClaudeTask, VibeSession, VibeSyncStatus } from '$lib/types';
 
@@ -56,6 +57,7 @@
     { id: 'kanban', label: 'Kanban', badge: inProgressTasks.length || undefined },
     { id: 'context', label: 'Context' },
     { id: 'router', label: 'Router' },
+    { id: 'terminal', label: 'Terminal' },
   ]);
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
@@ -263,6 +265,11 @@
             <li>🏔️ <strong>Opus</strong> — architect, design, complex multi-file work</li>
           </ul>
         </div>
+      </div>
+
+    {:else if activeTab === 'terminal'}
+      <div class="terminal-layout">
+        <VibeTerminal />
       </div>
     {/if}
   </div>
@@ -519,6 +526,14 @@
   .context-bottom {
     flex: 1;
     overflow: hidden;
+  }
+
+  /* Terminal tab */
+  .terminal-layout {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
   /* Router tab */

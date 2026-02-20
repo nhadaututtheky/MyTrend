@@ -567,6 +567,7 @@ export interface VibeSession {
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'claude-opus-4-6': 200_000,
+  'claude-sonnet-4-6': 200_000,
   'claude-sonnet-4-5-20250929': 200_000,
   'claude-haiku-4-5-20251001': 200_000,
   default: 200_000,
@@ -575,16 +576,60 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 // USD per million tokens: [input, output]
 export const MODEL_PRICING: Record<string, [number, number]> = {
   'claude-opus-4-6': [15, 75],
+  'claude-sonnet-4-6': [3, 15],
   'claude-sonnet-4-5-20250929': [3, 15],
   'claude-haiku-4-5-20251001': [0.8, 4],
   default: [3, 15],
 };
 
-export interface ModelSuggestion {
-  recommended: 'haiku' | 'sonnet' | 'opus';
+export type ModelTier = 'haiku-4.5' | 'sonnet-4.5' | 'sonnet-4.6' | 'opus-4.6';
+
+export interface ModelInfo {
+  tier: ModelTier;
+  label: string;
   model_id: string;
+  family: 'haiku' | 'sonnet' | 'opus';
+  version: '4.5' | '4.6';
+  color: 'green' | 'blue' | 'purple';
+  emoji: string;
   reason: string;
-  alternatives: Array<{ model: string; model_id: string; reason: string }>;
+  input_price: number;
+  output_price: number;
+}
+
+export const MODEL_CATALOG: ModelInfo[] = [
+  {
+    tier: 'haiku-4.5', label: 'Haiku 4.5', model_id: 'claude-haiku-4-5-20251001',
+    family: 'haiku', version: '4.5', color: 'green', emoji: '🍃',
+    reason: 'Simple task — fastest and cheapest',
+    input_price: 0.8, output_price: 4,
+  },
+  {
+    tier: 'sonnet-4.5', label: 'Sonnet 4.5', model_id: 'claude-sonnet-4-5-20250929',
+    family: 'sonnet', version: '4.5', color: 'blue', emoji: '⚡',
+    reason: 'Standard code task — great balance',
+    input_price: 3, output_price: 15,
+  },
+  {
+    tier: 'sonnet-4.6', label: 'Sonnet 4.6', model_id: 'claude-sonnet-4-6',
+    family: 'sonnet', version: '4.6', color: 'blue', emoji: '⚡',
+    reason: 'Latest Sonnet — best cost/quality for code',
+    input_price: 3, output_price: 15,
+  },
+  {
+    tier: 'opus-4.6', label: 'Opus 4.6', model_id: 'claude-opus-4-6',
+    family: 'opus', version: '4.6', color: 'purple', emoji: '🏔️',
+    reason: 'Maximum reasoning — architecture & complex tasks',
+    input_price: 15, output_price: 75,
+  },
+];
+
+export interface ModelSuggestion {
+  recommended: ModelTier;
+  model_id: string;
+  model_info: ModelInfo;
+  reason: string;
+  alternatives: ModelInfo[];
   cli_command: string;
   estimated_cost_note: string;
 }

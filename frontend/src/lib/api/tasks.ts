@@ -4,10 +4,11 @@ import type {
   ClaudeTaskStatus,
   VibeSession,
   ModelSuggestion,
+  ModelTier,
   VibeSyncStatus,
   PBListResult,
 } from '$lib/types';
-import { MODEL_CONTEXT_WINDOWS, MODEL_PRICING } from '$lib/types';
+import { MODEL_CONTEXT_WINDOWS, MODEL_PRICING, MODEL_CATALOG } from '$lib/types';
 
 function getPbUrl(): string {
   return typeof window !== 'undefined'
@@ -18,28 +19,24 @@ function getPbUrl(): string {
 // ---------------------------------------------------------------------------
 // Keyword routing for model suggestions
 // ---------------------------------------------------------------------------
-const HAIKU_KEYWORDS = [
-  'search', 'find', 'grep', 'read', 'check', 'list', 'look', 'show',
-  'status', 'count', 'format', 'lint', 'simple', 'quick', 'basic', 'trivial',
-  'glob', 'what', 'where', 'which', 'verify', 'confirm', 'view', 'display',
-];
 
-const OPUS_KEYWORDS = [
-  'architect', 'design', 'plan', 'security', 'audit', 'refactor large',
-  'complex', 'multi-file', 'system design', 'strategy', 'performance review',
-  'comprehensive', 'deep dive', 'full analysis', 'restructure', 'overhaul',
-];
-
-const MODEL_IDS: Record<'haiku' | 'sonnet' | 'opus', string> = {
-  haiku: 'claude-haiku-4-5-20251001',
-  sonnet: 'claude-sonnet-4-5-20250929',
-  opus: 'claude-opus-4-6',
-};
-
-const MODEL_REASONS: Record<'haiku' | 'sonnet' | 'opus', string> = {
-  haiku: 'Simple task — fast and cheap',
-  sonnet: 'Standard code task — best balance',
-  opus: 'Complex / architectural task — maximum reasoning',
+// Model tier routing: task keywords → recommended tier
+const TIER_KEYWORDS: Record<ModelTier, string[]> = {
+  'haiku-4.5': [
+    'search', 'find', 'grep', 'read', 'check', 'list', 'look', 'show',
+    'status', 'count', 'format', 'lint', 'simple', 'quick', 'basic', 'trivial',
+    'glob', 'what', 'where', 'which', 'verify', 'confirm', 'view', 'display',
+  ],
+  'sonnet-4.5': [],  // not auto-routed, manual pick only
+  'sonnet-4.6': [
+    'write', 'implement', 'code', 'fix', 'bug', 'test', 'refactor', 'build',
+    'create', 'add', 'update', 'feature', 'component', 'function', 'module',
+  ],
+  'opus-4.6': [
+    'architect', 'design', 'plan', 'security', 'audit', 'refactor large',
+    'complex', 'multi-file', 'system design', 'strategy', 'performance review',
+    'comprehensive', 'deep dive', 'full analysis', 'restructure', 'overhaul',
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -253,42 +250,33 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
 export function suggestModel(taskContent: string): ModelSuggestion {
   const text = taskContent.toLowerCase();
 
-  let recommended: 'haiku' | 'sonnet' | 'opus' = 'sonnet';
+  // Priority: opus > sonnet > haiku (check most expensive first)
+  const tierPriority: ModelTier[] = ['opus-4.6', 'sonnet-4.6', 'haiku-4.5'];
+  let matchedTier: ModelTier = 'sonnet-4.6'; // default
 
-  for (const kw of OPUS_KEYWORDS) {
-    if (text.includes(kw)) {
-      recommended = 'opus';
-      break;
-    }
-  }
-
-  if (recommended === 'sonnet') {
-    for (const kw of HAIKU_KEYWORDS) {
+  for (const tier of tierPriority) {
+    const keywords = TIER_KEYWORDS[tier];
+    if (keywords.length === 0) continue;
+    for (const kw of keywords) {
       if (text.includes(kw)) {
-        recommended = 'haiku';
+        matchedTier = tier;
         break;
       }
     }
+    if (matchedTier === tier) break;
   }
 
-  const modelId = MODEL_IDS[recommended];
-  const alternatives = (Object.keys(MODEL_IDS) as Array<'haiku' | 'sonnet' | 'opus'>)
-    .filter((m) => m !== recommended)
-    .map((m) => ({
-      model: m,
-      model_id: MODEL_IDS[m],
-      reason: MODEL_REASONS[m],
-    }));
-
-  const [inputRate, outputRate] = MODEL_PRICING[modelId] ?? MODEL_PRICING['default'] ?? [15, 75];
-  const costNote = `~$${inputRate}/M input, $${outputRate}/M output`;
+  const modelInfo = MODEL_CATALOG.find((m) => m.tier === matchedTier)!;
+  const alternatives = MODEL_CATALOG.filter((m) => m.tier !== matchedTier);
+  const costNote = `~$${modelInfo.input_price}/M input, $${modelInfo.output_price}/M output`;
 
   return {
-    recommended,
-    model_id: modelId,
-    reason: MODEL_REASONS[recommended],
+    recommended: matchedTier,
+    model_id: modelInfo.model_id,
+    model_info: modelInfo,
+    reason: modelInfo.reason,
     alternatives,
-    cli_command: `claude --model ${modelId}`,
+    cli_command: `claude --model ${modelInfo.model_id}`,
     estimated_cost_note: costNote,
   };
 }
