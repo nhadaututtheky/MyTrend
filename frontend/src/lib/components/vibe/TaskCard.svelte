@@ -35,9 +35,14 @@
 
   function getProjectName(dir: string): string {
     if (!dir) return '';
-    // Normalize slashes (backslash + collapse doubles from PocketBase decode)
+    // Dash-encoded format: "C--Users-X-Desktop-Future-MyTrend--claude-worktrees-branch"
+    if (!dir.includes('/') && !dir.includes('\\') && dir.includes('--')) {
+      const stripped = dir.replace(/--\.?claude-worktrees-[^-].*$/, '');
+      const parts = stripped.split('--').filter(Boolean);
+      return parts[parts.length - 1] ?? dir;
+    }
+    // Slash format
     const normalized = dir.replace(/\\/g, '/').replace(/\/+/g, '/');
-    // Strip worktree suffix: /.claude/worktrees/<branch> or /worktrees/<branch>
     const stripped = normalized.replace(/\/\.?claude\/worktrees\/[^/]*\/?$/, '');
     const parts = stripped.split('/').filter(Boolean);
     return parts[parts.length - 1] ?? dir;

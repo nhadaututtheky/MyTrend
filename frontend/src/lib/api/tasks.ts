@@ -122,12 +122,23 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
     const key = `${task.session_id}::${task.agent_id}`;
 
     if (!sessionMap.has(key)) {
-      // Extract clean project name from path
-      // e.g. C//Users/X/Desktop/Future/MyTrend//claude/worktrees/pensive -> "MyTrend"
-      //      C//Users/X/Desktop/Future/Future                             -> "Future"
+      // Extract clean project name from path.
+      // Handles two formats from PocketBase:
+      //   Slash format:  "C//Users/X/Desktop/Future/MyTrend//claude/worktrees/pensive" -> "MyTrend"
+      //   Dash-encoded:  "C--Users-X-Desktop-Future-MyTrend--claude-worktrees-pensive"  -> "MyTrend"
       function extractProjectName(dir: string): string {
         if (!dir) return 'Unknown';
-        // Normalize: replace backslash + collapse multiple slashes
+
+        // Detect dash-encoded format (no slashes, uses -- as separator)
+        if (!dir.includes('/') && !dir.includes('\\') && dir.includes('--')) {
+          // Strip worktree suffix: --claude-worktrees-<branch> or --.claude-worktrees-<branch>
+          const stripped = dir.replace(/--\.?claude-worktrees-[^-].*$/, '');
+          // Split by -- (path separators) and get last meaningful segment
+          const parts = stripped.split('--').filter(Boolean);
+          return parts[parts.length - 1] ?? dir;
+        }
+
+        // Slash format: normalize backslash + collapse multiple slashes
         const normalized = dir.replace(/\\/g, '/').replace(/\/+/g, '/');
         // Strip worktree suffix: /.claude/worktrees/... or /worktrees/...
         const stripped = normalized.replace(/\/\.?claude\/worktrees\/[^/]*\/?$/, '');
