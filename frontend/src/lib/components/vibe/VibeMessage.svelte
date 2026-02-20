@@ -35,6 +35,7 @@
   );
 </script>
 
+{#if textContent || toolUses.length > 0}
 <div class="msg msg-{role}" class:has-tools={toolUses.length > 0}>
   <div class="msg-header">
     <span class="msg-role">{role === 'user' ? 'You' : model ?? 'Claude'}</span>
@@ -63,6 +64,7 @@
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   .msg {

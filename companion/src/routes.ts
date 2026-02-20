@@ -215,9 +215,9 @@ export function createApp(ctx: AppContext): Hono {
         return c.json({ translated: "", error: `Google API ${res.status}` }, 502);
       }
 
-      const result = await res.json();
+      const result = (await res.json()) as [string, unknown][][] | null;
       const translated =
-        result[0]?.map((seg: [string]) => seg[0]).join("") ?? "";
+        result?.[0]?.map((seg) => seg[0]).join("") ?? "";
       return c.json({ translated });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Translation failed";

@@ -206,19 +206,29 @@
       case 'assistant': {
         const aId = msg.message.id ?? `assistant-${++msgCounter}`;
         // Deduplicate: skip if already seen
-        if (!seenIds.has(aId)) {
-          seenIds.add(aId);
-          messages = [
-            ...messages,
-            {
-              id: aId,
-              role: 'assistant',
-              content: msg.message.content,
-              model: msg.message.model,
-              timestamp: msg.timestamp,
-            },
-          ];
+        if (seenIds.has(aId)) break;
+
+        // Skip thinking-only messages (no visible text or tool_use content)
+        const blocks = msg.message.content;
+        if (Array.isArray(blocks)) {
+          const hasVisible = blocks.some(
+            (b: ContentBlock) =>
+              (b.type === 'text' && b.text?.trim()) || b.type === 'tool_use'
+          );
+          if (!hasVisible) break;
         }
+
+        seenIds.add(aId);
+        messages = [
+          ...messages,
+          {
+            id: aId,
+            role: 'assistant',
+            content: msg.message.content,
+            model: msg.message.model,
+            timestamp: msg.timestamp,
+          },
+        ];
         streamingText = '';
         scrollToBottom();
         break;

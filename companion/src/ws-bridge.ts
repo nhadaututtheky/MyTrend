@@ -321,6 +321,22 @@ export class WsBridge {
     session: ActiveSession,
     msg: CLIAssistantMessage
   ): void {
+    // Skip assistant messages that only contain thinking blocks (no visible content).
+    // These are partial messages from --include-partial-messages that render as empty bubbles.
+    const content = msg.message.content;
+    if (Array.isArray(content)) {
+      const hasVisible = content.some(
+        (b) =>
+          (b.type === "text" && b.text?.trim()) ||
+          b.type === "tool_use" ||
+          b.type === "tool_result"
+      );
+      if (!hasVisible) {
+        this.updateStatus(session, "busy");
+        return;
+      }
+    }
+
     const browserMsg: BrowserIncomingMessage = {
       type: "assistant",
       message: msg.message,
