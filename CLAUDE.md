@@ -60,3 +60,35 @@ Comic hand-drawn style with:
 - Comic Mono font
 - Light/dark mode via [data-theme] attribute
 - Accent colors: green (#00D26A), red (#FF4757), yellow (#FFE66D), blue (#4ECDC4)
+
+## Git Workflow (BẮT BUỘC)
+
+**Sau khi code xong trong worktree, PHẢI làm đủ 4 bước:**
+
+```bash
+# 1. Commit trong worktree
+cd .claude/worktrees/<branch-name>
+git add <files>
+git commit -m "feat/fix: mô tả"
+
+# 2. Merge về main
+cd C:/Users/X/Desktop/Future/MyTrend
+git merge claude/<branch-name> --no-ff -m "Merge branch '...'"
+
+# 3. Resolve conflicts nếu có, rồi commit
+git add . && git commit -m "merge: resolve conflicts"
+
+# 4. Push
+git push
+
+# Kiểm tra tồn đọng định kỳ
+git worktree list
+git status  # trong TỪNG worktree
+```
+
+**Rules:**
+- KHÔNG để uncommitted code sau khi xong task
+- KHÔNG để worktree chỉ có code mà không có commit
+- Check tất cả worktrees trước khi kết thúc session: `git worktree list`
+- Conflicts: ưu tiên version có nhiều lines hơn / mới hơn
+- `cool-pasteur`, `pensive-lehmann` là pattern đặt tên branch của Claude Code
