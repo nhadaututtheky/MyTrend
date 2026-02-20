@@ -2,7 +2,6 @@
   import { onMount, onDestroy } from 'svelte';
   import pb from '$lib/config/pocketbase';
   import { fetchProjects } from '$lib/api/projects';
-  import { fetchPlans } from '$lib/api/plans';
   import { fetchActivities, fetchHeatmapData } from '$lib/api/activity';
   import { fetchWeeklyInsights, fetchWeekComparison } from '$lib/api/insights';
   import { fetchTrendingTopics } from '$lib/api/topics';
@@ -25,7 +24,6 @@
   } from '$lib/types';
 
   let projects = $state<Project[]>([]);
-  let activePlans = $state<Plan[]>([]);
   let activities = $state<Activity[]>([]);
   let heatmapData = $state<HeatmapDay[]>([]);
   let trendData = $state<TimeSeriesPoint[]>([]);
@@ -33,16 +31,6 @@
   let comparison = $state<WeekComparison | null>(null);
   let trendingTopics = $state<TrendingTopic[]>([]);
   let isLoading = $state(true);
-
-  const PLAN_STATUS_COLORS: Record<PlanStatus, 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> = {
-    draft: 'yellow',
-    approved: 'blue',
-    in_progress: 'orange',
-    review: 'purple',
-    completed: 'green',
-    abandoned: 'red',
-    superseded: 'red',
-  };
 
   const totalConversations = $derived(projects.reduce((sum, p) => sum + p.total_conversations, 0));
   const totalIdeas = $derived(projects.reduce((sum, p) => sum + p.total_ideas, 0));
@@ -84,11 +72,6 @@
 
       if (projectsResult.status === 'fulfilled') {
         projects = projectsResult.value.items;
-      }
-      if (plansResult.status === 'fulfilled') {
-        activePlans = plansResult.value.items
-          .filter((p) => p.status !== 'completed' && p.status !== 'abandoned' && p.status !== 'superseded')
-          .slice(0, 5);
       }
       if (activitiesResult.status === 'fulfilled') {
         activities = activitiesResult.value.items.slice(0, 10);
