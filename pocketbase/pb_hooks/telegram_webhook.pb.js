@@ -284,4 +284,47 @@ routerAdd('DELETE', '/api/telegram/webhook/setup', (c) => {
   }
 });
 
-console.log('[TelegramWebhook] Hooks registered: webhook, setup, remove');
+// ---------------------------------------------------------------------------
+// POST /api/telegram/notify - Send a message to configured Telegram channel
+// Body: { message: string, parse_mode?: "Markdown" | "HTML" }
+// ---------------------------------------------------------------------------
+routerAdd('POST', '/api/telegram/notify', (c) => {
+  var authRecord = c.get('authRecord');
+  if (!authRecord) return c.json(401, { error: 'Authentication required' });
+
+  var body = $apis.requestInfo(c).data;
+  var message = (body.message || '').trim();
+  if (!message) return c.json(400, { error: 'Missing message' });
+
+  var parseMode = body.parse_mode || 'Markdown';
+  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
+  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID');
+
+  if (!botToken) return c.json(500, { error: 'Bot token not configured' });
+  if (!channelId) return c.json(500, { error: 'Channel ID not configured' });
+
+  try {
+    var res = $http.send({
+      url: 'https://api.telegram.org/bot' + botToken + '/sendMessage',
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: channelId,
+        text: message.substring(0, 4096),
+        parse_mode: parseMode,
+      }),
+      timeout: 15,
+    });
+
+    if (res.statusCode === 200 && res.json && res.json.ok) {
+      return c.json(200, { success: true, message_id: res.json.result ? res.json.result.message_id : null });
+    }
+
+    var errMsg = (res.json && res.json.description) ? res.json.description : ('HTTP ' + res.statusCode);
+    return c.json(502, { success: false, error: errMsg });
+  } catch (e) {
+    return c.json(502, { success: false, error: 'Send failed: ' + e });
+  }
+});
+
+console.log('[TelegramWebhook] Hooks registered: webhook, setup, remove, notify');

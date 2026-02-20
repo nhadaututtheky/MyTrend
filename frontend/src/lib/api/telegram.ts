@@ -147,3 +147,15 @@ export async function saveTelegramSettings(
   if (!res.ok) throw new Error('Failed to save Telegram settings');
   return res.json();
 }
+
+export async function sendVibeNotification(
+  message: string,
+  parseMode: 'Markdown' | 'HTML' = 'Markdown',
+): Promise<{ success: boolean; message_id?: number; error?: string }> {
+  const res = await fetch(`${PB_URL}/api/telegram/notify`, {
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, parse_mode: parseMode }),
+  });
+  return res.json();
+}
