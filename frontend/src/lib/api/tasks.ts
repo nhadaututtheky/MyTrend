@@ -123,19 +123,30 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
 
     if (!sessionMap.has(key)) {
       // Extract clean project name from path.
-      // Handles two formats from PocketBase:
-      //   Slash format:  "C//Users/X/Desktop/Future/MyTrend//claude/worktrees/pensive" -> "MyTrend"
-      //   Dash-encoded:  "C--Users-X-Desktop-Future-MyTrend--claude-worktrees-pensive"  -> "MyTrend"
+      // Claude Code encodes project_dir: ':' and '\' each become '-'
+      //   "C:\Users\X\Desktop\Future\MyTrend"              -> "C--Users-X-Desktop-Future-MyTrend"
+      //   "C:\...\MyTrend\.claude\worktrees\pensive"        -> "C--Users-...-MyTrend--claude-worktrees-pensive"
+      // The last path segment before "--claude" or "--worktrees" is the project name.
+      // Within a segment, '-' is used for both '\' separators AND '-' chars in folder names.
+      // Strategy: strip worktree suffix, then take the last '-'-token that looks like a project name.
+      // Slash format (older data): "C//Users/X/Desktop/Future/MyTrend//claude/worktrees/pensive"
       function extractProjectName(dir: string): string {
         if (!dir) return 'Unknown';
 
-        // Detect dash-encoded format (no slashes, uses -- as separator)
-        if (!dir.includes('/') && !dir.includes('\\') && dir.includes('--')) {
-          // Strip worktree suffix: --claude-worktrees-<branch> or --.claude-worktrees-<branch>
-          const stripped = dir.replace(/--\.?claude-worktrees-[^-].*$/, '');
-          // Split by -- (path separators) and get last meaningful segment
-          const parts = stripped.split('--').filter(Boolean);
-          return parts[parts.length - 1] ?? dir;
+        // Dash-encoded format: no slashes at all
+        if (!dir.includes('/') && !dir.includes('\\')) {
+          // Strip worktree suffix: --claude-worktrees-* or --.claude-worktrees-*
+          const stripped = dir.replace(/--\.?claude-worktrees-.+$/, '');
+          // Decode: replace '--' with '/' to recover path separators
+          // "C--Users-X-Desktop-Future-MyTrend" -> "C/Users-X-Desktop-Future-MyTrend"
+          // Single dashes between segments are ambiguous but '--' is always a path separator
+          const decoded = stripped.replace(/--/g, '/');
+          // Now split by '/' and take last segment
+          const parts = decoded.split('/').filter(Boolean);
+          const last = parts[parts.length - 1]; // e.g. "Users-X-Desktop-Future-MyTrend"
+          // Within last segment, '-' could be '\' or part of name — take the last '-' token
+          const tokens = last ? last.split('-').filter(Boolean) : [];
+          return tokens[tokens.length - 1] ?? stripped ?? dir;
         }
 
         // Slash format: normalize backslash + collapse multiple slashes

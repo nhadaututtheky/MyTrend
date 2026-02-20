@@ -35,11 +35,14 @@
 
   function getProjectName(dir: string): string {
     if (!dir) return '';
-    // Dash-encoded format: "C--Users-X-Desktop-Future-MyTrend--claude-worktrees-branch"
-    if (!dir.includes('/') && !dir.includes('\\') && dir.includes('--')) {
-      const stripped = dir.replace(/--\.?claude-worktrees-[^-].*$/, '');
-      const parts = stripped.split('--').filter(Boolean);
-      return parts[parts.length - 1] ?? dir;
+    // Dash-encoded: Claude Code encodes ':' and '\' as '-', so '--' = two consecutive separators
+    if (!dir.includes('/') && !dir.includes('\\')) {
+      const stripped = dir.replace(/--\.?claude-worktrees-.+$/, '');
+      const decoded = stripped.replace(/--/g, '/');
+      const parts = decoded.split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      const tokens = last ? last.split('-').filter(Boolean) : [];
+      return tokens[tokens.length - 1] ?? stripped ?? dir;
     }
     // Slash format
     const normalized = dir.replace(/\\/g, '/').replace(/\/+/g, '/');
