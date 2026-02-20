@@ -143,8 +143,8 @@ onRecordAfterCreateRequest((e) => {
       idea.set('type', detection.type);
       idea.set('status', 'inbox');
       idea.set('priority', detection.type === 'bug' ? 'high' : 'medium');
-      idea.set('description', 'Auto-extracted from conversation. Signal: "' + detection.phrase + '"');
-      idea.set('tags', JSON.stringify([detection.type, 'auto-extracted']));
+      idea.set('content', 'Auto-extracted from conversation. Signal: "' + detection.phrase + '"');
+      idea.set('tags', [detection.type, 'auto-extracted']);
       if (convId) idea.set('conversation', convId);
       if (projectId) idea.set('project', projectId);
       dao.saveRecord(idea);

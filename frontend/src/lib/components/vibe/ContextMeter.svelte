@@ -49,8 +49,8 @@
       agg.estimated_cost += s.estimated_cost;
     }
 
-    const contextWindow = MODEL_CONTEXT_WINDOWS['default'];
-    agg.context_pct = Math.round((agg.total_tokens / contextWindow) * 100);
+    const cw = MODEL_CONTEXT_WINDOWS['default'] ?? 200_000;
+    agg.context_pct = Math.round((agg.total_tokens / cw) * 100);
     return agg;
   });
 
@@ -68,7 +68,7 @@
 
   // Context window for display
   const contextWindow = $derived(
-    data ? (MODEL_CONTEXT_WINDOWS[data.model] ?? MODEL_CONTEXT_WINDOWS['default']) : 200_000,
+    data ? (MODEL_CONTEXT_WINDOWS[data.model] ?? MODEL_CONTEXT_WINDOWS['default'] ?? 200_000) : 200_000,
   );
 
   const isWarning = $derived(data ? data.context_pct >= 80 : false);

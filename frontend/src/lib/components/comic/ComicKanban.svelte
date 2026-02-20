@@ -38,19 +38,11 @@
         {/if}
         {#each col.items as task (task.id)}
           <div class="task-card sketch-border" class:active={task.status === 'in_progress'}>
-            <div class="task-subject">{task.subject}</div>
-            {#if task.description}
-              <div class="task-desc">{task.description.length > 120 ? task.description.slice(0, 117) + '...' : task.description}</div>
-            {/if}
-            {#if task.status === 'in_progress' && task.activeForm}
+            <div class="task-subject">{task.content}</div>
+            {#if task.status === 'in_progress' && task.active_form}
               <div class="task-active">
                 <span class="active-dot"></span>
-                {task.activeForm}
-              </div>
-            {/if}
-            {#if task.blockedBy.length > 0}
-              <div class="task-blocked">
-                <ComicBadge color="red" size="sm">Blocked by #{task.blockedBy.join(', #')}</ComicBadge>
+                {task.active_form}
               </div>
             {/if}
             <span class="task-id">#{task.id}</span>
@@ -135,13 +127,6 @@
     padding-right: 28px;
   }
 
-  .task-desc {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    line-height: 1.4;
-    margin-bottom: 4px;
-  }
-
   .task-active {
     display: flex;
     align-items: center;
@@ -160,10 +145,6 @@
     background: var(--accent-blue);
     animation: pulse 1.5s ease-in-out infinite;
     flex-shrink: 0;
-  }
-
-  .task-blocked {
-    margin-top: 4px;
   }
 
   .task-id {

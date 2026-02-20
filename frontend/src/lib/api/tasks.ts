@@ -104,7 +104,7 @@ export function calcCost(
   cacheCreateTokens: number,
   model: string,
 ): number {
-  const [inputRate, outputRate] = MODEL_PRICING[model] ?? MODEL_PRICING['default'];
+  const [inputRate, outputRate] = MODEL_PRICING[model] ?? MODEL_PRICING['default'] ?? [15, 75];
   const inputCost = (inputTokens / 1_000_000) * inputRate;
   const outputCost = (outputTokens / 1_000_000) * outputRate;
   const cacheReadCost = (cacheReadTokens / 1_000_000) * (inputRate * 0.1);
@@ -214,7 +214,7 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
       session.cache_create_tokens = first.cache_create_tokens || 0;
     }
 
-    const contextWindow = MODEL_CONTEXT_WINDOWS[session.model] ?? MODEL_CONTEXT_WINDOWS['default'];
+    const contextWindow = MODEL_CONTEXT_WINDOWS[session.model] ?? MODEL_CONTEXT_WINDOWS['default'] ?? 200_000;
     session.total_tokens =
       session.input_tokens + session.output_tokens + session.cache_read_tokens + session.cache_create_tokens;
     session.context_pct = Math.min(100, Math.round((session.total_tokens / contextWindow) * 100));
@@ -280,7 +280,7 @@ export function suggestModel(taskContent: string): ModelSuggestion {
       reason: MODEL_REASONS[m],
     }));
 
-  const [inputRate, outputRate] = MODEL_PRICING[modelId] ?? MODEL_PRICING['default'];
+  const [inputRate, outputRate] = MODEL_PRICING[modelId] ?? MODEL_PRICING['default'] ?? [15, 75];
   const costNote = `~$${inputRate}/M input, $${outputRate}/M output`;
 
   return {

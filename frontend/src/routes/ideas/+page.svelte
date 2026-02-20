@@ -37,6 +37,23 @@
     statusFilter === 'all' ? ideas : ideas.filter((i) => i.status === statusFilter),
   );
 
+  const inboxCount = $derived(ideas.filter((i) => i.status === 'inbox').length);
+
+  const statusTabsWithCount = $derived(
+    statusTabs.map((t) => t.id === 'inbox' && inboxCount > 0
+      ? { ...t, label: `Inbox (${inboxCount})` }
+      : t,
+    ),
+  );
+
+  function isAutoExtracted(idea: Idea): boolean {
+    return Array.isArray(idea.tags) && idea.tags.includes('auto-extracted');
+  }
+
+  function stripHtml(html: string): string {
+    return html.replace(/<[^>]*>/g, '').trim();
+  }
+
   const NEON_MAP: Record<string, 'green' | 'blue' | 'purple' | 'red' | false> = {
     green: 'green', blue: 'blue', purple: 'purple', red: 'red',
   };
@@ -84,7 +101,7 @@
     </div>
   </div>
 
-  <ComicTabs tabs={statusTabs} bind:active={statusFilter} />
+  <ComicTabs tabs={statusTabsWithCount} bind:active={statusFilter} />
 
   {#if isLoading}
     <div class="skeleton-grid">
@@ -108,12 +125,18 @@
             <div class="idea-header">
               <h3 class="idea-title">{idea.title}</h3>
               <div class="badges">
+                {#if isAutoExtracted(idea)}
+                  <ComicBadge color="blue" size="sm">auto</ComicBadge>
+                {/if}
                 <ComicBadge color={TYPE_COLORS[idea.type] ?? 'blue'} size="sm">{idea.type}</ComicBadge>
                 <ComicBadge color={PRIORITY_COLORS[idea.priority] ?? 'green'} size="sm">{idea.priority}</ComicBadge>
               </div>
             </div>
-            {#if idea.tags.length > 0}
-              <div class="tags">{#each idea.tags.slice(0, 3) as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}</div>
+            {#if idea.content}
+              <p class="idea-preview">{stripHtml(idea.content).slice(0, 120)}{stripHtml(idea.content).length > 120 ? '...' : ''}</p>
+            {/if}
+            {#if Array.isArray(idea.tags) && idea.tags.length > 0}
+              <div class="tags">{#each idea.tags.filter(t => t !== 'auto-extracted').slice(0, 3) as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}</div>
             {/if}
           </ComicCard>
         </a>
@@ -179,7 +202,18 @@
 
   .idea-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
   .idea-title { font-size: 0.95rem; font-weight: 700; margin: 0; }
-  .badges { display: flex; gap: 4px; flex-shrink: 0; }
+  .badges { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+  .idea-preview {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: var(--spacing-xs) 0 0;
+    line-height: 1.5;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
   .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
 
   @media (max-width: 768px) {
