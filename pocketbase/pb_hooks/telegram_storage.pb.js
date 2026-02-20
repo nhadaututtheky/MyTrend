@@ -5,20 +5,48 @@
 // PocketBase Goja JSVM: each routerAdd has isolated scope - must inline helpers.
 
 // ---------------------------------------------------------------------------
+// Helper: resolve Telegram credentials
+// Priority: env vars → user_settings DB record
+// ---------------------------------------------------------------------------
+function resolveTelegramCreds(userId) {
+  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN') || '';
+  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID') || '';
+
+  // Fallback to DB settings if env not set
+  if ((!botToken || !channelId) && userId) {
+    try {
+      var dao = $app.dao();
+      var rec = dao.findFirstRecordByFilter(
+        'user_settings',
+        'user = {:uid}',
+        { uid: userId }
+      );
+      if (!botToken) botToken = rec.getString('telegram_bot_token') || '';
+      if (!channelId) channelId = rec.getString('telegram_channel_id') || '';
+    } catch (e) { /* no settings record */ }
+  }
+
+  return { botToken: botToken, channelId: channelId };
+}
+
+// ---------------------------------------------------------------------------
 // GET /api/telegram/status - Bot connection status + file stats
 // ---------------------------------------------------------------------------
 routerAdd('GET', '/api/telegram/status', (c) => {
   var authRecord = c.get('authRecord');
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID');
+  var creds = resolveTelegramCreds(authRecord.getId());
+  var botToken = creds.botToken;
+  var channelId = creds.channelId;
 
   var status = {
     configured: !!(botToken && channelId),
     bot_token_set: !!botToken,
     channel_id_set: !!channelId,
     channel_id: channelId || null,
+    env_token_set: !!$os.getenv('TELEGRAM_BOT_TOKEN'),
+    env_channel_set: !!$os.getenv('TELEGRAM_STORAGE_CHANNEL_ID'),
     bot_info: null,
     total_files: 0,
     total_size: 0,
@@ -73,11 +101,12 @@ routerAdd('POST', '/api/telegram/test', (c) => {
   var authRecord = c.get('authRecord');
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID');
+  var creds = resolveTelegramCreds(authRecord.getId());
+  var botToken = creds.botToken;
+  var channelId = creds.channelId;
 
   if (!botToken || !channelId) {
-    return c.json(400, { error: 'Telegram not configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_STORAGE_CHANNEL_ID.' });
+    return c.json(400, { error: 'Telegram not configured. Add Bot Token and Channel ID in Settings.' });
   }
 
   try {
@@ -122,8 +151,9 @@ routerAdd('GET', '/api/telegram/resolve-channel', (c) => {
   var authRecord = c.get('authRecord');
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  if (!botToken) return c.json(400, { error: 'Bot token not configured' });
+  var creds = resolveTelegramCreds(authRecord.getId());
+  var botToken = creds.botToken;
+  if (!botToken) return c.json(400, { error: 'Bot token not configured. Add it in Settings.' });
 
   try {
     var res = $http.send({
@@ -167,10 +197,11 @@ routerAdd('POST', '/api/telegram/upload', (c) => {
   var authRecord = c.get('authRecord');
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID');
+  var creds = resolveTelegramCreds(authRecord.getId());
+  var botToken = creds.botToken;
+  var channelId = creds.channelId;
   if (!botToken || !channelId) {
-    return c.json(500, { error: 'Telegram storage not configured' });
+    return c.json(400, { error: 'Telegram storage not configured. Add Bot Token and Channel ID in Settings.' });
   }
 
   // Read form fields
@@ -276,8 +307,9 @@ routerAdd('GET', '/api/telegram/files/:id', (c) => {
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
   var fileRecordId = c.pathParam('id');
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  if (!botToken) return c.json(500, { error: 'Telegram not configured' });
+  var creds = resolveTelegramCreds(authRecord.getId());
+  var botToken = creds.botToken;
+  if (!botToken) return c.json(400, { error: 'Telegram not configured. Add Bot Token in Settings.' });
 
   var dao = $app.dao();
   var record;
@@ -395,7 +427,8 @@ routerAdd('DELETE', '/api/telegram/files/:id', (c) => {
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
   var fileRecordId = c.pathParam('id');
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
+  var creds = resolveTelegramCreds(authRecord.getId());
+  var botToken = creds.botToken;
   var dao = $app.dao();
 
   var record;

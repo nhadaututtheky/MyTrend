@@ -5,7 +5,8 @@
   import { theme, toggleTheme } from '$lib/stores/theme';
   import { getDeviceName, setDeviceName } from '$lib/stores/sync';
   import { toast } from '$lib/stores/toast';
-  import { getTelegramStatus, testTelegramConnection, resolveChannel, setupWebhook, removeWebhook } from '$lib/api/telegram';
+  import { getTelegramStatus, testTelegramConnection, resolveChannel, setupWebhook, removeWebhook, getTelegramSettings, saveTelegramSettings } from '$lib/api/telegram';
+  import type { TelegramSettings } from '$lib/api/telegram';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
@@ -26,6 +27,14 @@
   let tgChannels = $state<TelegramChannel[]>([]);
   let tgResolvingChannel = $state(false);
   let webhookUrl = $state('');
+
+  // Telegram credentials (DB-stored)
+  let tgBotToken = $state('');
+  let tgChannelId = $state('');
+  let tgSettingsLoading = $state(false);
+  let tgSettingsSaving = $state(false);
+  let tgEnvTokenSet = $state(false);
+  let tgEnvChannelSet = $state(false);
   let webhookSaving = $state(false);
 
   $effect(() => {
@@ -49,6 +58,7 @@
   onMount(() => {
     deviceName = getDeviceName();
     loadTelegramStatus();
+    loadTelegramSettings();
   });
 
   async function saveProfile(): Promise<void> {
@@ -81,6 +91,39 @@
       tgStatus = null;
     } finally {
       tgLoading = false;
+    }
+  }
+
+  async function loadTelegramSettings(): Promise<void> {
+    tgSettingsLoading = true;
+    try {
+      const s = await getTelegramSettings();
+      tgBotToken = s.telegram_bot_token;
+      tgChannelId = s.telegram_channel_id;
+      tgEnvTokenSet = s.env_bot_token_set;
+      tgEnvChannelSet = s.env_channel_id_set;
+    } catch {
+      // ignore — settings may not exist yet
+    } finally {
+      tgSettingsLoading = false;
+    }
+  }
+
+  async function handleSaveTelegramSettings(): Promise<void> {
+    tgSettingsSaving = true;
+    try {
+      await saveTelegramSettings({
+        telegram_bot_token: tgBotToken.trim(),
+        telegram_channel_id: tgChannelId.trim(),
+        telegram_webhook_secret: '',
+      });
+      toast.success('Telegram credentials saved!');
+      // Refresh status with new credentials
+      await loadTelegramStatus();
+    } catch {
+      toast.error('Failed to save Telegram credentials');
+    } finally {
+      tgSettingsSaving = false;
     }
   }
 
@@ -207,6 +250,36 @@
         <ComicBadge color="green" size="sm">Connected</ComicBadge>
       {:else}
         <ComicBadge color="orange" size="sm">Not Configured</ComicBadge>
+      {/if}
+    </div>
+
+    <!-- Credentials input section -->
+    <div class="tg-credentials">
+      {#if tgEnvTokenSet}
+        <p class="tg-hint tg-env-note">Bot Token: set via environment variable</p>
+      {:else}
+        <ComicInput
+          bind:value={tgBotToken}
+          label="Bot Token"
+          placeholder="123456:ABC-DEF..."
+          type="password"
+        />
+      {/if}
+      {#if tgEnvChannelSet}
+        <p class="tg-hint tg-env-note">Channel ID: set via environment variable</p>
+      {:else}
+        <ComicInput
+          bind:value={tgChannelId}
+          label="Channel ID"
+          placeholder="-100123456789"
+        />
+      {/if}
+      {#if !tgEnvTokenSet || !tgEnvChannelSet}
+        <div class="actions">
+          <ComicButton variant="primary" loading={tgSettingsSaving} onclick={handleSaveTelegramSettings}>
+            Save Credentials
+          </ComicButton>
+        </div>
       {/if}
     </div>
 
@@ -420,6 +493,24 @@
   .tg-channel-type {
     font-size: 0.7rem;
     color: var(--text-muted);
+  }
+
+  .tg-credentials {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px dashed var(--border-color);
+  }
+
+  .tg-env-note {
+    background: var(--bg-secondary);
+    padding: 4px var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
   }
 
   .tg-webhook {

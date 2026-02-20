@@ -426,6 +426,66 @@ export interface TelegramChannel {
   type: string;
 }
 
+// Claude Tasks (from Claude Code session files)
+export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface ClaudeTask {
+  id: string;
+  content: string;
+  subject?: string;
+  description?: string;
+  status: ClaudeTaskStatus;
+  activeForm?: string;
+  blockedBy: string[];
+}
+
+export interface ClaudeTaskSession {
+  id: string;
+  sessionId: string;
+  title: string;
+  subject?: string;
+  created: string;
+  updated: string;
+  tasks: ClaudeTask[];
+  completedCount: number;
+  totalCount: number;
+  // Task count breakdowns
+  completed: number;
+  inProgress: number;
+  pending: number;
+  total: number;
+}
+
+export interface ClaudeTodoList {
+  id: string;
+  sessionId: string;
+  filename: string;
+  title: string;
+  items: ClaudeTask[];
+  todos: ClaudeTask[];
+}
+
+// Weekly Insights / Analytics
+export interface WeeklyInsights {
+  activities: number;
+  hours: number;
+  ideas: number;
+  top_topics: Array<{ name: string; count: number }>;
+  streak: number;
+}
+
+export interface InsightPatterns {
+  peak_hours: Array<{ hour: number; count: number }>;
+  all_hour_data: Record<string, number>;
+  top_projects: Array<{ id: string; name: string; hours: number; color?: string }>;
+}
+
+export interface WeekComparison {
+  activities: { this_period: number; last_period: number; change_pct: number };
+  hours: { this_period: number; last_period: number; change_pct: number };
+  ideas: { this_period: number; last_period: number; change_pct: number };
+}
+
 // Toast
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 

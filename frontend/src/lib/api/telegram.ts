@@ -6,6 +6,14 @@ import type {
   TelegramChannel,
 } from '$lib/types';
 
+export interface TelegramSettings {
+  telegram_bot_token: string;
+  telegram_channel_id: string;
+  telegram_webhook_secret: string;
+  env_bot_token_set: boolean;
+  env_channel_id_set: boolean;
+}
+
 const PB_URL = import.meta.env.VITE_PB_URL || 'http://localhost:8090';
 
 function authHeaders(): Record<string, string> {
@@ -117,5 +125,25 @@ export async function removeWebhook(): Promise<{ success: boolean }> {
     method: 'DELETE',
     headers: authHeaders(),
   });
+  return res.json();
+}
+
+export async function getTelegramSettings(): Promise<TelegramSettings> {
+  const res = await fetch(`${PB_URL}/api/mytrend/settings/telegram`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to load Telegram settings');
+  return res.json();
+}
+
+export async function saveTelegramSettings(
+  settings: Pick<TelegramSettings, 'telegram_bot_token' | 'telegram_channel_id' | 'telegram_webhook_secret'>,
+): Promise<{ success: boolean }> {
+  const res = await fetch(`${PB_URL}/api/mytrend/settings/telegram`, {
+    method: 'PUT',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error('Failed to save Telegram settings');
   return res.json();
 }
