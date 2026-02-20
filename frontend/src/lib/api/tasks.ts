@@ -259,3 +259,15 @@ export function suggestModel(taskContent: string): ModelSuggestion {
     estimated_cost_note: costNote,
   };
 }
+
+// ---------------------------------------------------------------------------
+// fetchSessionTasks — compat for tasks/[sessionId] page (cool-pasteur)
+// ---------------------------------------------------------------------------
+export async function fetchSessionTasks(
+  sessionId: string,
+): Promise<{ tasks: ClaudeTask[]; highwatermark: number }> {
+  const result = await fetchTasks({ sessionId, perPage: 500 });
+  const tasks = result.items;
+  const highwatermark = tasks.length;
+  return { tasks, highwatermark };
+}

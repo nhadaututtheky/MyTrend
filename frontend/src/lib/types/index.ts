@@ -426,66 +426,6 @@ export interface TelegramChannel {
   type: string;
 }
 
-// Claude Tasks (from Claude Code session files)
-export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
-
-export interface ClaudeTask {
-  id: string;
-  content: string;
-  subject?: string;
-  description?: string;
-  status: ClaudeTaskStatus;
-  activeForm?: string;
-  blockedBy: string[];
-}
-
-export interface ClaudeTaskSession {
-  id: string;
-  sessionId: string;
-  title: string;
-  subject?: string;
-  created: string;
-  updated: string;
-  tasks: ClaudeTask[];
-  completedCount: number;
-  totalCount: number;
-  // Task count breakdowns
-  completed: number;
-  inProgress: number;
-  pending: number;
-  total: number;
-}
-
-export interface ClaudeTodoList {
-  id: string;
-  sessionId: string;
-  filename: string;
-  title: string;
-  items: ClaudeTask[];
-  todos: ClaudeTask[];
-}
-
-// Weekly Insights / Analytics
-export interface WeeklyInsights {
-  activities: number;
-  hours: number;
-  ideas: number;
-  top_topics: Array<{ name: string; count: number }>;
-  streak: number;
-}
-
-export interface InsightPatterns {
-  peak_hours: Array<{ hour: number; count: number }>;
-  all_hour_data: Record<string, number>;
-  top_projects: Array<{ id: string; name: string; hours: number; color?: string }>;
-}
-
-export interface WeekComparison {
-  activities: { this_period: number; last_period: number; change_pct: number };
-  hours: { this_period: number; last_period: number; change_pct: number };
-  ideas: { this_period: number; last_period: number; change_pct: number };
-}
-
 // Toast
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -575,19 +515,88 @@ export interface AskResult {
   query: string;
 }
 
-// Claude Task Viewer
+// Claude Code Tasks (TodoWrite + Vibe integration)
 export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
 
-export interface ClaudeTask {
-  id: string;
-  subject: string;
-  description: string;
-  activeForm: string;
+export interface ClaudeTask extends BaseRecord {
+  user: string;
+  session_id: string;
+  agent_id: string;
+  content: string;
+  active_form: string;
   status: ClaudeTaskStatus;
-  blocks: readonly string[];
-  blockedBy: readonly string[];
+  task_index: number;
+  model: string;
+  project_dir: string;
+  session_title: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_create_tokens: number;
+  started_at: string;
+  ended_at: string;
+  file_hash: string;
+  source_file: string;
 }
 
+export interface VibeSession {
+  session_id: string;
+  agent_id: string;
+  session_title: string;
+  model: string;
+  project_dir: string;
+  project_name: string;
+  tasks: ClaudeTask[];
+  total_tasks: number;
+  pending_count: number;
+  in_progress_count: number;
+  completed_count: number;
+  progress_pct: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_create_tokens: number;
+  total_tokens: number;
+  context_pct: number;
+  estimated_cost: number;
+  started_at: string;
+  ended_at: string;
+  duration_min: number;
+  is_active: boolean;
+}
+
+export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  'claude-opus-4-6': 200_000,
+  'claude-sonnet-4-5-20250929': 200_000,
+  'claude-haiku-4-5-20251001': 200_000,
+  default: 200_000,
+};
+
+// USD per million tokens: [input, output]
+export const MODEL_PRICING: Record<string, [number, number]> = {
+  'claude-opus-4-6': [15, 75],
+  'claude-sonnet-4-5-20250929': [3, 15],
+  'claude-haiku-4-5-20251001': [0.8, 4],
+  default: [3, 15],
+};
+
+export interface ModelSuggestion {
+  recommended: 'haiku' | 'sonnet' | 'opus';
+  model_id: string;
+  reason: string;
+  alternatives: Array<{ model: string; model_id: string; reason: string }>;
+  cli_command: string;
+  estimated_cost_note: string;
+}
+
+export interface VibeSyncStatus {
+  last_sync: string;
+  total_files: number;
+  total_tasks: number;
+  active_sessions: number;
+}
+
+// Claude Task Viewer (cool-pasteur compat)
 export interface ClaudeTaskSession {
   sessionId: string;
   subject: string;
