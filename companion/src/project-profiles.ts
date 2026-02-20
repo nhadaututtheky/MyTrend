@@ -11,14 +11,14 @@ const DEFAULT_PROFILES: ProjectProfile[] = [
     name: "MyTrend",
     dir: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
     defaultModel: "sonnet",
-    permissionMode: "default",
+    permissionMode: "bypasstool",
   },
   {
     slug: "future-bot",
     name: "Future Bot",
     dir: "C:\\Users\\X\\Desktop\\Future\\Future",
     defaultModel: "sonnet",
-    permissionMode: "default",
+    permissionMode: "bypasstool",
   },
 ];
 

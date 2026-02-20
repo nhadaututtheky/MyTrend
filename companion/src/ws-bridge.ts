@@ -47,6 +47,7 @@ interface ActiveSession {
 export class WsBridge {
   private sessions = new Map<string, ActiveSession>();
   private store: SessionStore;
+  private keepAliveTimers = new Map<string, ReturnType<typeof setInterval>>();
 
   /** Callback when session status changes (for REST API/events). */
   onStatusChange?: (sessionId: string, status: SessionStatus) => void;
@@ -114,6 +115,13 @@ export class WsBridge {
     // Notify browsers
     this.broadcastToBrowsers(session, { type: "cli_connected" });
 
+    // Start keep-alive heartbeat every 15s
+    this.stopKeepAlive(sessionId);
+    const timer = setInterval(() => {
+      this.sendToCLI(session, JSON.stringify({ type: "keep_alive" }));
+    }, 15_000);
+    this.keepAliveTimers.set(sessionId, timer);
+
     // Flush queued messages
     if (session.pendingMessages.length > 0) {
       console.log(
@@ -165,6 +173,8 @@ export class WsBridge {
     if (!session) return;
 
     session.cliSocket = null;
+    this.stopKeepAlive(socketData.sessionId);
+
     console.log(
       `[ws-bridge] CLI disconnected for session ${socketData.sessionId}`
     );
@@ -181,6 +191,7 @@ export class WsBridge {
     }
     session.pendingPermissions.clear();
 
+    this.updateStatus(session, "ended");
     this.persistSession(session);
   }
 
@@ -580,6 +591,16 @@ export class WsBridge {
     });
 
     this.onStatusChange?.(session.id, status);
+  }
+
+  // ── Keep-alive management ───────────────────────────────────────────────
+
+  private stopKeepAlive(sessionId: string): void {
+    const timer = this.keepAliveTimers.get(sessionId);
+    if (timer) {
+      clearInterval(timer);
+      this.keepAliveTimers.delete(sessionId);
+    }
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────

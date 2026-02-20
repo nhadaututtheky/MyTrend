@@ -28,6 +28,8 @@
   let connection = $state<CompanionConnection | null>(null);
   let isCreating = $state(false);
   let errorMsg = $state('');
+  let reconnectAttempt = $state(0);
+  let healthPollTimer: ReturnType<typeof setInterval> | undefined;
 
   // Chat state
   interface ChatMessage {
@@ -61,12 +63,32 @@
     if (isHealthy) {
       await refreshSessions();
       await refreshProjects();
+    } else {
+      // Auto-poll health when offline
+      startHealthPoll();
     }
   });
 
   onDestroy(() => {
     connection?.disconnect();
+    if (healthPollTimer) clearInterval(healthPollTimer);
   });
+
+  function startHealthPoll() {
+    if (healthPollTimer) return;
+    healthPollTimer = setInterval(async () => {
+      const healthy = await checkCompanionHealth();
+      if (healthy) {
+        isHealthy = true;
+        if (healthPollTimer) {
+          clearInterval(healthPollTimer);
+          healthPollTimer = undefined;
+        }
+        await refreshSessions();
+        await refreshProjects();
+      }
+    }, 15_000);
+  }
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   async function refreshSessions() {
@@ -142,17 +164,22 @@
 
   // ─── WebSocket ────────────────────────────────────────────────────────────
   function connectWS(sessionId: string) {
+    reconnectAttempt = 0;
     connection = connectToSession(
       sessionId,
       handleBridgeMessage,
       () => {
-        // on close
+        // on permanent close (after all retries exhausted)
+        reconnectAttempt = 0;
         if (sessionState) {
           sessionState = { ...sessionState, status: 'ended' };
         }
       },
       () => {
         errorMsg = 'WebSocket connection failed';
+      },
+      (attempt: number) => {
+        reconnectAttempt = attempt;
       },
     );
   }
@@ -321,9 +348,19 @@
         Start the companion service to use the terminal:
       </p>
       <code class="offline-cmd">cd companion && bun run dev</code>
+      <p class="offline-sub" style="font-size: 11px; margin-top: 4px;">
+        Auto-checking every 15s...
+      </p>
       <button
         class="btn-retry"
-        onclick={async () => { isHealthy = await checkCompanionHealth(); }}
+        onclick={async () => {
+          isHealthy = await checkCompanionHealth();
+          if (isHealthy) {
+            if (healthPollTimer) { clearInterval(healthPollTimer); healthPollTimer = undefined; }
+            await refreshSessions();
+            await refreshProjects();
+          }
+        }}
         aria-label="Retry connection"
       >
         Retry
@@ -410,7 +447,9 @@
           <span class="status-cost">{costFormatted}</span>
         </div>
         <div class="status-right">
-          {#if isBusy}
+          {#if reconnectAttempt > 0}
+            <span class="status-reconnecting">reconnecting ({reconnectAttempt})...</span>
+          {:else if isBusy}
             <span class="status-busy">working...</span>
           {/if}
           <button
@@ -797,6 +836,13 @@
   @keyframes busyPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
+  }
+
+  .status-reconnecting {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-xs);
+    color: var(--accent-yellow);
+    animation: busyPulse 1s ease-in-out infinite;
   }
 
   .btn-disconnect,

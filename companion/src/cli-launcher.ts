@@ -2,6 +2,13 @@ import type { Subprocess } from "bun";
 import type { CreateSessionRequest } from "./session-types.js";
 import { SessionStore } from "./session-store.js";
 
+const VALID_PERMISSION_MODES = new Set([
+  "ask",
+  "allow-all",
+  "bypasstool",
+  "plan",
+]);
+
 interface LaunchInfo {
   sessionId: string;
   proc: Subprocess;
@@ -44,21 +51,27 @@ export class CLILauncher {
     const model = options.model ?? "sonnet";
     args.push("--model", model);
 
-    // Permission mode
-    const permMode = options.permissionMode ?? "default";
-    args.push("--permission-mode", permMode);
+    // Permission mode - validate before passing to CLI
+    const permMode = options.permissionMode ?? "bypasstool";
+    if (VALID_PERMISSION_MODES.has(permMode)) {
+      args.push("--permission-mode", permMode);
+    } else {
+      console.warn(
+        `[cli-launcher] Invalid permission mode "${permMode}", using "bypasstool"`
+      );
+      args.push("--permission-mode", "bypasstool");
+    }
 
     // Resume existing session
     if (options.resume) {
-      // Check if there's a CLI session_id we can resume
       const persisted = this.store.load(sessionId);
       if (persisted?.state.session_id) {
         args.push("--resume", persisted.state.session_id);
       }
     }
 
-    // Headless mode - empty prompt triggers interactive SDK mode
-    args.push("-p", "");
+    // SDK mode: --sdk-url handles input/output via WebSocket
+    // No -p flag needed — Claude waits for messages via the WS connection
 
     console.log(
       `[cli-launcher] Spawning: claude ${args.join(" ")}\n  cwd: ${options.projectDir}`
@@ -110,6 +123,20 @@ export class CLILauncher {
       console.log(
         `[cli-launcher] Session ${sessionId} spawned (PID=${proc.pid})`
       );
+
+      // Verify process didn't exit immediately (bad args, missing claude binary, etc.)
+      const earlyExit = await Promise.race([
+        proc.exited.then((code) => code),
+        new Promise<null>((r) => setTimeout(() => r(null), 3_000)),
+      ]);
+
+      if (earlyExit !== null) {
+        this.processes.delete(sessionId);
+        return {
+          ok: false,
+          error: `Claude Code exited immediately with code ${earlyExit}. Check if 'claude' is in PATH and args are valid.`,
+        };
+      }
 
       return { ok: true, pid: proc.pid };
     } catch (err) {

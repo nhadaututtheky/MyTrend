@@ -162,30 +162,78 @@ export interface CompanionConnection {
   setModel: (model: string) => void;
   disconnect: () => void;
   readonly readyState: number;
+  readonly isReconnecting: boolean;
 }
+
+const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 export function connectToSession(
   sessionId: string,
   onMessage: (msg: BridgeMessage) => void,
   onClose?: () => void,
   onError?: (err: Event) => void,
+  onReconnecting?: (attempt: number) => void,
 ): CompanionConnection {
-  const ws = new WebSocket(`${COMPANION_WS}/ws/browser/${sessionId}`);
+  let ws: WebSocket | null = null;
+  let reconnectAttempt = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let intentionalClose = false;
+  let isReconnecting = false;
 
-  ws.onmessage = (event) => {
-    try {
-      const msg = JSON.parse(event.data as string) as BridgeMessage;
-      onMessage(msg);
-    } catch (err) {
-      console.error('[companion] Failed to parse WS message:', err);
-    }
-  };
+  function createWS(): WebSocket {
+    const socket = new WebSocket(`${COMPANION_WS}/ws/browser/${sessionId}`);
 
-  ws.onclose = () => onClose?.();
-  ws.onerror = (err) => onError?.(err);
+    socket.onopen = () => {
+      reconnectAttempt = 0;
+      isReconnecting = false;
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data as string) as BridgeMessage;
+        onMessage(msg);
+      } catch (err) {
+        console.error('[companion] Failed to parse WS message:', err);
+      }
+    };
+
+    socket.onclose = () => {
+      if (intentionalClose) {
+        onClose?.();
+        return;
+      }
+
+      // Auto-reconnect with exponential backoff
+      if (reconnectAttempt < MAX_RECONNECT_ATTEMPTS) {
+        isReconnecting = true;
+        const delay = RECONNECT_DELAYS[Math.min(reconnectAttempt, RECONNECT_DELAYS.length - 1)];
+        reconnectAttempt++;
+        onReconnecting?.(reconnectAttempt);
+        console.log(`[companion] WS closed, reconnecting in ${delay}ms (attempt ${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
+        reconnectTimer = setTimeout(() => {
+          ws = createWS();
+        }, delay);
+      } else {
+        isReconnecting = false;
+        console.error('[companion] Max reconnect attempts reached');
+        onClose?.();
+      }
+    };
+
+    socket.onerror = (err) => {
+      if (!isReconnecting) {
+        onError?.(err);
+      }
+    };
+
+    return socket;
+  }
+
+  ws = createWS();
 
   function sendJSON(data: unknown): void {
-    if (ws.readyState === WebSocket.OPEN) {
+    if (ws?.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(data));
     }
   }
@@ -207,10 +255,16 @@ export function connectToSession(
       sendJSON({ type: 'set_model', model });
     },
     disconnect() {
-      ws.close();
+      intentionalClose = true;
+      isReconnecting = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
     },
     get readyState() {
-      return ws.readyState;
+      return ws?.readyState ?? WebSocket.CLOSED;
+    },
+    get isReconnecting() {
+      return isReconnecting;
     },
   };
 }
