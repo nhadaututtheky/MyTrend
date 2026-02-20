@@ -78,13 +78,17 @@
       isLoading = false;
     }
 
-    unsubscribe = await pb.collection('hub_sessions').subscribe(sessionId, (e) => {
-      if (e.action === 'update') {
-        const updated = e.record as unknown as HubSession;
-        session = updated;
-        messages = updated.messages ?? [];
-      }
-    });
+    try {
+      unsubscribe = await pb.collection('hub_sessions').subscribe(sessionId, (e) => {
+        if (e.action === 'update') {
+          const updated = e.record as unknown as HubSession;
+          session = updated;
+          messages = updated.messages ?? [];
+        }
+      });
+    } catch (err: unknown) {
+      console.error('[Hub/Session] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => {

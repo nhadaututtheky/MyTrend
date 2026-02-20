@@ -56,7 +56,10 @@
 </div>
 
 <style>
-  .mini-trending { display: flex; flex-direction: column; }
+  .mini-trending {
+    display: flex;
+    flex-direction: column;
+  }
 
   .trending-list {
     list-style: none;
@@ -75,7 +78,9 @@
     border-bottom: 1px dashed var(--border-color);
   }
 
-  .trending-item:last-child { border-bottom: none; }
+  .trending-item:last-child {
+    border-bottom: none;
+  }
 
   .rank {
     font-family: var(--font-mono, monospace);
@@ -97,7 +102,9 @@
     text-overflow: ellipsis;
   }
 
-  .topic-name:hover { color: var(--accent-blue); }
+  .topic-name:hover {
+    color: var(--accent-blue);
+  }
 
   .empty {
     font-size: var(--font-size-sm);

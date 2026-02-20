@@ -3,6 +3,7 @@
 // MyTrend - Activity Auto-Tracking
 // Creates activity records when conversations, ideas, projects are created.
 // These activity records feed into activity_aggregation for trends/heatmap.
+// Enriched metadata: hour_of_day, day_of_week, source, duration_sec for insights.
 
 // ---------------------------------------------------------------------------
 // Track conversation creation
@@ -12,6 +13,7 @@ onRecordAfterCreateRequest((e) => {
   var userId = record.getString('user');
   if (!userId) return;
 
+  var now = new Date();
   var dao = $app.dao();
   try {
     var col = dao.findCollectionByNameOrId('activities');
@@ -28,8 +30,11 @@ onRecordAfterCreateRequest((e) => {
       message_count: record.getInt('message_count') || 0,
       tokens: record.getInt('total_tokens') || 0,
       session_id: record.getString('session_id') || '',
+      hour_of_day: now.getHours(),
+      day_of_week: now.getDay(),
+      conversation_id: record.getId(),
     }));
-    activity.set('timestamp', record.getString('started_at') || new Date().toISOString());
+    activity.set('timestamp', record.getString('started_at') || now.toISOString());
     activity.set('duration_sec', (record.getInt('duration_min') || 0) * 60);
     dao.saveRecord(activity);
     console.log('[ActivityTracking] Tracked conversation: ' + record.getId());
@@ -46,6 +51,7 @@ onRecordAfterCreateRequest((e) => {
   var userId = record.getString('user');
   if (!userId) return;
 
+  var now = new Date();
   var dao = $app.dao();
   try {
     var col = dao.findCollectionByNameOrId('activities');
@@ -60,8 +66,11 @@ onRecordAfterCreateRequest((e) => {
     activity.set('metadata', JSON.stringify({
       idea_type: record.getString('type') || '',
       priority: record.getString('priority') || '',
+      hour_of_day: now.getHours(),
+      day_of_week: now.getDay(),
+      idea_id: record.getId(),
     }));
-    activity.set('timestamp', new Date().toISOString());
+    activity.set('timestamp', now.toISOString());
     activity.set('duration_sec', 0);
     dao.saveRecord(activity);
     console.log('[ActivityTracking] Tracked idea: ' + record.getId());
@@ -78,6 +87,7 @@ onRecordAfterCreateRequest((e) => {
   var userId = record.getString('user');
   if (!userId) return;
 
+  var now = new Date();
   var dao = $app.dao();
   try {
     var col = dao.findCollectionByNameOrId('activities');
@@ -90,8 +100,10 @@ onRecordAfterCreateRequest((e) => {
     activity.set('device_name', '');
     activity.set('metadata', JSON.stringify({
       status: record.getString('status') || 'active',
+      hour_of_day: now.getHours(),
+      day_of_week: now.getDay(),
     }));
-    activity.set('timestamp', new Date().toISOString());
+    activity.set('timestamp', now.toISOString());
     activity.set('duration_sec', 0);
     dao.saveRecord(activity);
     console.log('[ActivityTracking] Tracked project: ' + record.getId());

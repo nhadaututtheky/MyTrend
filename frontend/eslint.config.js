@@ -44,6 +44,7 @@ export default tseslint.config(
         FileReader: 'readonly',
         Blob: 'readonly',
         HTMLCanvasElement: 'readonly',
+        HTMLIFrameElement: 'readonly',
         CanvasRenderingContext2D: 'readonly',
         getComputedStyle: 'readonly',
         ResizeObserver: 'readonly',

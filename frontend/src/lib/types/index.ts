@@ -504,83 +504,108 @@ export interface NavItem {
   badge?: number;
 }
 
-// Claude Code Tasks (TodoWrite integration)
+// Insights API
+export interface WeeklyInsights {
+  period: { start: string; end: string };
+  activity_summary: {
+    total: number;
+    hours: number;
+    avg_per_day: number;
+    vs_last_week_pct: number;
+    breakdown: Record<string, number>;
+  };
+  top_topics: Array<{ name: string; count: number }>;
+  peak_hours: Array<{ hour: number; count: number }>;
+  focus_breakdown: Array<{
+    project_id: string;
+    project_name: string;
+    minutes: number;
+    count: number;
+    pct: number;
+  }>;
+  streak: { current: number; longest: number };
+  new_ideas_count: number;
+  conversation_stats: {
+    total: number;
+    avg_messages: number;
+    avg_tokens: number;
+  };
+}
+
+export interface InsightPatterns {
+  productive_hours: Array<{ hour: number; count: number }>;
+  productive_days: Array<{ day: number; name: string; count: number }>;
+  topic_velocity: Array<{
+    topic: string;
+    this_month: number;
+    last_month: number;
+    growth_pct: number;
+  }>;
+  session_patterns: {
+    avg_session_minutes: number;
+    sessions_per_day: number;
+    total_sessions: number;
+  };
+}
+
+export interface PeriodComparison {
+  this_period: number;
+  last_period: number;
+  change_pct: number;
+}
+
+export interface WeekComparison {
+  period: string;
+  days: number;
+  activities: PeriodComparison;
+  hours: PeriodComparison;
+  conversations: PeriodComparison;
+  ideas: PeriodComparison;
+}
+
+export interface AskResult {
+  answer: string;
+  sources: Array<{
+    type: string;
+    id: string;
+    title: string;
+    snippet: string;
+    relevance: number;
+  }>;
+  query: string;
+}
+
+// Claude Task Viewer
 export type ClaudeTaskStatus = 'pending' | 'in_progress' | 'completed';
 
-export interface ClaudeTask extends BaseRecord {
-  user: string;
-  session_id: string;
-  agent_id: string;
-  content: string;
-  active_form: string;
+export interface ClaudeTask {
+  id: string;
+  subject: string;
+  description: string;
+  activeForm: string;
   status: ClaudeTaskStatus;
-  task_index: number;
-  model: string;
-  project_dir: string;
-  session_title: string;
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_tokens: number;
-  cache_create_tokens: number;
-  started_at: string;
-  ended_at: string;
-  file_hash: string;
-  source_file: string;
+  blocks: readonly string[];
+  blockedBy: readonly string[];
 }
 
-export interface VibeSession {
-  session_id: string;
-  agent_id: string;
-  session_title: string;
-  model: string;
-  project_dir: string;
-  project_name: string;
-  tasks: ClaudeTask[];
-  total_tasks: number;
-  pending_count: number;
-  in_progress_count: number;
-  completed_count: number;
-  progress_pct: number;
-  input_tokens: number;
-  output_tokens: number;
-  cache_read_tokens: number;
-  cache_create_tokens: number;
-  total_tokens: number;
-  context_pct: number;
-  estimated_cost: number;
-  started_at: string;
-  ended_at: string;
-  duration_min: number;
-  is_active: boolean;
+export interface ClaudeTaskSession {
+  sessionId: string;
+  subject: string;
+  highwatermark: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
+  total: number;
 }
 
-export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
-  'claude-opus-4-6': 200_000,
-  'claude-sonnet-4-5-20250929': 200_000,
-  'claude-haiku-4-5-20251001': 200_000,
-  default: 200_000,
-};
-
-// USD per million tokens: [input, output]
-export const MODEL_PRICING: Record<string, [number, number]> = {
-  'claude-opus-4-6': [15, 75],
-  'claude-sonnet-4-5-20250929': [3, 15],
-  'claude-haiku-4-5-20251001': [0.8, 4],
-  default: [3, 15],
-};
-
-export interface ModelSuggestion {
-  recommended: 'haiku' | 'sonnet' | 'opus';
-  model_id: string;
-  reason: string;
-  alternatives: Array<{ model: string; model_id: string; reason: string }>;
-  cli_command: string;
-  estimated_cost_note: string;
+export interface ClaudeTodoItem {
+  content: string;
+  status: ClaudeTaskStatus;
+  activeForm: string;
 }
 
-export interface VibeSyncStatus {
-  last_sync: string;
-  total_files: number;
-  total_tasks: number;
-  active_sessions: number;
+export interface ClaudeTodoList {
+  filename: string;
+  sessionId: string;
+  todos: ClaudeTodoItem[];
 }

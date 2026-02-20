@@ -21,17 +21,21 @@
       isLoading = false;
     }
 
-    unsubscribe = await pb.collection('hub_sessions').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        sessions = [e.record as unknown as HubSession, ...sessions];
-      } else if (e.action === 'update') {
-        sessions = sessions.map((s) =>
-          s.id === e.record.id ? (e.record as unknown as HubSession) : s,
-        );
-      } else if (e.action === 'delete') {
-        sessions = sessions.filter((s) => s.id !== e.record.id);
-      }
-    });
+    try {
+      unsubscribe = await pb.collection('hub_sessions').subscribe('*', (e) => {
+        if (e.action === 'create') {
+          sessions = [e.record as unknown as HubSession, ...sessions];
+        } else if (e.action === 'update') {
+          sessions = sessions.map((s) =>
+            s.id === e.record.id ? (e.record as unknown as HubSession) : s,
+          );
+        } else if (e.action === 'delete') {
+          sessions = sessions.filter((s) => s.id !== e.record.id);
+        }
+      });
+    } catch (err: unknown) {
+      console.error('[Hub] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => {

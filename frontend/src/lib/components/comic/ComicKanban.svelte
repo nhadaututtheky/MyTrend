@@ -90,8 +90,13 @@
     border-bottom: 2px solid var(--border-color);
   }
 
-  .col-icon { font-size: 1rem; }
-  .col-title { flex: 1; }
+  .col-icon {
+    font-size: 1rem;
+  }
+
+  .col-title {
+    flex: 1;
+  }
 
   .col-body {
     display: flex;
@@ -157,7 +162,9 @@
     flex-shrink: 0;
   }
 
-  .task-blocked { margin-top: 4px; }
+  .task-blocked {
+    margin-top: 4px;
+  }
 
   .task-id {
     position: absolute;
@@ -197,6 +204,8 @@
   }
 
   @media (max-width: 768px) {
-    .kanban { grid-template-columns: 1fr; }
+    .kanban {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

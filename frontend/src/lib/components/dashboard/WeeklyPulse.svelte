@@ -146,7 +146,9 @@
     font-size: var(--font-size-sm);
   }
 
-  .topics-chip { border-color: var(--accent-orange); }
+  .topics-chip {
+    border-color: var(--accent-orange);
+  }
 
   .chip-topics {
     font-family: var(--font-comic);
@@ -160,6 +162,9 @@
       overflow-x: auto;
       flex-wrap: nowrap;
     }
-    .chip { flex-shrink: 0; }
+
+    .chip {
+      flex-shrink: 0;
+    }
   }
 </style>

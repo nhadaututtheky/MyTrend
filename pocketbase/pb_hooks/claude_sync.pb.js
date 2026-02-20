@@ -322,6 +322,13 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
           try { var s = new Date(startedAt).getTime(), e2 = new Date(endedAt).getTime(); if (!isNaN(s) && !isNaN(e2)) durMin = Math.round((e2 - s) / 60000); } catch (e) {}
         }
 
+        // Detect source from project path
+        var source = 'cli';
+        var pathDepth = projName.split('-').length;
+        if (projName.match(/^C--Users-[^-]+$/) || pathDepth <= 3) {
+          source = 'desktop';
+        }
+
         // Save or Update
         try {
           var record;
@@ -334,7 +341,7 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
           }
           record.set('user', userId);
           record.set('title', title);
-          record.set('source', 'cli');
+          record.set('source', source);
           record.set('session_id', sessionId);
           record.set('device_name', $os.getenv('HOSTNAME') || 'docker');
           record.set('messages', messages);
@@ -344,7 +351,7 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
           record.set('ended_at', endedAt || '');
           record.set('duration_min', durMin);
           record.set('topics', []);
-          record.set('tags', [tag, 'claude-cli']);
+          record.set('tags', [tag, 'claude-' + source]);
           if (projectId) record.set('project', projectId);
           if (firstUserText) {
             record.set('summary', firstUserText.length > 500 ? firstUserText.substring(0, 497) + '...' : firstUserText);
@@ -501,12 +508,15 @@ try {
             var ti = dt.replace(/[#*`_~]/g, '').replace(/\s+/g, ' ').trim();
             if (ti.length > 200) ti = ti.substring(0, 197) + '...';
             if (!ti) ti = 'Untitled';
+            var src = 'cli';
+            var pn = pds[p].name();
+            if (pn.match(/^C--Users-[^-]+$/) || pn.split('-').length <= 3) src = 'desktop';
             var r = new Record(col);
-            r.set('user', uid); r.set('title', ti); r.set('source', 'cli'); r.set('session_id', sid);
+            r.set('user', uid); r.set('title', ti); r.set('source', src); r.set('session_id', sid);
             r.set('device_name', $os.getenv('HOSTNAME') || 'docker');
             r.set('messages', ms); r.set('message_count', ms.length); r.set('total_tokens', tt);
             r.set('started_at', sa || new Date().toISOString()); r.set('ended_at', ea || '');
-            r.set('topics', []); r.set('tags', [tg, 'claude-cli']);
+            r.set('topics', []); r.set('tags', [tg, 'claude-' + src]);
             if (cronProjId) r.set('project', cronProjId);
             if (fut) r.set('summary', fut.length > 500 ? fut.substring(0, 497) + '...' : fut);
             dao.saveRecord(r); imp++;

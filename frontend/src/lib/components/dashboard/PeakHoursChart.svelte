@@ -21,6 +21,7 @@
       return points;
     }
 
+    // Fallback: build from peak hours only (sparse)
     if (peakHours.length === 0) return [];
 
     const points: ChartDataPoint[] = [];

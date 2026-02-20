@@ -46,17 +46,21 @@
       isLoading = false;
     }
 
-    unsubscribe = await pb.collection('projects').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        projects = [e.record as unknown as Project, ...projects].slice(0, 100);
-      } else if (e.action === 'update') {
-        projects = projects.map((p) =>
-          p.id === e.record.id ? (e.record as unknown as Project) : p,
-        );
-      } else if (e.action === 'delete') {
-        projects = projects.filter((p) => p.id !== e.record.id);
-      }
-    });
+    try {
+      unsubscribe = await pb.collection('projects').subscribe('*', (e) => {
+        if (e.action === 'create') {
+          projects = [e.record as unknown as Project, ...projects].slice(0, 100);
+        } else if (e.action === 'update') {
+          projects = projects.map((p) =>
+            p.id === e.record.id ? (e.record as unknown as Project) : p,
+          );
+        } else if (e.action === 'delete') {
+          projects = projects.filter((p) => p.id !== e.record.id);
+        }
+      });
+    } catch (err: unknown) {
+      console.error('[Projects] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => { unsubscribe?.(); });

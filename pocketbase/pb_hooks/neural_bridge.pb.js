@@ -56,32 +56,28 @@ function encodeToNeuralMemory(collection, record) {
       metadata.session_id = record.getString('session_id') || '';
       metadata.message_count = record.getInt('message_count') || 0;
 
-    } else if (collection === 'plans') {
-      var planTitle = record.getString('title') || '';
-      var planType = record.getString('plan_type') || '';
-      var planContent = record.getString('content') || '';
-      var planTrigger = record.getString('trigger') || '';
-      var planReasoning = record.getString('reasoning') || '';
-
-      var planParts = [];
-      if (planTitle) planParts.push('Plan: ' + planTitle);
-      if (planType) planParts.push('Type: ' + planType);
-      if (planTrigger) planParts.push('Trigger: ' + planTrigger.substring(0, 1000));
-      if (planContent) planParts.push(planContent);
-      if (planReasoning) planParts.push('Reasoning: ' + planReasoning.substring(0, 1000));
-      content = planParts.join('\n');
-
-      var planTags = record.get('tags') || [];
-      for (var pt = 0; pt < planTags.length; pt++) {
-        tags.push(String(planTags[pt]));
+      // Add project context
+      var projId = record.getString('project');
+      if (projId) {
+        try {
+          var proj = $app.dao().findRecordById('projects', projId);
+          var projName = proj.getString('name');
+          if (projName) {
+            tags.push('project:' + projName);
+            metadata.project_name = projName;
+            content = 'Project: ' + projName + '\n' + content;
+          }
+        } catch (e) { /* skip */ }
       }
-      tags.push('plan');
-      if (planType) tags.push(planType);
 
-      metadata.title = planTitle;
-      metadata.plan_type = planType;
-      metadata.status = record.getString('status') || '';
-      metadata.priority = record.getString('priority') || '';
+      // Add topic names from topics list
+      var topicsList = record.get('topics') || [];
+      for (var tp = 0; tp < topicsList.length && tp < 10; tp++) {
+        var topicName = String(topicsList[tp]);
+        if (topicName) {
+          tags.push('topic:' + topicName);
+        }
+      }
 
     } else if (collection === 'ideas') {
       var ideaTitle = record.getString('title') || '';

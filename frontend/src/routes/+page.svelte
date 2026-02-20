@@ -4,6 +4,8 @@
   import { fetchProjects } from '$lib/api/projects';
   import { fetchPlans } from '$lib/api/plans';
   import { fetchActivities, fetchHeatmapData } from '$lib/api/activity';
+  import { fetchWeeklyInsights, fetchWeekComparison } from '$lib/api/insights';
+  import { fetchTrendingTopics } from '$lib/api/topics';
   import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
   import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
   import ComicSparkline from '$lib/components/comic/ComicSparkline.svelte';
@@ -11,18 +13,25 @@
   import ActivityTimeline from '$lib/components/dashboard/ActivityTimeline.svelte';
   import ProjectCard from '$lib/components/dashboard/ProjectCard.svelte';
   import TrendChart from '$lib/components/dashboard/TrendChart.svelte';
+  import WeeklyPulse from '$lib/components/dashboard/WeeklyPulse.svelte';
+  import PeakHoursChart from '$lib/components/dashboard/PeakHoursChart.svelte';
+  import FocusBreakdown from '$lib/components/dashboard/FocusBreakdown.svelte';
+  import MiniTrending from '$lib/components/dashboard/MiniTrending.svelte';
   import HeatmapCalendar from '$lib/components/comic/HeatmapCalendar.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
-  import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
-  import { formatNumber } from '$lib/utils/format';
-  import { formatRelative } from '$lib/utils/date';
-  import type { Project, Activity, HeatmapDay, TimeSeriesPoint, Plan, PlanStatus } from '$lib/types';
+  import type {
+    Project, Activity, HeatmapDay, TimeSeriesPoint,
+    WeeklyInsights, WeekComparison, TrendingTopic,
+  } from '$lib/types';
 
   let projects = $state<Project[]>([]);
   let activePlans = $state<Plan[]>([]);
   let activities = $state<Activity[]>([]);
   let heatmapData = $state<HeatmapDay[]>([]);
   let trendData = $state<TimeSeriesPoint[]>([]);
+  let weeklyInsights = $state<WeeklyInsights | null>(null);
+  let comparison = $state<WeekComparison | null>(null);
+  let trendingTopics = $state<TrendingTopic[]>([]);
   let isLoading = $state(true);
 
   const PLAN_STATUS_COLORS: Record<PlanStatus, 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> = {
@@ -63,12 +72,15 @@
 
   onMount(async () => {
     try {
-      const [projectsResult, plansResult, activitiesResult, heatmap] = await Promise.allSettled([
-        fetchProjects(1, 'active'),
-        fetchPlans(1, { sort: '-updated' }),
-        fetchActivities(1),
-        fetchHeatmapData(),
-      ]);
+      const [projectsResult, activitiesResult, heatmap, insightsResult, compareResult, trendingResult] =
+        await Promise.allSettled([
+          fetchProjects(1, 'active'),
+          fetchActivities(1),
+          fetchHeatmapData(),
+          fetchWeeklyInsights(),
+          fetchWeekComparison('week'),
+          fetchTrendingTopics(5),
+        ]);
 
       if (projectsResult.status === 'fulfilled') {
         projects = projectsResult.value.items;
@@ -85,17 +97,30 @@
         heatmapData = heatmap.value;
         trendData = heatmap.value.slice(-30).map((d) => ({ date: d.date, value: d.count }));
       }
+      if (insightsResult.status === 'fulfilled') {
+        weeklyInsights = insightsResult.value;
+      }
+      if (compareResult.status === 'fulfilled') {
+        comparison = compareResult.value;
+      }
+      if (trendingResult.status === 'fulfilled') {
+        trendingTopics = trendingResult.value;
+      }
     } catch (err: unknown) {
       console.error('[Dashboard]', err);
     } finally {
       isLoading = false;
     }
 
-    unsubscribe = await pb.collection('activities').subscribe('*', (e) => {
-      if (e.action === 'create') {
-        activities = [e.record as unknown as Activity, ...activities].slice(0, 10);
-      }
-    });
+    try {
+      unsubscribe = await pb.collection('activities').subscribe('*', (e) => {
+        if (e.action === 'create') {
+          activities = [e.record as unknown as Activity, ...activities].slice(0, 10);
+        }
+      });
+    } catch (err: unknown) {
+      console.error('[Dashboard] Realtime subscribe failed:', err);
+    }
   });
 
   onDestroy(() => { unsubscribe?.(); });
@@ -119,14 +144,27 @@
 
   {#if isLoading}
     <BentoGrid columns={3} gap="md">
+      <div data-span="full"><ComicSkeleton variant="card" height="80px" /></div>
       <div data-span="2"><ComicSkeleton variant="card" height="100px" /></div>
       <div><ComicSkeleton variant="card" height="100px" /></div>
+      <div><ComicSkeleton variant="chart" /></div>
+      <div><ComicSkeleton variant="chart" /></div>
+      <div><ComicSkeleton variant="card" height="180px" /></div>
       <div data-span="2"><ComicSkeleton variant="chart" /></div>
       <div><ComicSkeleton variant="card" height="180px" /></div>
     </BentoGrid>
   {:else}
     <BentoGrid columns={3} gap="md">
-      <!-- Row 1: Stats (span 2) + Streak -->
+      <!-- Row 1: Weekly Pulse (full width) -->
+      <ComicBentoCard title="Weekly Pulse" icon="💡" span="full" neonColor="green" variant="neon">
+        <WeeklyPulse
+          {comparison}
+          topTopics={weeklyInsights?.top_topics}
+          streak={streakDays}
+        />
+      </ComicBentoCard>
+
+      <!-- Row 2: Overview Stats (span 2) + Streak -->
       <ComicBentoCard title="Overview" icon="📊" span={2} neonColor="green" variant="neon">
         <div class="stats-row">
           <div class="stat-item">
@@ -165,7 +203,23 @@
         </div>
       </ComicBentoCard>
 
-      <!-- Row 2: Trend (span 2) + Activity -->
+      <!-- Row 3: Peak Hours + Focus Breakdown + Mini Trending -->
+      <ComicBentoCard title="Peak Hours" icon="⏰" neonColor="blue" variant="neon">
+        <PeakHoursChart peakHours={weeklyInsights?.peak_hours} />
+      </ComicBentoCard>
+
+      <ComicBentoCard title="Focus" icon="🎯" neonColor="purple" variant="neon">
+        <FocusBreakdown breakdown={weeklyInsights?.focus_breakdown} />
+      </ComicBentoCard>
+
+      <ComicBentoCard title="Trending" icon="🔥" neonColor="orange" variant="neon">
+        {#snippet footer()}
+          <a href="/trends" class="see-all">View all trends →</a>
+        {/snippet}
+        <MiniTrending topics={trendingTopics} />
+      </ComicBentoCard>
+
+      <!-- Row 4: 30-Day Trend (span 2) + Activity -->
       <ComicBentoCard title="30-Day Trend" icon="📈" span={2} neonColor="blue" variant="neon">
         <TrendChart data={trendData} title="Daily Activity" />
       </ComicBentoCard>
@@ -174,38 +228,12 @@
         <ActivityTimeline {activities} />
       </ComicBentoCard>
 
-      <!-- Row 3: Active Plans (full width) -->
-      {#if activePlans.length > 0}
-        <ComicBentoCard title="Active Plans" icon="📋" span="full">
-          {#snippet footer()}
-            <a href="/plans" class="see-all">View all plans →</a>
-          {/snippet}
-          <div class="plans-list">
-            {#each activePlans as plan (plan.id)}
-              <a href="/plans/{plan.id}" class="plan-row">
-                <span class="plan-title">{plan.title}</span>
-                <div class="plan-badges">
-                  <ComicBadge color={PLAN_STATUS_COLORS[plan.status]} size="sm">{plan.status.replace('_', ' ')}</ComicBadge>
-                  {#if plan.plan_type}
-                    <ComicBadge color="blue" size="sm">{plan.plan_type}</ComicBadge>
-                  {/if}
-                  {#if plan.priority === 'critical' || plan.priority === 'high'}
-                    <ComicBadge color={plan.priority === 'critical' ? 'red' : 'orange'} size="sm">{plan.priority}</ComicBadge>
-                  {/if}
-                </div>
-                <span class="plan-time">{formatRelative(plan.updated)}</span>
-              </a>
-            {/each}
-          </div>
-        </ComicBentoCard>
-      {/if}
-
-      <!-- Row 4: Heatmap (full width) -->
+      <!-- Row 5: Heatmap (full width) -->
       <ComicBentoCard title="Activity Heatmap" icon="🗓" span="full">
         <HeatmapCalendar data={heatmapData} />
       </ComicBentoCard>
 
-      <!-- Row 4: Projects (full width) -->
+      <!-- Row 6: Projects (full width) -->
       <ComicBentoCard title="Active Projects" icon="📁" span="full">
         {#snippet footer()}
           <a href="/projects" class="see-all">View all projects →</a>
@@ -339,50 +367,6 @@
   .empty {
     color: var(--text-muted);
     font-size: var(--font-size-base);
-  }
-
-  /* Plans */
-  .plans-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
-  }
-
-  .plan-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-md);
-    border-radius: var(--radius-sm);
-    text-decoration: none;
-    color: inherit;
-    transition: background var(--transition-fast);
-    cursor: pointer;
-  }
-
-  .plan-row:hover {
-    background: var(--bg-secondary);
-  }
-
-  .plan-title {
-    flex: 1;
-    font-weight: 700;
-    font-size: var(--font-size-md);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .plan-badges {
-    display: flex;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-
-  .plan-time {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    flex-shrink: 0;
   }
 
   @media (max-width: 768px) {
