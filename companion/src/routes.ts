@@ -20,7 +20,7 @@ export function createApp(ctx: AppContext): Hono {
   app.use(
     "*",
     cors({
-      origin: ["http://localhost:3000", "http://localhost:80", "http://localhost"],
+      origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:80", "http://localhost"],
       allowMethods: ["GET", "POST", "PUT", "DELETE"],
       allowHeaders: ["Content-Type"],
     })
@@ -126,6 +126,8 @@ export function createApp(ctx: AppContext): Hono {
     });
 
     if (!result.ok) {
+      // Clean up failed session
+      ctx.store.remove(sessionId);
       return c.json({ error: result.error }, 500);
     }
 
@@ -184,6 +186,43 @@ export function createApp(ctx: AppContext): Hono {
       error: result.error,
       pid: result.pid,
     });
+  });
+
+  // ── Translation proxy ──────────────────────────────────────────────────
+
+  app.post("/api/translate", async (c) => {
+    const body = await c.req.json<{ text: string; from?: string; to?: string }>();
+    if (!body.text?.trim()) {
+      return c.json({ translated: "" });
+    }
+
+    const sl = body.from ?? "vi";
+    const tl = body.to ?? "en";
+
+    try {
+      const url = new URL("https://translate.googleapis.com/translate_a/single");
+      url.searchParams.set("client", "gtx");
+      url.searchParams.set("sl", sl);
+      url.searchParams.set("tl", tl);
+      url.searchParams.set("dt", "t");
+      url.searchParams.set("q", body.text);
+
+      const res = await fetch(url.toString(), {
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!res.ok) {
+        return c.json({ translated: "", error: `Google API ${res.status}` }, 502);
+      }
+
+      const result = await res.json();
+      const translated =
+        result[0]?.map((seg: [string]) => seg[0]).join("") ?? "";
+      return c.json({ translated });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Translation failed";
+      return c.json({ translated: "", error: msg }, 502);
+    }
   });
 
   // ── Project profiles ───────────────────────────────────────────────────

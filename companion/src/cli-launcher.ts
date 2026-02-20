@@ -1,11 +1,13 @@
 import type { Subprocess } from "bun";
 import type { CreateSessionRequest } from "./session-types.js";
 import { SessionStore } from "./session-store.js";
+import type { WsBridge } from "./ws-bridge.js";
 
 const VALID_PERMISSION_MODES = new Set([
-  "ask",
-  "allow-all",
-  "bypasstool",
+  "default",
+  "acceptEdits",
+  "bypassPermissions",
+  "dontAsk",
   "plan",
 ]);
 
@@ -22,28 +24,25 @@ interface LaunchInfo {
 export class CLILauncher {
   private processes = new Map<string, LaunchInfo>();
   private store: SessionStore;
-  private port: number;
+  private bridge: WsBridge;
 
-  constructor(store: SessionStore, port: number) {
+  constructor(store: SessionStore, bridge: WsBridge) {
     this.store = store;
-    this.port = port;
+    this.bridge = bridge;
   }
 
-  /** Spawn a new Claude Code CLI process with --sdk-url. */
+  /** Spawn a new Claude Code CLI process with stdin/stdout piping. */
   async launch(
     sessionId: string,
     options: CreateSessionRequest
   ): Promise<{ ok: boolean; pid?: number; error?: string }> {
-    const sdkUrl = `ws://localhost:${this.port}/ws/cli/${sessionId}`;
-
     const args: string[] = [
-      "--sdk-url",
-      sdkUrl,
       "--print",
       "--output-format",
       "stream-json",
       "--input-format",
       "stream-json",
+      "--include-partial-messages",
       "--verbose",
     ];
 
@@ -52,14 +51,14 @@ export class CLILauncher {
     args.push("--model", model);
 
     // Permission mode - validate before passing to CLI
-    const permMode = options.permissionMode ?? "bypasstool";
+    const permMode = options.permissionMode ?? "bypassPermissions";
     if (VALID_PERMISSION_MODES.has(permMode)) {
       args.push("--permission-mode", permMode);
     } else {
       console.warn(
-        `[cli-launcher] Invalid permission mode "${permMode}", using "bypasstool"`
+        `[cli-launcher] Invalid permission mode "${permMode}", using "bypassPermissions"`
       );
-      args.push("--permission-mode", "bypasstool");
+      args.push("--permission-mode", "bypassPermissions");
     }
 
     // Resume existing session
@@ -70,23 +69,30 @@ export class CLILauncher {
       }
     }
 
-    // SDK mode: --sdk-url handles input/output via WebSocket
-    // No -p flag needed — Claude waits for messages via the WS connection
+    // Initial prompt if provided
+    if (options.prompt?.trim()) {
+      args.push("-p", options.prompt.trim());
+    }
 
     console.log(
       `[cli-launcher] Spawning: claude ${args.join(" ")}\n  cwd: ${options.projectDir}`
     );
 
     try {
+      // Build clean env: remove all Claude Code env vars to avoid nested session rejection
+      const cleanEnv: Record<string, string> = {};
+      for (const [k, v] of Object.entries(process.env)) {
+        if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_")) continue;
+        if (v !== undefined) cleanEnv[k] = v;
+      }
+      cleanEnv.HOME = process.env.USERPROFILE ?? process.env.HOME ?? "";
+
       const proc = Bun.spawn(["claude", ...args], {
         cwd: options.projectDir,
+        stdin: "pipe",
         stdout: "pipe",
         stderr: "pipe",
-        env: {
-          ...process.env,
-          // Ensure claude finds its config
-          HOME: process.env.USERPROFILE ?? process.env.HOME ?? "",
-        },
+        env: cleanEnv,
       });
 
       const info: LaunchInfo = {
@@ -101,8 +107,18 @@ export class CLILauncher {
 
       this.processes.set(sessionId, info);
 
-      // Log stdout/stderr in background
-      this.pipeOutput(sessionId, proc);
+      // Connect CLI stdin to bridge
+      const stdin = proc.stdin;
+      this.bridge.connectCLI(sessionId, (data: string) => {
+        stdin.write(data);
+        stdin.flush();
+      });
+
+      // Pipe stdout NDJSON to bridge
+      this.pipeStdoutToBridge(sessionId, proc);
+
+      // Pipe stderr to console for debugging
+      this.pipeStderr(sessionId, proc);
 
       // Track process exit
       proc.exited.then((exitCode) => {
@@ -110,6 +126,9 @@ export class CLILauncher {
           `[cli-launcher] Session ${sessionId} exited (code=${exitCode})`
         );
         this.processes.delete(sessionId);
+
+        // Disconnect from bridge
+        this.bridge.disconnectCLI(sessionId);
 
         // Update persisted session
         const persisted = this.store.load(sessionId);
@@ -186,54 +205,71 @@ export class CLILauncher {
     return [...this.processes.keys()];
   }
 
-  /** Pipe stdout/stderr to console for debugging. */
-  private pipeOutput(sessionId: string, proc: Subprocess): void {
+  /** Read CLI stdout, parse NDJSON lines, and feed to bridge. */
+  private pipeStdoutToBridge(sessionId: string, proc: Subprocess): void {
     const prefix = `[cli:${sessionId.slice(0, 8)}]`;
-
     const stdout = proc.stdout;
-    if (stdout && typeof stdout !== "number") {
-      const reader = stdout.getReader();
-      const decoder = new TextDecoder();
-      const readStdout = async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            for (const line of text.split("\n")) {
-              if (line.trim() && !line.startsWith("{")) {
-                console.log(`${prefix} ${line}`);
-              }
-            }
-          }
-        } catch {
-          // stream closed
-        }
-      };
-      readStdout();
-    }
+    if (!stdout || typeof stdout === "number") return;
 
-    const stderr = proc.stderr;
-    if (stderr && typeof stderr !== "number") {
-      const reader = stderr.getReader();
-      const decoder = new TextDecoder();
-      const readStderr = async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const text = decoder.decode(value, { stream: true });
-            for (const line of text.split("\n")) {
-              if (line.trim()) {
-                console.error(`${prefix} ERR: ${line}`);
-              }
+    const reader = stdout.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const read = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? ""; // keep incomplete last line
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            if (trimmed.startsWith("{")) {
+              // JSON line - feed to bridge
+              this.bridge.feedCLIData(sessionId, trimmed);
+            } else {
+              // Non-JSON debug/verbose output
+              console.log(`${prefix} ${trimmed}`);
             }
           }
-        } catch {
-          // stream closed
         }
-      };
-      readStderr();
-    }
+      } catch {
+        // stream closed
+      }
+    };
+    read();
+  }
+
+  /** Pipe stderr to console for debugging. */
+  private pipeStderr(sessionId: string, proc: Subprocess): void {
+    const prefix = `[cli:${sessionId.slice(0, 8)}]`;
+    const stderr = proc.stderr;
+    if (!stderr || typeof stderr === "number") return;
+
+    const reader = stderr.getReader();
+    const decoder = new TextDecoder();
+
+    const read = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const text = decoder.decode(value, { stream: true });
+          for (const line of text.split("\n")) {
+            if (line.trim()) {
+              console.error(`${prefix} ERR: ${line}`);
+            }
+          }
+        }
+      } catch {
+        // stream closed
+      }
+    };
+    read();
   }
 }

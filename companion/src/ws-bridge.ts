@@ -35,7 +35,8 @@ export type SocketData = CLISocketData | BrowserSocketData;
 interface ActiveSession {
   id: string;
   state: SessionState;
-  cliSocket: ServerWebSocket<SocketData> | null;
+  /** Function to write NDJSON to CLI stdin (pipe-based transport). */
+  cliSend: ((data: string) => void) | null;
   browserSockets: Set<ServerWebSocket<SocketData>>;
   pendingMessages: string[];
   pendingPermissions: Map<string, PermissionRequest>;
@@ -47,7 +48,6 @@ interface ActiveSession {
 export class WsBridge {
   private sessions = new Map<string, ActiveSession>();
   private store: SessionStore;
-  private keepAliveTimers = new Map<string, ReturnType<typeof setInterval>>();
 
   /** Callback when session status changes (for REST API/events). */
   onStatusChange?: (sessionId: string, status: SessionStatus) => void;
@@ -83,7 +83,7 @@ export class WsBridge {
     session = {
       id: sessionId,
       state,
-      cliSocket: null,
+      cliSend: null,
       browserSockets: new Set(),
       pendingMessages: persisted?.pendingPermissions
         ? []
@@ -104,23 +104,17 @@ export class WsBridge {
     return [...this.sessions.values()];
   }
 
-  // ── CLI WebSocket handlers ───────────────────────────────────────────────
+  // ── Pipe-based CLI connection (stdin/stdout) ───────────────────────────
 
-  handleCLIOpen(ws: ServerWebSocket<SocketData>, sessionId: string): void {
+  /** Called by CLILauncher when CLI process starts - connects stdin writer. */
+  connectCLI(sessionId: string, sendFn: (data: string) => void): void {
     const session = this.ensureSession(sessionId);
-    session.cliSocket = ws;
+    session.cliSend = sendFn;
 
-    console.log(`[ws-bridge] CLI connected for session ${sessionId}`);
+    console.log(`[ws-bridge] CLI pipe connected for session ${sessionId}`);
 
     // Notify browsers
     this.broadcastToBrowsers(session, { type: "cli_connected" });
-
-    // Start keep-alive heartbeat every 15s
-    this.stopKeepAlive(sessionId);
-    const timer = setInterval(() => {
-      this.sendToCLI(session, JSON.stringify({ type: "keep_alive" }));
-    }, 15_000);
-    this.keepAliveTimers.set(sessionId, timer);
 
     // Flush queued messages
     if (session.pendingMessages.length > 0) {
@@ -134,49 +128,37 @@ export class WsBridge {
     }
   }
 
-  handleCLIMessage(
-    ws: ServerWebSocket<SocketData>,
-    raw: string | Buffer
-  ): void {
-    const data = typeof raw === "string" ? raw : raw.toString("utf-8");
-    const socketData = ws.data as CLISocketData;
-    const session = this.sessions.get(socketData.sessionId);
+  /** Called by CLILauncher when CLI stdout has data - parse NDJSON and route. */
+  feedCLIData(sessionId: string, raw: string): void {
+    const session = this.sessions.get(sessionId);
     if (!session) {
       console.warn(
-        `[ws-bridge] CLI message for unknown session: ${socketData.sessionId}`
+        `[ws-bridge] CLI data for unknown session: ${sessionId}`
       );
       return;
     }
 
-    // NDJSON: split on newlines, parse each line
-    const lines = data.split("\n").filter((l) => l.trim());
-    for (const line of lines) {
-      let msg: CLIMessage;
-      try {
-        msg = JSON.parse(line);
-      } catch {
-        console.warn(
-          `[ws-bridge] Failed to parse CLI message: ${line.substring(0, 200)}`
-        );
-        continue;
-      }
-      this.routeCLIMessage(session, msg);
+    // Each call should be a single NDJSON line (launcher splits on newlines)
+    let msg: CLIMessage;
+    try {
+      msg = JSON.parse(raw);
+    } catch {
+      // Not JSON - might be a debug/verbose line, skip
+      return;
     }
-
-    // Persist session state
+    this.routeCLIMessage(session, msg);
     this.persistSession(session);
   }
 
-  handleCLIClose(ws: ServerWebSocket<SocketData>): void {
-    const socketData = ws.data as CLISocketData;
-    const session = this.sessions.get(socketData.sessionId);
+  /** Called by CLILauncher when CLI process exits. */
+  disconnectCLI(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    session.cliSocket = null;
-    this.stopKeepAlive(socketData.sessionId);
+    session.cliSend = null;
 
     console.log(
-      `[ws-bridge] CLI disconnected for session ${socketData.sessionId}`
+      `[ws-bridge] CLI pipe disconnected for session ${sessionId}`
     );
 
     // Notify browsers
@@ -457,10 +439,11 @@ export class WsBridge {
     // Also broadcast to other browsers
     this.broadcastToBrowsers(session, historyMsg);
 
-    // Send to CLI as NDJSON
+    // Send to CLI as NDJSON via stdin pipe
+    // Format: {"type":"user","message":{"role":"user","content":"..."}}
     const ndjson = JSON.stringify({
       type: "user",
-      content,
+      message: { role: "user", content },
     });
     this.sendToCLI(session, ndjson);
     this.updateStatus(session, "busy");
@@ -540,7 +523,7 @@ export class WsBridge {
   // ── Transport helpers ────────────────────────────────────────────────────
 
   private sendToCLI(session: ActiveSession, ndjson: string): void {
-    if (!session.cliSocket) {
+    if (!session.cliSend) {
       console.log(
         `[ws-bridge] CLI not connected for ${session.id}, queuing message`
       );
@@ -549,7 +532,7 @@ export class WsBridge {
     }
 
     try {
-      session.cliSocket.send(ndjson + "\n");
+      session.cliSend(ndjson + "\n");
     } catch (err) {
       console.error(`[ws-bridge] Failed to send to CLI:`, err);
       session.pendingMessages.push(ndjson);
@@ -591,16 +574,6 @@ export class WsBridge {
     });
 
     this.onStatusChange?.(session.id, status);
-  }
-
-  // ── Keep-alive management ───────────────────────────────────────────────
-
-  private stopKeepAlive(sessionId: string): void {
-    const timer = this.keepAliveTimers.get(sessionId);
-    if (timer) {
-      clearInterval(timer);
-      this.keepAliveTimers.delete(sessionId);
-    }
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────

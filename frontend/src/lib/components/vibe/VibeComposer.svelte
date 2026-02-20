@@ -25,23 +25,19 @@
   }
 
   async function translateText(text: string) {
-    if (!text.trim() || !isVietnamese(text)) {
+    if (!text.trim()) {
       translatedText = '';
       return;
     }
 
     isTranslating = true;
     try {
-      const url = new URL('https://translate.googleapis.com/translate_a/single');
-      url.searchParams.set('client', 'gtx');
-      url.searchParams.set('sl', 'vi');
-      url.searchParams.set('tl', 'en');
-      url.searchParams.set('dt', 't');
-      url.searchParams.set('q', text);
-
-      const res = await fetch(url, {
-        signal: AbortSignal.timeout(3000),
-        headers: { 'User-Agent': 'Mozilla/5.0' },
+      // Use companion proxy to avoid CORS issues
+      const res = await fetch('http://localhost:3457/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, from: 'vi', to: 'en' }),
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!res.ok) {
@@ -50,7 +46,7 @@
       }
 
       const result = await res.json();
-      translatedText = result[0]?.map((seg: [string]) => seg[0]).join('') ?? '';
+      translatedText = result.translated ?? '';
     } catch {
       translatedText = '';
     } finally {

@@ -44,6 +44,8 @@
   let messages = $state<ChatMessage[]>([]);
   let permissions = $state<PermissionRequest[]>([]);
   let streamingText = $state('');
+  let msgCounter = 0; // unique counter to avoid duplicate keys
+  const seenIds = new Set<string>(); // dedup message IDs
 
   // Create session form
   let selectedProject = $state('');
@@ -117,6 +119,9 @@
 
     isCreating = true;
     errorMsg = '';
+    messages = [];
+    seenIds.clear();
+    msgCounter = 0;
 
     try {
       const result = await createSession({
@@ -157,6 +162,8 @@
     permissions = [];
     streamingText = '';
     sessionState = null;
+    seenIds.clear();
+    msgCounter = 0;
 
     activeSessionId = id;
     connectWS(id);
@@ -196,20 +203,26 @@
         }
         break;
 
-      case 'assistant':
-        messages = [
-          ...messages,
-          {
-            id: msg.message.id,
-            role: 'assistant',
-            content: msg.message.content,
-            model: msg.message.model,
-            timestamp: msg.timestamp,
-          },
-        ];
+      case 'assistant': {
+        const aId = msg.message.id ?? `assistant-${++msgCounter}`;
+        // Deduplicate: skip if already seen
+        if (!seenIds.has(aId)) {
+          seenIds.add(aId);
+          messages = [
+            ...messages,
+            {
+              id: aId,
+              role: 'assistant',
+              content: msg.message.content,
+              model: msg.message.model,
+              timestamp: msg.timestamp,
+            },
+          ];
+        }
         streamingText = '';
         scrollToBottom();
         break;
+      }
 
       case 'stream_event': {
         // Extract streaming text from content_block_delta events
@@ -278,18 +291,29 @@
         }
         break;
 
-      case 'user_message':
-        messages = [
-          ...messages,
-          {
-            id: `user-${msg.timestamp}`,
-            role: 'user',
-            content: msg.content,
-            timestamp: msg.timestamp,
-          },
-        ];
-        scrollToBottom();
+      case 'user_message': {
+        // Skip if we recently sent a message with the same content (bridge echo).
+        // Only add user_message from bridge during history replay.
+        const isDuplicate = messages.some(
+          (m) => m.role === 'user' && m.content === msg.content
+            && Math.abs(m.timestamp - msg.timestamp) < 5000
+        );
+        if (!isDuplicate) {
+          const uId = `user-${msg.timestamp}-${++msgCounter}`;
+          seenIds.add(uId);
+          messages = [
+            ...messages,
+            {
+              id: uId,
+              role: 'user',
+              content: msg.content,
+              timestamp: msg.timestamp,
+            },
+          ];
+          scrollToBottom();
+        }
         break;
+      }
 
       case 'message_history':
         // Replay history
@@ -303,10 +327,12 @@
   function handleSend(content: string) {
     if (!connection) return;
     connection.send(content);
+    const id = `user-${Date.now()}`;
+    seenIds.add(id);
     messages = [
       ...messages,
       {
-        id: `user-${Date.now()}`,
+        id,
         role: 'user',
         content,
         timestamp: Date.now(),
