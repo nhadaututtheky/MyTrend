@@ -88,7 +88,7 @@
   <div class="task-meta">
     {#if task.session_title}
       <span class="meta-badge session-badge" title={task.session_title}>
-        {task.session_title.slice(0, 30)}{task.session_title.length > 30 ? '…' : ''}
+        {task.session_title}
       </span>
     {/if}
     {#if modelShort}
@@ -180,29 +180,31 @@
     font-family: var(--font-comic);
     font-size: var(--font-size-2xs);
     font-weight: 700;
-    padding: 1px 6px;
+    padding: 2px 6px;
     border-radius: 4px;
-    text-transform: uppercase;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .session-badge {
     background: rgba(162, 155, 254, 0.2);
     color: var(--accent-purple);
     border: 1px solid rgba(162, 155, 254, 0.4);
-    max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: 180px;
+    text-transform: none;
+    font-weight: 600;
   }
 
-  .model-green { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); border: 1px solid rgba(0, 210, 106, 0.3); }
-  .model-blue { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); border: 1px solid rgba(78, 205, 196, 0.3); }
-  .model-purple { background: rgba(162, 155, 254, 0.15); color: var(--accent-purple); border: 1px solid rgba(162, 155, 254, 0.3); }
+  .model-green { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); border: 1px solid rgba(0, 210, 106, 0.3); text-transform: uppercase; }
+  .model-blue { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); border: 1px solid rgba(78, 205, 196, 0.3); text-transform: uppercase; }
+  .model-purple { background: rgba(162, 155, 254, 0.15); color: var(--accent-purple); border: 1px solid rgba(162, 155, 254, 0.3); text-transform: uppercase; }
 
   .project-badge {
     background: rgba(255, 255, 255, 0.05);
     color: var(--text-muted);
     border: 1px solid var(--border-color);
+    text-transform: uppercase;
   }
 
   .meta-time {
