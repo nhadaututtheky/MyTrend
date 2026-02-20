@@ -114,6 +114,8 @@
       transform 200ms ease,
       box-shadow 200ms ease;
     overflow: hidden;
+    flex-shrink: 0;
+    min-height: 80px;
   }
 
   .task-card:hover {
