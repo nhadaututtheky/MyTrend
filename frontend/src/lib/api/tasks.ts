@@ -122,9 +122,20 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
     const key = `${task.session_id}::${task.agent_id}`;
 
     if (!sessionMap.has(key)) {
-      const projectName = task.project_dir
-        ? task.project_dir.split('/').pop() ?? task.project_dir
-        : 'Unknown';
+      // Extract clean project name from path
+      // e.g. C//Users/X/Desktop/Future/MyTrend//claude/worktrees/pensive -> "MyTrend"
+      //      C//Users/X/Desktop/Future/Future                             -> "Future"
+      function extractProjectName(dir: string): string {
+        if (!dir) return 'Unknown';
+        // Normalize: replace backslash + collapse multiple slashes
+        const normalized = dir.replace(/\\/g, '/').replace(/\/+/g, '/');
+        // Strip worktree suffix: /.claude/worktrees/... or /worktrees/...
+        const stripped = normalized.replace(/\/\.?claude\/worktrees\/[^/]*\/?$/, '');
+        // Get last non-empty path segment
+        const parts = stripped.split('/').filter(Boolean);
+        return parts[parts.length - 1] ?? dir;
+      }
+      const projectName = extractProjectName(task.project_dir);
 
       sessionMap.set(key, {
         session_id: task.session_id,
@@ -184,7 +195,7 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
     const contextWindow = MODEL_CONTEXT_WINDOWS[session.model] ?? MODEL_CONTEXT_WINDOWS['default'];
     session.total_tokens =
       session.input_tokens + session.output_tokens + session.cache_read_tokens + session.cache_create_tokens;
-    session.context_pct = Math.round((session.total_tokens / contextWindow) * 100);
+    session.context_pct = Math.min(100, Math.round((session.total_tokens / contextWindow) * 100));
 
     session.estimated_cost = calcCost(
       session.input_tokens,
