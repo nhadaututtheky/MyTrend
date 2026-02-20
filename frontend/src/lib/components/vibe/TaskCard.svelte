@@ -35,7 +35,12 @@
 
   function getProjectName(dir: string): string {
     if (!dir) return '';
-    return dir.split('/').filter(Boolean).pop() ?? dir;
+    // Normalize slashes (backslash + collapse doubles from PocketBase decode)
+    const normalized = dir.replace(/\\/g, '/').replace(/\/+/g, '/');
+    // Strip worktree suffix: /.claude/worktrees/<branch> or /worktrees/<branch>
+    const stripped = normalized.replace(/\/\.?claude\/worktrees\/[^/]*\/?$/, '');
+    const parts = stripped.split('/').filter(Boolean);
+    return parts[parts.length - 1] ?? dir;
   }
 
   function timeAgo(dateStr: string): string {
