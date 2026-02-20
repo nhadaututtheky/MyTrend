@@ -81,7 +81,7 @@
       <ComicInput label="Title" bind:value={title} placeholder="What is this plan about?" required />
 
       <div class="field">
-        <label class="field-label">Type</label>
+        <span class="field-label">Type</span>
         <ComicTabs tabs={typeTabs} bind:active={planType} />
       </div>
 

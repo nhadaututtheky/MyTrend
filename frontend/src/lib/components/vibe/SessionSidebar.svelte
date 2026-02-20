@@ -70,7 +70,6 @@
           class:active={session.is_active}
           onclick={() => onselect(session.session_id)}
           aria-pressed={isSelected}
-          role="listitem"
           aria-label="Session {session.project_name}"
         >
           <!-- Project name + model badge -->

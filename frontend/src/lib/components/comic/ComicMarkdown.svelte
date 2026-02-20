@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+
   interface Props {
     content: string;
     maxHeight?: string;
@@ -6,7 +8,7 @@
   }
 
   const { content, maxHeight, collapsible = false }: Props = $props();
-  let collapsed = $state(collapsible);
+  let collapsed = $state(untrack(() => collapsible));
 
   /**
    * Lightweight markdown to HTML (no external dependency).

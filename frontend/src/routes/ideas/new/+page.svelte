@@ -112,7 +112,7 @@
 
         <!-- File attachments -->
         <div class="field">
-          <label class="label">Attachments (Telegram Storage)</label>
+          <label class="label" for="file-attachments">Attachments (Telegram Storage)</label>
           <div
             class="upload-zone"
             role="button"
@@ -121,6 +121,7 @@
             onkeydown={(e) => { if (e.key === 'Enter') fileInput?.click(); }}
           >
             <input
+              id="file-attachments"
               bind:this={fileInput}
               type="file"
               multiple
