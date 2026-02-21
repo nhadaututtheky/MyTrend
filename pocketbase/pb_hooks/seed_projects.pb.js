@@ -37,6 +37,14 @@ var DEFAULT_PROJECTS = [
     icon: '🌉',
     tech_stack: ['Bun', 'Hono', 'TypeScript', 'WebSocket'],
   },
+  {
+    name: 'Feature Factory',
+    slug: 'feature-factory',
+    description: 'AI-powered feature pipeline. Turns feature requests into production-ready code via Claude agents.',
+    color: '#6366F1',
+    icon: '🏭',
+    tech_stack: ['Next.js 16', 'PostgreSQL', 'TypeScript', 'Claude API'],
+  },
 ];
 
 routerAdd('POST', '/api/mytrend/seed-projects', (c) => {
