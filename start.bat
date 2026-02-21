@@ -32,8 +32,15 @@ goto end
 
 :dev
 echo.
-echo  Starting frontend dev server...
+echo  Starting companion + frontend dev servers...
+cd /d "%~dp0companion"
+start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run dev"
+timeout /t 2 /nobreak >nul
 cd /d "%~dp0frontend"
+echo.
+echo  Companion:  http://localhost:3457/api/health
+echo  Frontend:   http://localhost:5173
+echo.
 call npm run dev
 goto end
 
