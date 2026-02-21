@@ -21,6 +21,7 @@
   let currentTheme = $state('light');
   let isSaving = $state(false);
   let user = $state<User | null>(null);
+  let isSeeding = $state(false);
 
   // Telegram state
   let tgStatus = $state<TelegramStatus | null>(null);
@@ -301,6 +302,19 @@
     if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
   }
+
+  async function handleSeedProjects(): Promise<void> {
+    isSeeding = true;
+    try {
+      const res = await pb.send('/api/mytrend/seed-projects', { method: 'POST' });
+      toast.success(res.message || 'Projects seeded!');
+    } catch (err: unknown) {
+      console.error('[Settings] Seed projects failed:', err);
+      toast.error('Failed to seed projects');
+    } finally {
+      isSeeding = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -548,9 +562,13 @@
   <ComicCard>
     <h2 class="section-title">Data</h2>
     <div class="data-actions">
+      <ComicButton variant="outline" onclick={handleSeedProjects} loading={isSeeding}>
+        Seed Default Projects
+      </ComicButton>
       <ComicButton variant="outline">Export All Data (JSON)</ComicButton>
       <ComicButton variant="danger">Clear All Data</ComicButton>
     </div>
+    <p class="seed-hint">Creates Neural Memory, MyTrend, Future Bot, Companion projects if not already there.</p>
   </ComicCard>
 </div>
 
@@ -591,6 +609,12 @@
     display: flex;
     gap: var(--spacing-sm);
     flex-wrap: wrap;
+  }
+
+  .seed-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: var(--spacing-xs) 0 0;
   }
 
   .section-header {
