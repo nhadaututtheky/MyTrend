@@ -63,6 +63,18 @@ export interface TelegramInlineKeyboardButton {
   text: string;
   callback_data?: string;
   url?: string;
+  /** Bot API 9.4: colored button style */
+  style?: "primary" | "success" | "danger";
+}
+
+export interface TelegramBotCommand {
+  command: string;
+  description: string;
+}
+
+export interface TelegramReactionType {
+  type: "emoji";
+  emoji: string;
 }
 
 export interface TelegramInlineKeyboardMarkup {

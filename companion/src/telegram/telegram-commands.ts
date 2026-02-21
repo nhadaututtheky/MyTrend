@@ -8,6 +8,11 @@ import {
   formatStatus,
   formatWelcome,
   formatConnected,
+  buildProjectKeyboard,
+  buildModelKeyboard,
+  buildStopConfirmKeyboard,
+  buildNewConfirmKeyboard,
+  buildSessionActionsKeyboard,
 } from "./telegram-formatter.js";
 
 type CommandHandler = (bridge: TelegramBridge, msg: TelegramMessage, args: string) => Promise<void>;
@@ -53,7 +58,11 @@ async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promis
 
   const profiles = bridge.getProfiles();
   if (profiles.length > 0) {
-    await bridge.sendToChat(msg.chat.id, formatProjectList(profiles));
+    await bridge.sendToChatWithKeyboard(
+      msg.chat.id,
+      "Select a project to connect:",
+      buildProjectKeyboard(profiles)
+    );
   }
 }
 
@@ -63,13 +72,31 @@ async function handleHelp(bridge: TelegramBridge, msg: TelegramMessage): Promise
 
 async function handleProjects(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
   const profiles = bridge.getProfiles();
-  await bridge.sendToChat(msg.chat.id, formatProjectList(profiles));
+  if (profiles.length > 0) {
+    await bridge.sendToChatWithKeyboard(
+      msg.chat.id,
+      formatProjectList(profiles),
+      buildProjectKeyboard(profiles)
+    );
+  } else {
+    await bridge.sendToChat(msg.chat.id, "No projects configured.");
+  }
 }
 
 async function handleProject(bridge: TelegramBridge, msg: TelegramMessage, args: string): Promise<void> {
   const slug = args.trim().toLowerCase();
   if (!slug) {
-    await bridge.sendToChat(msg.chat.id, "Usage: <code>/project &lt;slug&gt;</code>\nSee <code>/projects</code> for available options.");
+    // No args: show project keyboard
+    const profiles = bridge.getProfiles();
+    if (profiles.length > 0) {
+      await bridge.sendToChatWithKeyboard(
+        msg.chat.id,
+        "Select a project:",
+        buildProjectKeyboard(profiles)
+      );
+    } else {
+      await bridge.sendToChat(msg.chat.id, "No projects configured.");
+    }
     return;
   }
 
@@ -96,7 +123,12 @@ async function handleProject(bridge: TelegramBridge, msg: TelegramMessage, args:
     return;
   }
 
-  await bridge.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
+  const mapping = bridge.getMapping(chatId);
+  await bridge.sendToChatWithKeyboard(
+    chatId,
+    formatConnected(profile, profile.defaultModel),
+    buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel)
+  );
 }
 
 async function handleStop(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
@@ -108,8 +140,11 @@ async function handleStop(bridge: TelegramBridge, msg: TelegramMessage): Promise
     return;
   }
 
-  await bridge.destroySession(chatId);
-  await bridge.sendToChat(chatId, `Session stopped. (<code>${mapping.projectSlug}</code>)`);
+  await bridge.sendToChatWithKeyboard(
+    chatId,
+    `Stop session <code>${mapping.projectSlug}</code>?`,
+    buildStopConfirmKeyboard()
+  );
 }
 
 async function handleCancel(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
@@ -162,8 +197,23 @@ async function handleModel(bridge: TelegramBridge, msg: TelegramMessage, args: s
 
   const model = args.trim().toLowerCase();
   const valid = ["sonnet", "opus", "haiku"];
-  if (!model || !valid.includes(model)) {
-    await bridge.sendToChat(chatId, `Usage: <code>/model &lt;${valid.join("|")}&gt;</code>\nCurrent: <code>${mapping.model}</code>`);
+
+  // No args: show model keyboard
+  if (!model) {
+    await bridge.sendToChatWithKeyboard(
+      chatId,
+      `Current model: <code>${mapping.model}</code>`,
+      buildModelKeyboard(mapping.model)
+    );
+    return;
+  }
+
+  if (!valid.includes(model)) {
+    await bridge.sendToChatWithKeyboard(
+      chatId,
+      `Invalid model. Current: <code>${mapping.model}</code>`,
+      buildModelKeyboard(mapping.model)
+    );
     return;
   }
 
@@ -180,22 +230,9 @@ async function handleNew(bridge: TelegramBridge, msg: TelegramMessage): Promise<
     return;
   }
 
-  const slug = mapping.projectSlug;
-  const profile = bridge.getProfiles().find((p) => p.slug === slug);
-
-  if (!profile) {
-    await bridge.sendToChat(chatId, `Project <code>${slug}</code> no longer exists.`);
-    return;
-  }
-
-  await bridge.destroySession(chatId);
-  await bridge.sendToChat(chatId, "Restarting session...");
-
-  const result = await bridge.createSession(chatId, profile);
-  if (!result.ok) {
-    await bridge.sendToChat(chatId, `Failed: ${result.error}`);
-    return;
-  }
-
-  await bridge.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
+  await bridge.sendToChatWithKeyboard(
+    chatId,
+    `Restart session <code>${mapping.projectSlug}</code>? Current session will be destroyed.`,
+    buildNewConfirmKeyboard()
+  );
 }

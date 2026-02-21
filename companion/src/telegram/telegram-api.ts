@@ -4,6 +4,8 @@ import type {
   TelegramConfig,
   TelegramUpdate,
   TelegramUser,
+  TelegramBotCommand,
+  TelegramReactionType,
   TelegramInlineKeyboardMarkup,
 } from "./telegram-types.js";
 
@@ -46,7 +48,7 @@ export class TelegramAPI {
     return data.result;
   }
 
-  // ── Bot identity ────────────────────────────────────────────────────────
+  // ── Bot identity & setup ──────────────────────────────────────────────
 
   async getMe(): Promise<TelegramUser> {
     return this.call<TelegramUser>("getMe");
@@ -54,6 +56,11 @@ export class TelegramAPI {
 
   async deleteWebhook(): Promise<boolean> {
     return this.call<boolean>("deleteWebhook", { drop_pending_updates: false });
+  }
+
+  /** Register bot commands that appear in the chat menu. */
+  async setMyCommands(commands: TelegramBotCommand[]): Promise<boolean> {
+    return this.call<boolean>("setMyCommands", { commands });
   }
 
   // ── Polling ─────────────────────────────────────────────────────────────
@@ -69,7 +76,7 @@ export class TelegramAPI {
       body: JSON.stringify({
         offset,
         timeout,
-        allowed_updates: ["message"],
+        allowed_updates: ["message", "callback_query"],
       }),
       signal,
     });
@@ -144,12 +151,50 @@ export class TelegramAPI {
     });
   }
 
+  /** Remove or replace inline keyboard on an existing message. */
+  async editMessageReplyMarkup(
+    chatId: number,
+    messageId: number,
+    replyMarkup?: TelegramInlineKeyboardMarkup
+  ): Promise<void> {
+    await this.call("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: replyMarkup ?? { inline_keyboard: [] },
+    });
+  }
+
   async sendChatAction(chatId: number, action: "typing" | "upload_photo" = "typing"): Promise<void> {
     await this.call("sendChatAction", {
       chat_id: chatId,
       action,
     });
   }
+
+  // ── Reactions ─────────────────────────────────────────────────────────
+
+  async setMessageReaction(
+    chatId: number,
+    messageId: number,
+    reaction: TelegramReactionType[]
+  ): Promise<void> {
+    await this.call("setMessageReaction", {
+      chat_id: chatId,
+      message_id: messageId,
+      reaction,
+    });
+  }
+
+  /** Best-effort reaction — silently catches errors (may lack permissions). */
+  async react(chatId: number, messageId: number, emoji: string): Promise<void> {
+    try {
+      await this.setMessageReaction(chatId, messageId, [{ type: "emoji", emoji }]);
+    } catch {
+      // Reactions may not be available in all chat types
+    }
+  }
+
+  // ── Media ─────────────────────────────────────────────────────────────
 
   async sendPhoto(
     chatId: number,
@@ -167,6 +212,8 @@ export class TelegramAPI {
     const result = await this.call<{ message_id: number }>("sendPhoto", body);
     return result.message_id;
   }
+
+  // ── Callback queries ──────────────────────────────────────────────────
 
   async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
     await this.call("answerCallbackQuery", {

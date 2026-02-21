@@ -7,6 +7,8 @@ import type {
   TelegramSessionMapping,
   TelegramUpdate,
   TelegramMessage,
+  TelegramCallbackQuery,
+  TelegramInlineKeyboardMarkup,
 } from "./telegram-types.js";
 import type {
   BrowserIncomingMessage,
@@ -24,6 +26,13 @@ import {
   toTelegramHTML,
   extractText,
   formatResult,
+  formatConnected,
+  formatStatus,
+  buildModelKeyboard,
+  buildStopConfirmKeyboard,
+  buildPermissionKeyboard,
+  buildSessionActionsKeyboard,
+  formatPermissionRequest,
 } from "./telegram-formatter.js";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30min
@@ -75,6 +84,9 @@ export class TelegramBridge {
       // Remove any existing webhook so we can poll
       await this.api.deleteWebhook();
       console.log("[telegram] Webhook deleted, starting long polling...");
+
+      // Register bot menu commands
+      await this.registerCommands();
 
       // Load persisted mappings
       this.loadMappings();
@@ -141,6 +153,12 @@ export class TelegramBridge {
   // ── Update processing ─────────────────────────────────────────────────
 
   private async processUpdate(update: TelegramUpdate): Promise<void> {
+    // Handle callback queries (inline keyboard button presses)
+    if (update.callback_query) {
+      await this.handleCallbackQuery(update.callback_query);
+      return;
+    }
+
     const msg = update.message;
     if (!msg) return;
 
@@ -202,6 +220,9 @@ export class TelegramBridge {
       cleanText = cleanText.replace(new RegExp(`@${this.botUsername}\\s*`, "gi"), "").trim();
     }
     if (!cleanText) return;
+
+    // Acknowledge receipt with reaction
+    this.api.react(chatId, msg.message_id, "👀").catch(() => {});
 
     // Reset idle timer
     this.resetIdleTimer(chatId);
@@ -369,9 +390,17 @@ export class TelegramBridge {
         break;
       }
 
+      case "permission_request": {
+        const perm = msg.request;
+        const text = formatPermissionRequest(perm);
+        const keyboard = buildPermissionKeyboard(perm.request_id);
+        await this.sendToChatWithKeyboard(chatId, text, keyboard);
+        break;
+      }
+
       default:
         // Silently ignore: stream_event, cli_connected, session_init,
-        // user_message, message_history, permission_request, etc.
+        // user_message, message_history, permission_cancelled, etc.
         break;
     }
   }
@@ -421,6 +450,274 @@ export class TelegramBridge {
     }
   }
 
+  // ── Callback query handling ──────────────────────────────────────────
+
+  private async handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> {
+    const chatId = query.message?.chat.id;
+    const messageId = query.message?.message_id;
+    const data = query.data;
+    if (!chatId || !data) {
+      await this.api.answerCallbackQuery(query.id);
+      return;
+    }
+
+    // Security: whitelist check
+    if (!this.config.allowedChatIds.has(chatId)) {
+      await this.api.answerCallbackQuery(query.id, "Unauthorized");
+      return;
+    }
+
+    const [prefix, ...rest] = data.split(":");
+    const value = rest.join(":");
+
+    try {
+      switch (prefix) {
+        case "proj":
+          await this.onProjectSelected(chatId, messageId!, query.id, value);
+          break;
+        case "model":
+          await this.onModelSelected(chatId, messageId!, query.id, value);
+          break;
+        case "mode":
+          await this.onModeSelected(chatId, messageId!, query.id, value);
+          break;
+        case "perm":
+          await this.onPermissionResponse(chatId, messageId!, query.id, value);
+          break;
+        case "stop":
+          await this.onStopResponse(chatId, messageId!, query.id, value);
+          break;
+        case "new":
+          await this.onNewResponse(chatId, messageId!, query.id, value);
+          break;
+        case "action":
+          await this.onActionSelected(chatId, messageId!, query.id, value);
+          break;
+        default:
+          await this.api.answerCallbackQuery(query.id, "Unknown action");
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Error";
+      console.error(`[telegram] Callback error (${data}):`, errMsg);
+      await this.api.answerCallbackQuery(query.id, "Error occurred").catch(() => {});
+    }
+  }
+
+  private async onProjectSelected(
+    chatId: number, messageId: number, queryId: string, slug: string
+  ): Promise<void> {
+    // Check if already connected
+    const existing = this.chatSessions.get(chatId);
+    if (existing) {
+      await this.api.answerCallbackQuery(queryId, `Already connected to ${existing.projectSlug}`);
+      return;
+    }
+
+    const profile = this.deps.profiles.get(slug);
+    if (!profile) {
+      await this.api.answerCallbackQuery(queryId, "Project not found");
+      return;
+    }
+
+    // Remove keyboard from original message
+    await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
+    await this.api.answerCallbackQuery(queryId, `Connecting to ${profile.name}...`);
+
+    await this.sendToChat(chatId, `Connecting to ${profile.name}...`);
+    const result = await this.createSession(chatId, profile);
+
+    if (!result.ok) {
+      await this.sendToChat(chatId, `Failed to connect: ${result.error}`);
+      return;
+    }
+
+    const mapping = this.chatSessions.get(chatId);
+    await this.sendToChatWithKeyboard(
+      chatId,
+      formatConnected(profile, profile.defaultModel),
+      buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel)
+    );
+  }
+
+  private async onModelSelected(
+    chatId: number, messageId: number, queryId: string, model: string
+  ): Promise<void> {
+    const mapping = this.chatSessions.get(chatId);
+    if (!mapping) {
+      await this.api.answerCallbackQuery(queryId, "No active session");
+      return;
+    }
+
+    this.setModel(chatId, model);
+    await this.api.answerCallbackQuery(queryId, `Model → ${model}`);
+
+    // Update keyboard to reflect new selection
+    await this.api.editMessageReplyMarkup(chatId, messageId, buildModelKeyboard(model)).catch(() => {});
+  }
+
+  private async onModeSelected(
+    chatId: number, messageId: number, queryId: string, mode: string
+  ): Promise<void> {
+    // Mode changes not supported at runtime via CLI, just acknowledge
+    await this.api.answerCallbackQuery(queryId, `Mode: ${mode} (applies to next session)`);
+    await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
+  }
+
+  private async onPermissionResponse(
+    chatId: number, messageId: number, queryId: string, value: string
+  ): Promise<void> {
+    // value format: "allow:<requestId>" or "deny:<requestId>"
+    const [behavior, ...idParts] = value.split(":");
+    const requestId = idParts.join(":");
+
+    if (behavior !== "allow" && behavior !== "deny") {
+      await this.api.answerCallbackQuery(queryId, "Invalid response");
+      return;
+    }
+
+    const mapping = this.chatSessions.get(chatId);
+    if (!mapping) {
+      await this.api.answerCallbackQuery(queryId, "No active session");
+      return;
+    }
+
+    // Send permission response to CLI
+    this.deps.bridge.injectPermissionResponse(mapping.sessionId, {
+      request_id: requestId,
+      behavior,
+    });
+
+    const emoji = behavior === "allow" ? "✅" : "❌";
+    await this.api.answerCallbackQuery(queryId, `${emoji} ${behavior === "allow" ? "Allowed" : "Denied"}`);
+
+    // Remove the keyboard
+    await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
+  }
+
+  private async onStopResponse(
+    chatId: number, messageId: number, queryId: string, value: string
+  ): Promise<void> {
+    await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
+
+    if (value === "confirm") {
+      const mapping = this.chatSessions.get(chatId);
+      if (mapping) {
+        await this.destroySession(chatId);
+        await this.api.answerCallbackQuery(queryId, "Session stopped");
+        await this.sendToChat(chatId, `Session stopped. (<code>${mapping.projectSlug}</code>)`);
+      } else {
+        await this.api.answerCallbackQuery(queryId, "No active session");
+      }
+    } else {
+      await this.api.answerCallbackQuery(queryId, "Cancelled");
+    }
+  }
+
+  private async onNewResponse(
+    chatId: number, messageId: number, queryId: string, value: string
+  ): Promise<void> {
+    await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
+
+    if (value === "confirm") {
+      const mapping = this.chatSessions.get(chatId);
+      if (!mapping) {
+        await this.api.answerCallbackQuery(queryId, "No active session");
+        return;
+      }
+
+      const slug = mapping.projectSlug;
+      const profile = this.deps.profiles.get(slug);
+      if (!profile) {
+        await this.api.answerCallbackQuery(queryId, "Project not found");
+        return;
+      }
+
+      await this.api.answerCallbackQuery(queryId, "Restarting...");
+      await this.destroySession(chatId);
+      await this.sendToChat(chatId, "Restarting session...");
+
+      const result = await this.createSession(chatId, profile);
+      if (!result.ok) {
+        await this.sendToChat(chatId, `Failed: ${result.error}`);
+        return;
+      }
+      await this.sendToChatWithKeyboard(
+        chatId,
+        formatConnected(profile, profile.defaultModel),
+        buildSessionActionsKeyboard(mapping.model)
+      );
+    } else {
+      await this.api.answerCallbackQuery(queryId, "Cancelled");
+    }
+  }
+
+  private async onActionSelected(
+    chatId: number, _messageId: number, queryId: string, action: string
+  ): Promise<void> {
+    switch (action) {
+      case "model": {
+        const mapping = this.chatSessions.get(chatId);
+        await this.api.answerCallbackQuery(queryId);
+        await this.sendToChatWithKeyboard(
+          chatId,
+          "Select model:",
+          buildModelKeyboard(mapping?.model)
+        );
+        break;
+      }
+      case "status": {
+        await this.api.answerCallbackQuery(queryId);
+        const mapping = this.chatSessions.get(chatId);
+        if (mapping) {
+          const session = this.getSessionState(mapping.sessionId);
+          const status = session?.status ?? "unknown";
+          const lines = [formatStatus(mapping, status)];
+          if (session) {
+            lines.push(`Cost: <code>$${session.total_cost_usd.toFixed(3)}</code> | Turns: <code>${session.num_turns}</code>`);
+          }
+          await this.sendToChat(chatId, lines.join("\n"));
+        }
+        break;
+      }
+      case "cancel": {
+        this.interruptSession(chatId);
+        await this.api.answerCallbackQuery(queryId, "Interrupt sent");
+        break;
+      }
+      case "stop": {
+        await this.api.answerCallbackQuery(queryId);
+        await this.sendToChatWithKeyboard(
+          chatId,
+          "Stop the current session?",
+          buildStopConfirmKeyboard()
+        );
+        break;
+      }
+      default:
+        await this.api.answerCallbackQuery(queryId, "Unknown action");
+    }
+  }
+
+  // ── Bot menu commands ──────────────────────────────────────────────────
+
+  private async registerCommands(): Promise<void> {
+    try {
+      await this.api.setMyCommands([
+        { command: "start", description: "Start bot & show projects" },
+        { command: "projects", description: "List available projects" },
+        { command: "status", description: "Current session info" },
+        { command: "model", description: "Switch model (sonnet/opus/haiku)" },
+        { command: "cancel", description: "Interrupt Claude" },
+        { command: "stop", description: "Kill current session" },
+        { command: "new", description: "Restart session (same project)" },
+        { command: "help", description: "Show all commands" },
+      ]);
+      console.log("[telegram] Bot menu commands registered");
+    } catch (err) {
+      console.warn("[telegram] Failed to register commands:", err);
+    }
+  }
+
   // ── Public API (for commands) ─────────────────────────────────────────
 
   async sendToChat(chatId: number, text: string): Promise<void> {
@@ -436,6 +733,24 @@ export class TelegramBridge {
         // give up
       }
     }
+  }
+
+  async sendToChatWithKeyboard(
+    chatId: number,
+    text: string,
+    keyboard: TelegramInlineKeyboardMarkup
+  ): Promise<void> {
+    try {
+      await this.api.sendMessage(chatId, text, { replyMarkup: keyboard });
+    } catch (err) {
+      console.error(`[telegram] sendToChatWithKeyboard(${chatId}) error:`, err);
+      // Retry without keyboard as fallback
+      await this.sendToChat(chatId, text);
+    }
+  }
+
+  getAPI(): TelegramAPI {
+    return this.api;
   }
 
   getBotName(): string | null {

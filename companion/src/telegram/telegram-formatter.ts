@@ -1,7 +1,11 @@
 // Claude markdown → Telegram HTML converter + formatting helpers
 
-import type { CLIResultMessage, ContentBlock } from "../session-types.js";
-import type { TelegramSessionMapping } from "./telegram-types.js";
+import type { CLIResultMessage, ContentBlock, PermissionRequest } from "../session-types.js";
+import type {
+  TelegramSessionMapping,
+  TelegramInlineKeyboardMarkup,
+  TelegramInlineKeyboardButton,
+} from "./telegram-types.js";
 import type { ProjectProfile } from "../session-types.js";
 
 // ─── Markdown to Telegram HTML ──────────────────────────────────────────────
@@ -223,6 +227,155 @@ export function formatConnected(profile: ProjectProfile, model: string): string 
     "",
     "Send any message to chat with Claude.",
   ].join("\n");
+}
+
+// ─── Inline Keyboard Builders ────────────────────────────────────────────────
+
+/** Project selection keyboard — 2 per row, primary style. */
+export function buildProjectKeyboard(profiles: ProjectProfile[]): TelegramInlineKeyboardMarkup {
+  const rows: TelegramInlineKeyboardButton[][] = [];
+  for (let i = 0; i < profiles.length; i += 2) {
+    const row: TelegramInlineKeyboardButton[] = [
+      { text: profiles[i].name, callback_data: `proj:${profiles[i].slug}`, style: "primary" },
+    ];
+    if (profiles[i + 1]) {
+      row.push({
+        text: profiles[i + 1].name,
+        callback_data: `proj:${profiles[i + 1].slug}`,
+        style: "primary",
+      });
+    }
+    rows.push(row);
+  }
+  return { inline_keyboard: rows };
+}
+
+/** Model selection keyboard — checkmark on current model. */
+export function buildModelKeyboard(currentModel?: string): TelegramInlineKeyboardMarkup {
+  const models = ["sonnet", "opus", "haiku"];
+  const row: TelegramInlineKeyboardButton[] = models.map((m) => ({
+    text: m === currentModel ? `${m} ✓` : m,
+    callback_data: `model:${m}`,
+    style: m === currentModel ? "success" : undefined,
+  }));
+  return { inline_keyboard: [row] };
+}
+
+/** Permission mode selection keyboard. */
+export function buildModeKeyboard(currentMode?: string): TelegramInlineKeyboardMarkup {
+  const modes: { label: string; value: string }[] = [
+    { label: "Bypass", value: "bypassPermissions" },
+    { label: "Plan", value: "plan" },
+    { label: "Default", value: "default" },
+    { label: "Accept Edits", value: "acceptEdits" },
+  ];
+  const rows: TelegramInlineKeyboardButton[][] = [];
+  for (let i = 0; i < modes.length; i += 2) {
+    const row: TelegramInlineKeyboardButton[] = [
+      {
+        text: modes[i].value === currentMode ? `${modes[i].label} ✓` : modes[i].label,
+        callback_data: `mode:${modes[i].value}`,
+        style: modes[i].value === currentMode ? "success" : undefined,
+      },
+    ];
+    if (modes[i + 1]) {
+      row.push({
+        text: modes[i + 1].value === currentMode ? `${modes[i + 1].label} ✓` : modes[i + 1].label,
+        callback_data: `mode:${modes[i + 1].value}`,
+        style: modes[i + 1].value === currentMode ? "success" : undefined,
+      });
+    }
+    rows.push(row);
+  }
+  return { inline_keyboard: rows };
+}
+
+/** Stop confirmation keyboard — danger style. */
+export function buildStopConfirmKeyboard(): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Yes, stop", callback_data: "stop:confirm", style: "danger" },
+        { text: "Cancel", callback_data: "stop:cancel" },
+      ],
+    ],
+  };
+}
+
+/** New session confirmation keyboard — danger style. */
+export function buildNewConfirmKeyboard(): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Yes, restart", callback_data: "new:confirm", style: "danger" },
+        { text: "Cancel", callback_data: "new:cancel" },
+      ],
+    ],
+  };
+}
+
+/** Permission request keyboard — allow/deny with colored styles. */
+export function buildPermissionKeyboard(requestId: string): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: "Allow", callback_data: `perm:allow:${requestId}`, style: "success" },
+        { text: "Deny", callback_data: `perm:deny:${requestId}`, style: "danger" },
+      ],
+    ],
+  };
+}
+
+/** Session action bar — quick actions for active session. */
+export function buildSessionActionsKeyboard(model: string): TelegramInlineKeyboardMarkup {
+  return {
+    inline_keyboard: [
+      [
+        { text: `Model: ${model}`, callback_data: "action:model" },
+        { text: "Status", callback_data: "action:status" },
+      ],
+      [
+        { text: "Cancel", callback_data: "action:cancel" },
+        { text: "Stop", callback_data: "action:stop", style: "danger" },
+      ],
+    ],
+  };
+}
+
+/** Format a permission request for Telegram display. */
+export function formatPermissionRequest(perm: PermissionRequest): string {
+  const emoji = TOOL_EMOJI[perm.tool_name] ?? "🔧";
+  const lines = [
+    `<b>${emoji} Permission Request</b>`,
+    `Tool: <code>${perm.tool_name}</code>`,
+  ];
+
+  if (perm.description) {
+    lines.push(`${perm.description}`);
+  }
+
+  // Show key input details based on tool type
+  const input = perm.input;
+  switch (perm.tool_name) {
+    case "Bash":
+      if (input.command) lines.push(`Command: <code>${truncate(input.command as string, 100)}</code>`);
+      break;
+    case "Write":
+    case "Read":
+    case "Edit":
+      if (input.file_path) lines.push(`File: <code>${shortenPath(input.file_path as string)}</code>`);
+      break;
+    default:
+      // Show first string value for unknown tools
+      for (const [key, val] of Object.entries(input)) {
+        if (typeof val === "string" && val.length < 100) {
+          lines.push(`${key}: <code>${escapeHTML(truncate(val, 80))}</code>`);
+          break;
+        }
+      }
+  }
+
+  return lines.join("\n");
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

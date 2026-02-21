@@ -163,6 +163,16 @@ export class WsBridge {
     this.handleInterrupt(session);
   }
 
+  /** Respond to a pending permission request (from external client like Telegram). */
+  injectPermissionResponse(
+    sessionId: string,
+    response: { request_id: string; behavior: "allow" | "deny" }
+  ): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    this.handlePermissionResponse(session, response);
+  }
+
   /** Change model for a session (from external client). */
   injectSetModel(sessionId: string, model: string): void {
     const session = this.sessions.get(sessionId);
