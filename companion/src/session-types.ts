@@ -153,7 +153,8 @@ export type BrowserOutgoingMessage =
       updated_permissions?: PermissionUpdate[];
     }
   | { type: "interrupt" }
-  | { type: "set_model"; model: string };
+  | { type: "set_model"; model: string }
+  | { type: "set_auto_approve"; config: AutoApproveConfig };
 
 /** Messages the bridge sends TO the browser */
 export type BrowserIncomingMessage =
@@ -250,6 +251,14 @@ export interface PermissionRequest {
   description?: string;
   tool_use_id: string;
   timestamp: number;
+}
+
+// ─── Auto-Approve Config ─────────────────────────────────────────────────
+
+export interface AutoApproveConfig {
+  enabled: boolean;
+  timeoutSeconds: number; // 0 = disabled, 15/30/60
+  allowBash: boolean; // if false, Bash tools require manual approval
 }
 
 // ─── Project Profile ─────────────────────────────────────────────────────────

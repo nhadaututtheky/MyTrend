@@ -1,6 +1,6 @@
 // Claude markdown → Telegram HTML converter + formatting helpers
 
-import type { CLIResultMessage, ContentBlock, PermissionRequest, SessionState } from "../session-types.js";
+import type { AutoApproveConfig, CLIResultMessage, ContentBlock, PermissionRequest, SessionState } from "../session-types.js";
 import type {
   TelegramSessionMapping,
   TelegramInlineKeyboardMarkup,
@@ -252,6 +252,7 @@ export function formatHelp(): string {
     "/switch - Quick-switch project",
     "/model - Change model",
     "/status - Session info",
+    "/autoapprove - Auto-approve settings",
     "/cancel - Interrupt Claude",
     "/stop - End session",
     "/new - Restart session",
@@ -388,11 +389,53 @@ export function buildSessionActionsKeyboard(model: string): TelegramInlineKeyboa
         { text: "Status", callback_data: "action:status" },
       ],
       [
+        { text: "Auto ⏱", callback_data: "action:autoapprove" },
         { text: "Cancel", callback_data: "action:cancel" },
         { text: "Stop", callback_data: "action:stop", style: "danger" },
       ],
     ],
   };
+}
+
+/** Auto-approve config keyboard — timeout + bash toggle. */
+export function buildAutoApproveKeyboard(config: AutoApproveConfig): TelegramInlineKeyboardMarkup {
+  const timeouts = [
+    { label: "Off", seconds: 0 },
+    { label: "15s", seconds: 15 },
+    { label: "30s", seconds: 30 },
+    { label: "60s", seconds: 60 },
+  ];
+
+  const activeSeconds = config.enabled ? config.timeoutSeconds : 0;
+
+  const timeoutRow: TelegramInlineKeyboardButton[] = timeouts.map((t) => ({
+    text: t.seconds === activeSeconds ? `${t.label} ✓` : t.label,
+    callback_data: `autoapprove:timeout:${t.seconds}`,
+    style: t.seconds === activeSeconds ? "success" : undefined,
+  }));
+
+  const bashRow: TelegramInlineKeyboardButton[] = [
+    {
+      text: config.allowBash ? "Bash: ON ✓" : "Bash: OFF",
+      callback_data: `autoapprove:bash:${config.allowBash ? "off" : "on"}`,
+      style: config.allowBash ? "success" : "danger",
+    },
+  ];
+
+  return { inline_keyboard: [timeoutRow, bashRow] };
+}
+
+/** Format current auto-approve config as status text. */
+export function formatAutoApproveStatus(config: AutoApproveConfig): string {
+  if (!config.enabled || config.timeoutSeconds <= 0) {
+    return "<b>Auto-Approve: OFF</b>\nPermissions require manual approval.";
+  }
+  const bashStatus = config.allowBash ? "included" : "excluded (manual)";
+  return [
+    `<b>Auto-Approve: ${config.timeoutSeconds}s</b>`,
+    `Bash: ${bashStatus}`,
+    "Permissions auto-approve after timeout.",
+  ].join("\n");
 }
 
 /** Format a permission request for Telegram display. */

@@ -51,6 +51,14 @@
   let selectedProject = $state('');
   let selectedModel = $state('sonnet');
 
+  // Auto-approve config
+  interface AutoApproveConfig {
+    enabled: boolean;
+    timeoutSeconds: number;
+    allowBash: boolean;
+  }
+  let autoApproveConfig = $state<AutoApproveConfig>({ enabled: false, timeoutSeconds: 0, allowBash: false });
+
   // Auto-scroll
   let feedEl: HTMLDivElement | undefined = $state();
 
@@ -351,6 +359,17 @@
     scrollToBottom();
   }
 
+  function getAutoApproveTimeout(toolName: string): number {
+    if (!autoApproveConfig.enabled || autoApproveConfig.timeoutSeconds <= 0) return 0;
+    if (toolName === 'Bash' && !autoApproveConfig.allowBash) return 0;
+    return autoApproveConfig.timeoutSeconds;
+  }
+
+  function handleAutoApproveChange(enabled: boolean, seconds: number, bash: boolean) {
+    autoApproveConfig = { enabled, timeoutSeconds: seconds, allowBash: bash };
+    connection?.setAutoApprove(autoApproveConfig);
+  }
+
   function handleApprove(requestId: string) {
     connection?.approve(requestId);
     permissions = permissions.filter((p) => p.request_id !== requestId);
@@ -488,6 +507,22 @@
           {:else if isBusy}
             <span class="status-busy">working...</span>
           {/if}
+          <select
+            class="auto-approve-select"
+            value={autoApproveConfig.enabled ? String(autoApproveConfig.timeoutSeconds) : '0'}
+            onchange={(e) => {
+              const target = e.target as HTMLSelectElement;
+              const seconds = parseInt(target.value, 10);
+              handleAutoApproveChange(seconds > 0, seconds, autoApproveConfig.allowBash);
+            }}
+            aria-label="Auto-approve timeout"
+            title="Auto-approve permissions"
+          >
+            <option value="0">Auto: Off</option>
+            <option value="15">Auto: 15s</option>
+            <option value="30">Auto: 30s</option>
+            <option value="60">Auto: 60s</option>
+          </select>
           <button
             class="btn-disconnect"
             onclick={handleKill}
@@ -534,6 +569,7 @@
         {#each permissions as perm (perm.request_id)}
           <VibePermission
             request={perm}
+            autoApproveTimeout={getAutoApproveTimeout(perm.tool_name)}
             onapprove={handleApprove}
             ondeny={handleDeny}
           />
@@ -879,6 +915,23 @@
     font-size: var(--font-size-xs);
     color: var(--accent-yellow);
     animation: busyPulse 1s ease-in-out infinite;
+  }
+
+  .auto-approve-select {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-2xs);
+    font-weight: 700;
+    padding: 2px var(--spacing-xs);
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    outline: none;
+  }
+
+  .auto-approve-select:focus {
+    border-color: var(--accent-green);
   }
 
   .btn-disconnect,

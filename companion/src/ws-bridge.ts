@@ -13,6 +13,7 @@ import type {
   PersistedSession,
   SessionState,
   SessionStatus,
+  AutoApproveConfig,
 } from "./session-types.js";
 import { SessionStore } from "./session-store.js";
 
@@ -65,6 +66,10 @@ interface ActiveSession {
   messageHistory: BrowserIncomingMessage[];
   /** External subscribers (e.g. Telegram bridge) notified on CLI messages. */
   subscribers: Map<string, (msg: BrowserIncomingMessage) => void>;
+  /** Auto-approve configuration for this session. */
+  autoApproveConfig: AutoApproveConfig;
+  /** Active auto-approve timers keyed by request_id. */
+  autoApproveTimers: Map<string, ReturnType<typeof setTimeout>>;
 }
 
 // ─── Bridge ──────────────────────────────────────────────────────────────────
@@ -113,6 +118,8 @@ export class WsBridge {
       pendingPermissions: new Map(persisted?.pendingPermissions ?? []),
       messageHistory: persisted?.messageHistory ?? [],
       subscribers: new Map(),
+      autoApproveConfig: { enabled: false, timeoutSeconds: 0, allowBash: false },
+      autoApproveTimers: new Map(),
     };
 
     this.sessions.set(sessionId, session);
@@ -180,6 +187,16 @@ export class WsBridge {
     this.handleSetModel(session, model);
   }
 
+  /** Set auto-approve config for a session (from external client like Telegram). */
+  setAutoApprove(sessionId: string, config: AutoApproveConfig): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.autoApproveConfig = config;
+    console.log(
+      `[ws-bridge] Auto-approve updated for session ${sessionId.slice(0, 8)}: enabled=${config.enabled}, timeout=${config.timeoutSeconds}s, bash=${config.allowBash}`
+    );
+  }
+
   /** Read session state (for external clients). */
   getSessionState(sessionId: string): SessionState | undefined {
     return this.sessions.get(sessionId)?.state;
@@ -244,6 +261,12 @@ export class WsBridge {
 
     // Notify browsers
     this.broadcastToBrowsers(session, { type: "cli_disconnected" });
+
+    // Cancel auto-approve timers
+    for (const [, timer] of session.autoApproveTimers) {
+      clearTimeout(timer);
+    }
+    session.autoApproveTimers.clear();
 
     // Cancel pending permissions
     for (const [requestId] of session.pendingPermissions) {
@@ -487,6 +510,9 @@ export class WsBridge {
         type: "permission_request",
         request: perm,
       });
+
+      // Auto-approve timer
+      this.startAutoApproveTimer(session, perm);
     }
   }
 
@@ -520,6 +546,12 @@ export class WsBridge {
         break;
       case "set_model":
         this.handleSetModel(session, msg.model);
+        break;
+      case "set_auto_approve":
+        session.autoApproveConfig = msg.config;
+        console.log(
+          `[ws-bridge] Auto-approve set via browser: enabled=${msg.config.enabled}, timeout=${msg.config.timeoutSeconds}s`
+        );
         break;
     }
   }
@@ -557,6 +589,13 @@ export class WsBridge {
       updated_permissions?: unknown[];
     }
   ): void {
+    // Clear auto-approve timer if pending
+    const timer = session.autoApproveTimers.get(msg.request_id);
+    if (timer) {
+      clearTimeout(timer);
+      session.autoApproveTimers.delete(msg.request_id);
+    }
+
     session.pendingPermissions.delete(msg.request_id);
 
     let ndjson: string;
@@ -618,6 +657,37 @@ export class WsBridge {
       type: "session_update",
       session: { model },
     });
+  }
+
+  // ── Auto-approve timer ──────────────────────────────────────────────────
+
+  private startAutoApproveTimer(session: ActiveSession, perm: PermissionRequest): void {
+    const config = session.autoApproveConfig;
+    if (!config.enabled || config.timeoutSeconds <= 0) return;
+
+    // Skip Bash if allowBash is false
+    if (perm.tool_name === "Bash" && !config.allowBash) {
+      console.log(
+        `[ws-bridge] Auto-approve skipped for Bash (allowBash=false), request ${perm.request_id.slice(0, 8)}`
+      );
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      session.autoApproveTimers.delete(perm.request_id);
+      // Only auto-approve if still pending
+      if (!session.pendingPermissions.has(perm.request_id)) return;
+
+      console.log(
+        `[ws-bridge] Auto-approving ${perm.tool_name} after ${config.timeoutSeconds}s (request ${perm.request_id.slice(0, 8)})`
+      );
+      this.handlePermissionResponse(session, {
+        request_id: perm.request_id,
+        behavior: "allow",
+      });
+    }, config.timeoutSeconds * 1000);
+
+    session.autoApproveTimers.set(perm.request_id, timer);
   }
 
   // ── Transport helpers ────────────────────────────────────────────────────

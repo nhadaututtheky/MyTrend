@@ -1,13 +1,15 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import type { PermissionRequest } from '$lib/api/companion';
 
   interface Props {
     request: PermissionRequest;
+    autoApproveTimeout?: number; // seconds, 0 = no countdown
     onapprove: (requestId: string) => void;
     ondeny: (requestId: string) => void;
   }
 
-  let { request, onapprove, ondeny }: Props = $props();
+  let { request, autoApproveTimeout = 0, onapprove, ondeny }: Props = $props();
 
   const inputPreview = $derived(
     JSON.stringify(request.input, null, 2).slice(0, 400)
@@ -15,6 +17,39 @@
 
   const time = $derived(
     new Date(request.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  );
+
+  // ─── Countdown logic ───────────────────────────────────────────────────
+  let remaining = $state(0);
+  let countdownTimer: ReturnType<typeof setInterval> | undefined;
+
+  $effect(() => {
+    // Track prop reactively and reset
+    remaining = autoApproveTimeout;
+
+    if (autoApproveTimeout > 0) {
+      countdownTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          if (countdownTimer) clearInterval(countdownTimer);
+          countdownTimer = undefined;
+          onapprove(request.request_id);
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = undefined;
+    };
+  });
+
+  onDestroy(() => {
+    if (countdownTimer) clearInterval(countdownTimer);
+  });
+
+  const countdownPercent = $derived(
+    autoApproveTimeout > 0 ? (remaining / autoApproveTimeout) * 100 : 0
   );
 </script>
 
@@ -33,6 +68,13 @@
   </div>
 
   <pre class="perm-input">{inputPreview}</pre>
+
+  {#if autoApproveTimeout > 0 && remaining > 0}
+    <div class="countdown-bar" aria-label="Auto-approve in {remaining} seconds">
+      <div class="countdown-fill" style="width: {countdownPercent}%"></div>
+      <span class="countdown-text">Auto-approve in {remaining}s</span>
+    </div>
+  {/if}
 
   <div class="perm-actions">
     <button
@@ -139,6 +181,40 @@
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
+  }
+
+  /* ── Countdown bar ──────────────────────────────────────────────────── */
+  .countdown-bar {
+    position: relative;
+    height: 22px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--spacing-sm);
+    overflow: hidden;
+  }
+
+  .countdown-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(0, 210, 106, 0.25);
+    border-radius: var(--radius-sm);
+    transition: width 1s linear;
+  }
+
+  .countdown-text {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-family: var(--font-comic);
+    font-size: var(--font-size-2xs);
+    font-weight: 700;
+    color: var(--accent-green);
+    z-index: 1;
   }
 
   .perm-actions {

@@ -9,11 +9,13 @@ import {
   formatPinnedStatus,
   formatWelcome,
   formatConnected,
+  formatAutoApproveStatus,
   buildProjectKeyboard,
   buildModelKeyboard,
   buildStopConfirmKeyboard,
   buildNewConfirmKeyboard,
   buildSessionActionsKeyboard,
+  buildAutoApproveKeyboard,
 } from "./telegram-formatter.js";
 
 type CommandHandler = (bridge: TelegramBridge, msg: TelegramMessage, args: string) => Promise<void>;
@@ -29,6 +31,7 @@ const commands: Record<string, CommandHandler> = {
   status: handleStatus,
   model: handleModel,
   new: handleNew,
+  autoapprove: handleAutoApprove,
 };
 
 /** Dispatch a /command to its handler. Returns true if handled. */
@@ -271,5 +274,16 @@ async function handleNew(bridge: TelegramBridge, msg: TelegramMessage): Promise<
     chatId,
     `Restart session <code>${mapping.projectSlug}</code>? Current session will be destroyed.`,
     buildNewConfirmKeyboard()
+  );
+}
+
+async function handleAutoApprove(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
+  const chatId = msg.chat.id;
+  const config = bridge.getAutoApproveConfig(chatId);
+
+  await bridge.sendToChatWithKeyboard(
+    chatId,
+    formatAutoApproveStatus(config),
+    buildAutoApproveKeyboard(config)
   );
 }

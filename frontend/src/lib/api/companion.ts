@@ -209,12 +209,19 @@ export async function stopTelegramBridge(): Promise<{ ok: boolean }> {
 
 // ─── WebSocket Client ────────────────────────────────────────────────────────
 
+export interface AutoApproveConfig {
+  enabled: boolean;
+  timeoutSeconds: number;
+  allowBash: boolean;
+}
+
 export interface CompanionConnection {
   send: (content: string) => void;
   approve: (requestId: string) => void;
   deny: (requestId: string) => void;
   interrupt: () => void;
   setModel: (model: string) => void;
+  setAutoApprove: (config: AutoApproveConfig) => void;
   disconnect: () => void;
   readonly readyState: number;
   readonly isReconnecting: boolean;
@@ -308,6 +315,9 @@ export function connectToSession(
     },
     setModel(model: string) {
       sendJSON({ type: 'set_model', model });
+    },
+    setAutoApprove(config: AutoApproveConfig) {
+      sendJSON({ type: 'set_auto_approve', config });
     },
     disconnect() {
       intentionalClose = true;

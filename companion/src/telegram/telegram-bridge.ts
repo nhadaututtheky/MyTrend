@@ -11,6 +11,7 @@ import type {
   TelegramInlineKeyboardMarkup,
 } from "./telegram-types.js";
 import type {
+  AutoApproveConfig,
   BrowserIncomingMessage,
   CLIResultMessage,
   ProjectProfile,
@@ -35,7 +36,9 @@ import {
   buildStopConfirmKeyboard,
   buildPermissionKeyboard,
   buildSessionActionsKeyboard,
+  buildAutoApproveKeyboard,
   formatPermissionRequest,
+  formatAutoApproveStatus,
 } from "./telegram-formatter.js";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30min
@@ -71,6 +74,7 @@ export class TelegramBridge {
   private lastUserMsgId = new Map<number, number>();
   private costAlertsShown = new Map<number, Set<number>>();
   private lastProjectSlug = new Map<number, string>();
+  private autoApproveConfigs = new Map<number, AutoApproveConfig>();
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
@@ -333,6 +337,12 @@ export class TelegramBridge {
     // Subscribe to CLI messages
     this.subscribeToSession(chatId, sessionId);
 
+    // Apply auto-approve config if previously set for this chat
+    const existingConfig = this.autoApproveConfigs.get(chatId);
+    if (existingConfig?.enabled) {
+      this.deps.bridge.setAutoApprove(sessionId, existingConfig);
+    }
+
     // Create and pin status message
     try {
       const statusText = formatPinnedStatus(mapping, session.state);
@@ -471,7 +481,19 @@ export class TelegramBridge {
 
       case "permission_request": {
         const perm = msg.request;
-        const permText = formatPermissionRequest(perm);
+        let permText = formatPermissionRequest(perm);
+
+        // Show auto-approve countdown info
+        const aaConfig = this.getAutoApproveConfig(chatId);
+        if (aaConfig.enabled && aaConfig.timeoutSeconds > 0) {
+          const willAutoApprove = perm.tool_name !== "Bash" || aaConfig.allowBash;
+          if (willAutoApprove) {
+            permText += `\n\n⏱ Auto-approving in <b>${aaConfig.timeoutSeconds}s</b>...`;
+          } else {
+            permText += "\n\n🔒 Bash requires manual approval.";
+          }
+        }
+
         const keyboard = buildPermissionKeyboard(perm.request_id);
         await this.sendToChatWithKeyboard(chatId, permText, keyboard);
         break;
@@ -571,6 +593,9 @@ export class TelegramBridge {
           break;
         case "action":
           await this.onActionSelected(chatId, messageId!, query.id, value);
+          break;
+        case "autoapprove":
+          await this.onAutoApproveSelected(chatId, messageId!, query.id, value);
           break;
         default:
           await this.api.answerCallbackQuery(query.id, "Unknown action");
@@ -772,6 +797,16 @@ export class TelegramBridge {
         );
         break;
       }
+      case "autoapprove": {
+        await this.api.answerCallbackQuery(queryId);
+        const aaConfig = this.getAutoApproveConfig(chatId);
+        await this.sendToChatWithKeyboard(
+          chatId,
+          formatAutoApproveStatus(aaConfig),
+          buildAutoApproveKeyboard(aaConfig)
+        );
+        break;
+      }
       case "projects": {
         await this.api.answerCallbackQuery(queryId);
         const profiles = this.deps.profiles.getAll();
@@ -789,6 +824,40 @@ export class TelegramBridge {
     }
   }
 
+  private async onAutoApproveSelected(
+    chatId: number, messageId: number, queryId: string, value: string
+  ): Promise<void> {
+    // value format: "timeout:<seconds>" or "bash:<on|off>"
+    const [subtype, subvalue] = value.split(":");
+    const config = this.getAutoApproveConfig(chatId);
+
+    if (subtype === "timeout") {
+      const seconds = parseInt(subvalue, 10);
+      config.timeoutSeconds = seconds;
+      config.enabled = seconds > 0;
+    } else if (subtype === "bash") {
+      config.allowBash = subvalue === "on";
+    }
+
+    this.autoApproveConfigs.set(chatId, config);
+
+    // Push to ws-bridge
+    const mapping = this.chatSessions.get(chatId);
+    if (mapping) {
+      this.deps.bridge.setAutoApprove(mapping.sessionId, config);
+    }
+
+    await this.api.answerCallbackQuery(
+      queryId,
+      config.enabled ? `Auto-approve: ${config.timeoutSeconds}s` : "Auto-approve: OFF"
+    );
+
+    // Update the keyboard to reflect new state
+    await this.api.editMessageText(chatId, messageId, formatAutoApproveStatus(config), {
+      replyMarkup: buildAutoApproveKeyboard(config),
+    }).catch(() => {});
+  }
+
   // ── Bot menu commands ──────────────────────────────────────────────────
 
   private async registerCommands(): Promise<void> {
@@ -798,6 +867,7 @@ export class TelegramBridge {
         { command: "switch", description: "Quick-switch project" },
         { command: "model", description: "Switch model" },
         { command: "status", description: "Session info" },
+        { command: "autoapprove", description: "Auto-approve settings" },
         { command: "cancel", description: "Interrupt Claude" },
         { command: "stop", description: "End session" },
         { command: "new", description: "Restart session" },
@@ -876,6 +946,18 @@ export class TelegramBridge {
     this.updatePinnedStatus(chatId);
   }
 
+  getAutoApproveConfig(chatId: number): AutoApproveConfig {
+    return this.autoApproveConfigs.get(chatId) ?? { enabled: false, timeoutSeconds: 0, allowBash: false };
+  }
+
+  setAutoApproveConfig(chatId: number, config: AutoApproveConfig): void {
+    this.autoApproveConfigs.set(chatId, config);
+    const mapping = this.chatSessions.get(chatId);
+    if (mapping) {
+      this.deps.bridge.setAutoApprove(mapping.sessionId, config);
+    }
+  }
+
   getActiveChatCount(): number {
     return this.chatSessions.size;
   }
@@ -928,6 +1010,7 @@ export class TelegramBridge {
     this.lastToolFeedAt.delete(chatId);
     this.lastUserMsgId.delete(chatId);
     this.costAlertsShown.delete(chatId);
+    this.autoApproveConfigs.delete(chatId);
   }
 
   // ── Persistence ───────────────────────────────────────────────────────
