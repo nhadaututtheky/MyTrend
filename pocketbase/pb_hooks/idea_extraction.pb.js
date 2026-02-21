@@ -3,48 +3,70 @@
 // MyTrend - Smart Idea Extraction
 // Auto-extracts ideas from conversation user messages using signal phrases.
 // Creates ideas with status "inbox" for user review.
+// Triggers on both CREATE and UPDATE of conversations.
 
 // Signal phrases that indicate an idea/task/bug/feature
 var IDEA_SIGNALS = {
   feature: [
+    // English
     'should add', 'need to add', 'let\'s add', 'we need', 'let\'s implement',
     'let\'s build', 'should implement', 'want to add', 'need to implement',
     'feature:', 'feat:', 'can we add', 'would be nice to', 'should have',
+    'i want to', 'we should', 'let\'s create', 'need to create', 'add a',
+    'build a', 'implement a', 'create a new',
+    // Vietnamese (stripped diacritics)
     'can them', 'nen them', 'nen lam', 'can lam', 'them tinh nang',
+    'them cai', 'lam them', 'tao them', 'lam cai', 'tao cai',
+    'lam di', 'them di', 'build di', 'implement di',
+    'muon them', 'muon lam', 'muon tao',
   ],
   bug: [
+    // English
     'bug:', 'bug nay', 'still broken', 'doesn\'t work', 'not working',
     'is broken', 'error when', 'fails when', 'crash when', 'fix the',
+    'fix this', 'broken:', 'issue:', 'problem:',
+    // Vietnamese
     'phai fix', 'bi loi', 'ko chay', 'khong chay', 'dang loi',
+    'fix cai', 'fix di', 'sua cai', 'sua di', 'loi nay',
+    'ko duoc', 'khong duoc', 'bi bug', 'bi hong', 'hong roi',
+    'chet roi', 'ko hoat dong', 'khong hoat dong',
   ],
   optimization: [
+    // English
     'too slow', 'should optimize', 'need to optimize', 'performance issue',
     'can optimize', 'let\'s optimize', 'refactor', 'clean up',
-    'cham qua', 'nen toi uu', 'can refactor',
+    'speed up', 'make faster', 'improve performance',
+    // Vietnamese
+    'cham qua', 'nen toi uu', 'can refactor', 'nhanh hon',
+    'toi uu di', 'refactor di', 'clean di', 'don dep',
   ],
   question: [
+    // English
     'should we', 'what if we', 'how about', 'what do you think',
-    'nen dung gi', 'lam sao', 'tai sao',
+    'do you think', 'which is better',
+    // Vietnamese
+    'nen dung gi', 'lam sao', 'tai sao', 'dung cai nao',
+    'chon cai nao', 'theo bro', 'bro nghi sao',
   ],
 };
 
 /**
- * Strip Vietnamese diacritics so "nên thêm" matches signal "nen them".
+ * Strip Vietnamese diacritics so "nen them" matches signal "nen them".
  */
 var VIET_MAP = {
-  'à':'a','á':'a','ả':'a','ã':'a','ạ':'a',
-  'ă':'a','ằ':'a','ắ':'a','ẳ':'a','ẵ':'a','ặ':'a',
-  'â':'a','ầ':'a','ấ':'a','ẩ':'a','ẫ':'a','ậ':'a',
-  'è':'e','é':'e','ẻ':'e','ẽ':'e','ẹ':'e',
-  'ê':'e','ề':'e','ế':'e','ể':'e','ễ':'e','ệ':'e',
-  'ì':'i','í':'i','ỉ':'i','ĩ':'i','ị':'i',
-  'ò':'o','ó':'o','ỏ':'o','õ':'o','ọ':'o',
-  'ô':'o','ồ':'o','ố':'o','ổ':'o','ỗ':'o','ộ':'o',
-  'ơ':'o','ờ':'o','ớ':'o','ở':'o','ỡ':'o','ợ':'o',
-  'ù':'u','ú':'u','ủ':'u','ũ':'u','ụ':'u',
-  'ư':'u','ừ':'u','ứ':'u','ử':'u','ữ':'u','ự':'u',
-  'ỳ':'y','ý':'y','ỷ':'y','ỹ':'y','ỵ':'y',
-  'đ':'d',
+  '\u00e0':'a','\u00e1':'a','\u1ea3':'a','\u00e3':'a','\u1ea1':'a',
+  '\u0103':'a','\u1eb1':'a','\u1eaf':'a','\u1eb3':'a','\u1eb5':'a','\u1eb7':'a',
+  '\u00e2':'a','\u1ea7':'a','\u1ea5':'a','\u1ea9':'a','\u1eab':'a','\u1ead':'a',
+  '\u00e8':'e','\u00e9':'e','\u1ebb':'e','\u1ebd':'e','\u1eb9':'e',
+  '\u00ea':'e','\u1ec1':'e','\u1ebf':'e','\u1ec3':'e','\u1ec5':'e','\u1ec7':'e',
+  '\u00ec':'i','\u00ed':'i','\u1ec9':'i','\u0129':'i','\u1ecb':'i',
+  '\u00f2':'o','\u00f3':'o','\u1ecf':'o','\u00f5':'o','\u1ecd':'o',
+  '\u00f4':'o','\u1ed3':'o','\u1ed1':'o','\u1ed5':'o','\u1ed7':'o','\u1ed9':'o',
+  '\u01a1':'o','\u1edd':'o','\u1edb':'o','\u1edf':'o','\u1ee1':'o','\u1ee3':'o',
+  '\u00f9':'u','\u00fa':'u','\u1ee7':'u','\u0169':'u','\u1ee5':'u',
+  '\u01b0':'u','\u1eeb':'u','\u1ee9':'u','\u1eed':'u','\u1eef':'u','\u1ef1':'u',
+  '\u1ef3':'y','\u00fd':'y','\u1ef7':'y','\u1ef9':'y','\u1ef5':'y',
+  '\u0111':'d',
 };
 
 function stripDiacritics(str) {
@@ -78,7 +100,6 @@ function detectIdea(text) {
  * Extract the sentence containing the signal phrase.
  */
 function extractSentence(text, position) {
-  // Find sentence boundaries around the position
   var start = position;
   var end = position;
 
@@ -86,7 +107,6 @@ function extractSentence(text, position) {
   while (start > 0 && text[start - 1] !== '.' && text[start - 1] !== '\n' && text[start - 1] !== '!' && text[start - 1] !== '?') {
     start--;
   }
-  // Skip whitespace at start
   while (start < position && (text[start] === ' ' || text[start] === '\n')) start++;
 
   // Go forward to find sentence end
@@ -120,11 +140,12 @@ function decodeMessagesArray(raw) {
   return [];
 }
 
-// ---------------------------------------------------------------------------
-// Extract ideas from new conversations
-// ---------------------------------------------------------------------------
-onRecordAfterCreateRequest((e) => {
-  var record = e.record;
+/**
+ * Core extraction logic - shared between create and update handlers.
+ * @param {Object} record - The conversation record
+ * @param {number} startIndex - Index to start scanning messages from (0 for create, old count for update)
+ */
+function extractIdeasFromMessages(record, startIndex) {
   var userId = record.getString('user');
   if (!userId) return;
 
@@ -133,14 +154,31 @@ onRecordAfterCreateRequest((e) => {
   var convId = record.getId();
   var projectId = record.getString('project') || '';
 
-  var extractedCount = 0;
-  var seenTitles = {}; // Dedup within same conversation
+  if (messages.length <= startIndex) return;
 
-  for (var i = 0; i < messages.length; i++) {
+  // Count existing ideas for this conversation to respect max limit
+  var existingIdeaCount = 0;
+  try {
+    var existing = dao.findRecordsByFilter(
+      'ideas',
+      'conversation = {:cid}',
+      '-created', 10, 0,
+      { cid: convId }
+    );
+    existingIdeaCount = existing.length;
+  } catch (e) { /* no existing ideas */ }
+
+  if (existingIdeaCount >= 3) return; // Already at max
+
+  var extractedCount = 0;
+  var seenTitles = {};
+  var maxNew = 3 - existingIdeaCount;
+
+  for (var i = startIndex; i < messages.length; i++) {
     var msg = messages[i];
     if (!msg || msg.role !== 'user' || !msg.content) continue;
     var content = typeof msg.content === 'string' ? msg.content : '';
-    if (content.length < 20) continue;
+    if (content.length < 15) continue; // Lowered from 20 to catch shorter Vietnamese phrases
 
     var detection = detectIdea(content);
     if (!detection) continue;
@@ -148,12 +186,12 @@ onRecordAfterCreateRequest((e) => {
     var title = extractSentence(content, detection.position);
     if (!title) continue;
 
-    // Dedup: skip if similar title already extracted
-    var titleKey = title.substring(0, 50).toLowerCase();
+    // Dedup within this batch
+    var titleKey = stripDiacritics(title.substring(0, 50).toLowerCase());
     if (seenTitles[titleKey]) continue;
     seenTitles[titleKey] = true;
 
-    // Check if idea with similar title already exists
+    // Check if idea with similar title already exists globally
     try {
       dao.findFirstRecordByFilter(
         'ideas',
@@ -181,8 +219,7 @@ onRecordAfterCreateRequest((e) => {
       console.log('[IdeaExtraction] Create error: ' + err);
     }
 
-    // Max 3 ideas per conversation to avoid noise
-    if (extractedCount >= 3) break;
+    if (extractedCount >= maxNew) break;
   }
 
   if (extractedCount > 0) {
@@ -198,6 +235,31 @@ onRecordAfterCreateRequest((e) => {
       } catch (e) { /* skip */ }
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Extract ideas from NEW conversations (all messages)
+// ---------------------------------------------------------------------------
+onRecordAfterCreateRequest((e) => {
+  try {
+    extractIdeasFromMessages(e.record, 0);
+  } catch (err) {
+    console.log('[IdeaExtraction] Create handler error: ' + err);
+  }
 }, 'conversations');
 
-console.log('[IdeaExtraction] Registered: auto-extract ideas from conversations');
+// ---------------------------------------------------------------------------
+// Extract ideas from UPDATED conversations (only new messages)
+// ---------------------------------------------------------------------------
+onRecordAfterUpdateRequest((e) => {
+  try {
+    var record = e.record;
+    var oldMessages = decodeMessagesArray(record.originalCopy().get('messages'));
+    var startIndex = oldMessages.length; // Only scan newly added messages
+    extractIdeasFromMessages(record, startIndex);
+  } catch (err) {
+    console.log('[IdeaExtraction] Update handler error: ' + err);
+  }
+}, 'conversations');
+
+console.log('[IdeaExtraction] Registered: auto-extract ideas from conversations (create + update)');
