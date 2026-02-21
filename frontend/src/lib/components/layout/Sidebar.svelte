@@ -133,6 +133,7 @@
     gap: var(--spacing-sm);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-sm);
+    border: 1.5px solid transparent;
     color: var(--text-secondary);
     text-decoration: none;
     font-family: var(--font-comic);
@@ -141,25 +142,32 @@
     transition:
       background var(--transition-fast),
       color var(--transition-fast),
-      box-shadow var(--transition-fast);
+      box-shadow var(--transition-fast),
+      transform var(--transition-fast),
+      border-color var(--transition-fast);
     white-space: nowrap;
   }
 
-  .nav-link:hover {
+  .nav-link:hover:not(.active) {
     background: var(--bg-secondary);
     color: var(--text-primary);
     text-decoration: none;
+    border-color: var(--border-color);
+    box-shadow: 2px 2px 0 var(--border-color);
+    transform: translate(-1px, -1px);
   }
 
   .nav-link.active {
     background: var(--accent-green);
     color: #1a1a1a;
-    box-shadow: var(--shadow-sm);
+    border-color: var(--border-color);
+    box-shadow: 3px 3px 0 var(--border-color);
+    transform: translate(-1px, -1px);
   }
 
-  /* Neon glow on active in dark mode */
+  /* Keep hard shadow in dark mode too */
   :global([data-theme='dark']) .nav-link.active {
-    box-shadow: var(--shadow-sm), 0 0 10px rgba(0, 210, 106, 0.2);
+    box-shadow: 3px 3px 0 var(--border-color);
   }
 
   .nav-icon {

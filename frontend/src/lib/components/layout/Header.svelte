@@ -143,12 +143,11 @@
   }
 
   .logo-text {
-    font-family: var(--font-comic);
-    font-size: 1.5rem;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 800;
     color: var(--accent-green);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: -0.02em;
   }
 
   :global([data-theme='dark']) .logo-text {

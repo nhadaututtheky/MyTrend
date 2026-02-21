@@ -274,7 +274,14 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+    padding-left: var(--spacing-sm);
+    border-left: 3px solid var(--border-color);
   }
+
+  .stat-item:nth-child(1) { border-left-color: var(--accent-green); }
+  .stat-item:nth-child(2) { border-left-color: var(--accent-blue); }
+  .stat-item:nth-child(3) { border-left-color: var(--accent-yellow); }
+  .stat-item:nth-child(4) { border-left-color: var(--accent-purple); }
 
   .stat-value {
     font-family: var(--font-display);
