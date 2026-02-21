@@ -597,7 +597,6 @@ export class WsBridge {
     }
 
     try {
-      console.log(`[ws-bridge] Sending to CLI (${session.id.slice(0, 8)}): ${ndjson.slice(0, 100)}`);
       session.cliSend(ndjson + "\n");
     } catch (err) {
       console.error(`[ws-bridge] Failed to send to CLI:`, err);

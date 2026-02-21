@@ -23,7 +23,6 @@ import { dispatchCommand } from "./telegram-commands.js";
 import {
   toTelegramHTML,
   extractText,
-  extractToolActions,
   formatResult,
 } from "./telegram-formatter.js";
 
@@ -210,7 +209,6 @@ export class TelegramBridge {
     this.startTyping(chatId);
 
     // Inject message to CLI
-    console.log(`[telegram] Injecting message to session ${mapping.sessionId.slice(0, 8)}: "${cleanText.slice(0, 50)}"`);
     this.deps.bridge.injectUserMessage(mapping.sessionId, cleanText);
 
     // Update activity
@@ -322,19 +320,12 @@ export class TelegramBridge {
   // ── CLI response handling ─────────────────────────────────────────────
 
   private async handleCLIResponse(chatId: number, msg: BrowserIncomingMessage): Promise<void> {
-    console.log(`[telegram] CLI response (chat=${chatId}): type=${msg.type}`);
     switch (msg.type) {
       case "assistant": {
         const content = msg.message.content;
         if (!Array.isArray(content)) break;
 
-        // Show tool actions as short status lines
-        const toolActions = extractToolActions(content);
-        for (const action of toolActions) {
-          await this.sendToChat(chatId, action);
-        }
-
-        // Show text content
+        // Only show text responses — skip tool actions (no spam)
         const text = extractText(content);
         if (text) {
           const html = toTelegramHTML(text);
@@ -366,7 +357,7 @@ export class TelegramBridge {
 
       case "cli_disconnected": {
         this.stopTyping(chatId);
-        await this.sendToChat(chatId, "Claude CLI disconnected.");
+        await this.sendToChat(chatId, "Session ended.");
         const disconnectedMapping = this.chatSessions.get(chatId);
         if (disconnectedMapping) {
           this.deps.bridge.unsubscribe(disconnectedMapping.sessionId, `telegram:${chatId}`);
@@ -377,14 +368,9 @@ export class TelegramBridge {
         break;
       }
 
-      case "stream_event":
-      case "cli_connected":
-      case "session_init":
-      case "user_message":
-      case "message_history":
-      case "permission_request":
-      case "permission_cancelled":
-        // Silently ignore these for Telegram
+      default:
+        // Silently ignore: stream_event, cli_connected, session_init,
+        // user_message, message_history, permission_request, etc.
         break;
     }
   }
