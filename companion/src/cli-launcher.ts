@@ -87,7 +87,28 @@ export class CLILauncher {
       }
       cleanEnv.HOME = process.env.USERPROFILE ?? process.env.HOME ?? "";
 
-      const proc = Bun.spawn(["claude", ...args], {
+      // On Windows, bypass .cmd wrapper to avoid pipe buffering issues.
+      // claude.cmd just calls: node <npm_prefix>/node_modules/@anthropic-ai/claude-code/cli.js
+      let spawnArgs: string[];
+      if (process.platform === "win32") {
+        const npmPrefix = process.env.APPDATA
+          ? `${process.env.APPDATA}\\npm`
+          : "";
+        const cliScript = `${npmPrefix}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`;
+        // Try direct node invocation first, fallback to claude.cmd
+        const { existsSync } = await import("node:fs");
+        if (existsSync(cliScript)) {
+          spawnArgs = ["node", cliScript, ...args];
+        } else {
+          spawnArgs = ["claude.cmd", ...args];
+        }
+      } else {
+        spawnArgs = ["claude", ...args];
+      }
+
+      console.log(`[cli-launcher] Spawn command: ${spawnArgs[0]} ${spawnArgs.length > 3 ? spawnArgs.slice(1, 4).join(" ") + "..." : spawnArgs.slice(1).join(" ")}`);
+
+      const proc = Bun.spawn(spawnArgs, {
         cwd: options.projectDir,
         stdin: "pipe",
         stdout: "pipe",

@@ -148,16 +148,17 @@ export class TelegramBridge {
 
     // Security: whitelist is always populated (startup enforces this)
     if (!this.config.allowedChatIds.has(chatId)) {
-      console.log(`[telegram] Rejected message from unauthorized chat: ${chatId}`);
+      console.log(`[telegram] Rejected message from unauthorized chat: ${chatId} (type=${msg.chat.type}, from=${msg.from?.username ?? msg.from?.first_name ?? "?"})`);
       return;
     }
 
-    // In groups, only respond to commands and @mentions
+    // In groups: allow commands, @mentions, AND any message when there's an active session
     if (msg.chat.type !== "private") {
       const text = msg.text ?? "";
       const isCommand = text.startsWith("/");
       const isMention = this.botUsername && text.includes(`@${this.botUsername}`);
-      if (!isCommand && !isMention) return;
+      const hasActiveSession = this.chatSessions.has(chatId);
+      if (!isCommand && !isMention && !hasActiveSession) return;
     }
 
     // Check for commands
@@ -209,6 +210,7 @@ export class TelegramBridge {
     this.startTyping(chatId);
 
     // Inject message to CLI
+    console.log(`[telegram] Injecting message to session ${mapping.sessionId.slice(0, 8)}: "${cleanText.slice(0, 50)}"`);
     this.deps.bridge.injectUserMessage(mapping.sessionId, cleanText);
 
     // Update activity
@@ -320,6 +322,7 @@ export class TelegramBridge {
   // ── CLI response handling ─────────────────────────────────────────────
 
   private async handleCLIResponse(chatId: number, msg: BrowserIncomingMessage): Promise<void> {
+    console.log(`[telegram] CLI response (chat=${chatId}): type=${msg.type}`);
     switch (msg.type) {
       case "assistant": {
         const content = msg.message.content;
