@@ -4,6 +4,7 @@
   import type { ComponentType } from 'svelte';
   import {
     LayoutDashboard, FolderOpen, MessageCircle, Lightbulb, ClipboardList,
+    FileText,
     TrendingUp, Globe, Search,
     Terminal, Zap, Settings,
   } from 'lucide-svelte';
@@ -28,6 +29,7 @@
         { label: 'Conversations', href: '/conversations', icon: '', lucideIcon: MessageCircle },
         { label: 'Ideas', href: '/ideas', icon: '', lucideIcon: Lightbulb },
         { label: 'Plans', href: '/plans', icon: '', lucideIcon: ClipboardList },
+        { label: 'Files', href: '/files', icon: '', lucideIcon: FileText },
       ],
     },
     {
