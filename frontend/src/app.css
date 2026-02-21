@@ -19,6 +19,8 @@
 
 /* Design Tokens - Light Mode */
 :root {
+  --font-display: 'Bricolage Grotesque', 'Comic Mono', monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
   --font-comic: 'Comic Mono', 'Courier New', monospace;
 
   /* Typography Scale */
@@ -63,6 +65,11 @@
   --shadow-sm: 2px 2px 0 #1a1a1a;
   --shadow-md: 4px 4px 0 #1a1a1a;
   --shadow-lg: 6px 6px 0 #1a1a1a;
+  --shadow-xl: 8px 8px 0 #1a1a1a;
+  --shadow-accent-green: 4px 4px 0 var(--accent-green);
+  --shadow-accent-yellow: 4px 4px 0 var(--accent-yellow);
+  --shadow-accent-blue: 4px 4px 0 var(--accent-blue);
+  --shadow-accent-red: 4px 4px 0 var(--accent-red);
 
   /* Border Radius */
   --radius-sketch: 255px 15px 225px 15px / 15px 225px 15px 255px;
@@ -130,6 +137,11 @@
   --shadow-sm: 2px 2px 0 rgba(100, 100, 160, 0.25);
   --shadow-md: 4px 4px 0 rgba(100, 100, 160, 0.2);
   --shadow-lg: 6px 6px 0 rgba(100, 100, 160, 0.15);
+  --shadow-xl: 8px 8px 0 rgba(100, 100, 160, 0.15);
+  --shadow-accent-green: 4px 4px 0 rgba(0, 210, 106, 0.5);
+  --shadow-accent-yellow: 4px 4px 0 rgba(255, 230, 109, 0.5);
+  --shadow-accent-blue: 4px 4px 0 rgba(78, 205, 196, 0.5);
+  --shadow-accent-red: 4px 4px 0 rgba(255, 71, 87, 0.5);
   --shadow-neon: 4px 4px 0 rgba(100, 100, 160, 0.2), var(--glow-green);
   --border-glow: rgba(0, 210, 106, 0.3);
 }
@@ -151,7 +163,7 @@ html {
 }
 
 body {
-  font-family: var(--font-comic);
+  font-family: var(--font-body);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   line-height: var(--leading-relaxed);
@@ -171,10 +183,16 @@ h6 {
 }
 
 h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
   font-size: var(--font-size-5xl);
+  letter-spacing: -0.02em;
 }
 h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: var(--font-size-4xl);
+  letter-spacing: -0.01em;
 }
 h3 {
   font-size: var(--font-size-3xl);
@@ -184,6 +202,7 @@ h4 {
 }
 
 .comic-heading {
+  font-family: var(--font-comic);
   font-weight: 700;
   text-transform: uppercase;
   font-style: italic;

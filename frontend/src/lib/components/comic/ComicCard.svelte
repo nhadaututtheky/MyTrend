@@ -57,13 +57,23 @@
   }
 
   .card-skewed:hover {
-    transform: skewX(0) translateY(-4px);
+    transform: skewX(0) translate(-2px, -2px);
     box-shadow: var(--shadow-lg);
   }
 
+  .card-skewed:active {
+    transform: skewX(0) translate(1px, 1px);
+    box-shadow: var(--shadow-sm);
+  }
+
   .card-interactive:hover {
-    transform: translateY(-8px);
-    box-shadow: var(--shadow-lg);
+    transform: translate(-4px, -4px);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .card-interactive:active {
+    transform: translate(1px, 1px);
+    box-shadow: var(--shadow-sm);
   }
 
   .clickable {
@@ -71,7 +81,12 @@
   }
 
   .clickable:hover {
-    transform: translateY(-4px);
+    transform: translate(-2px, -2px);
     box-shadow: var(--shadow-lg);
+  }
+
+  .clickable:active {
+    transform: translate(1px, 1px);
+    box-shadow: var(--shadow-sm);
   }
 </style>

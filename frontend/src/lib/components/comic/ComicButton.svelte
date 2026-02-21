@@ -61,12 +61,12 @@
   }
 
   .comic-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
+    transform: translate(-2px, -2px);
     box-shadow: var(--shadow-md);
   }
 
   .comic-btn:active:not(:disabled) {
-    transform: translateY(2px);
+    transform: translate(1px, 1px);
     box-shadow: none;
   }
 
