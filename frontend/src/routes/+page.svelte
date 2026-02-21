@@ -277,9 +277,11 @@
   }
 
   .stat-value {
-    font-size: var(--font-size-4xl);
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: var(--font-size-5xl);
+    font-weight: 800;
     line-height: var(--leading-tight);
+    letter-spacing: -0.02em;
   }
 
   .stat-label {
@@ -299,9 +301,11 @@
   }
 
   .streak-number {
+    font-family: var(--font-display);
     font-size: var(--font-size-6xl);
-    font-weight: 700;
+    font-weight: 800;
     line-height: var(--leading-tight);
+    letter-spacing: -0.03em;
     color: var(--accent-orange);
   }
 
@@ -351,6 +355,31 @@
     color: var(--text-muted);
     font-size: var(--font-size-base);
   }
+
+  /* Stagger animation for bento cards */
+  @keyframes bentoFadeIn {
+    from {
+      opacity: 0;
+      transform: translate(4px, 4px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(0, 0);
+    }
+  }
+
+  .dashboard :global(.bento-card) {
+    animation: bentoFadeIn 280ms ease backwards;
+  }
+
+  .dashboard :global(.bento-card:nth-child(1)) { animation-delay: 0ms; }
+  .dashboard :global(.bento-card:nth-child(2)) { animation-delay: 60ms; }
+  .dashboard :global(.bento-card:nth-child(3)) { animation-delay: 120ms; }
+  .dashboard :global(.bento-card:nth-child(4)) { animation-delay: 180ms; }
+  .dashboard :global(.bento-card:nth-child(5)) { animation-delay: 220ms; }
+  .dashboard :global(.bento-card:nth-child(6)) { animation-delay: 260ms; }
+  .dashboard :global(.bento-card:nth-child(7)) { animation-delay: 300ms; }
+  .dashboard :global(.bento-card:nth-child(8)) { animation-delay: 340ms; }
 
   @media (max-width: 768px) {
     .page-header {

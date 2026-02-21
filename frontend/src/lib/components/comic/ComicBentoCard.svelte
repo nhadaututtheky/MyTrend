@@ -23,6 +23,16 @@
     footer,
   }: Props = $props();
 
+  const accentMap: Record<string, string> = {
+    green: 'var(--accent-green)',
+    blue: 'var(--accent-blue)',
+    red: 'var(--accent-red)',
+    purple: 'var(--accent-purple)',
+    yellow: 'var(--accent-yellow)',
+    orange: 'var(--accent-orange)',
+  };
+
+  const cardAccent = $derived(neonColor ? accentMap[neonColor] : '');
   const getNeonClass = () => variant === 'neon' ? `sketch-card-neon-${neonColor}` : '';
 
   function getSpanAttr(s: typeof span): string | undefined {
@@ -37,6 +47,7 @@
   data-span={getSpanAttr(span)}
   data-row-span={rowSpan > 1 ? String(rowSpan) : undefined}
   data-testid="bento-card"
+  style:--card-accent={cardAccent}
 >
   {#if title || icon}
     <div class="bento-header">
@@ -61,6 +72,7 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+    border-top: 4px solid var(--card-accent, var(--border-color));
   }
 
   .compact {
@@ -84,7 +96,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: var(--text-secondary);
+    color: var(--card-accent, var(--text-secondary));
     margin: 0;
   }
 
