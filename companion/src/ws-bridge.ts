@@ -16,6 +16,28 @@ import type {
 } from "./session-types.js";
 import { SessionStore } from "./session-store.js";
 
+// ─── Idea extraction (Telegram Claude Bridge → MyTrend) ──────────────────────
+
+const PB_URL = process.env.POCKETBASE_URL || "http://localhost:8090";
+const INTERNAL_SECRET = process.env.COMPANION_INTERNAL_SECRET || "";
+const MYTREND_USER_ID = process.env.MYTREND_SYNC_USER_ID || "";
+
+async function extractIdeaFromMessage(content: string): Promise<void> {
+  if (!INTERNAL_SECRET || !MYTREND_USER_ID || content.length < 15) return;
+  try {
+    await fetch(`${PB_URL}/api/internal/idea`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": INTERNAL_SECRET,
+      },
+      body: JSON.stringify({ content, userId: MYTREND_USER_ID }),
+    });
+  } catch {
+    // Non-fatal: don't block the main message flow
+  }
+}
+
 // ─── Socket data tags ────────────────────────────────────────────────────────
 
 export interface CLISocketData {
@@ -512,6 +534,9 @@ export class WsBridge {
     });
     this.sendToCLI(session, ndjson);
     this.updateStatus(session, "busy");
+
+    // Fire-and-forget: extract idea if message contains signal phrases
+    extractIdeaFromMessage(content);
   }
 
   private handlePermissionResponse(

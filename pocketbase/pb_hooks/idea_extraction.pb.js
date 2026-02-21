@@ -238,6 +238,94 @@ function extractIdeasFromMessages(record, startIndex) {
 }
 
 // ---------------------------------------------------------------------------
+// Hub session extraction - same logic but uses 'vibe-terminal' source tag
+// and no conversation relation (hub_sessions are not conversations).
+// ---------------------------------------------------------------------------
+function extractIdeasFromHub(record, startIndex) {
+  var userId = record.getString('user');
+  if (!userId) return;
+
+  var dao = $app.dao();
+  var messages = decodeMessagesArray(record.get('messages'));
+  var projectId = record.getString('project') || '';
+
+  if (messages.length <= startIndex) return;
+
+  var existingCount = 0;
+  try {
+    // Dedup by scanning title similarity globally (no per-hub-session limit)
+    var recId = record.getId();
+    var existing = dao.findRecordsByFilter(
+      'ideas',
+      'user = {:uid} && tags ~ "vibe-terminal"',
+      '-created', 50, 0,
+      { uid: userId }
+    );
+    // Count ideas created in last hour from this session (rough guard against spam)
+    var oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+    for (var x = 0; x < existing.length; x++) {
+      if (existing[x].getString('created') >= oneHourAgo) existingCount++;
+    }
+  } catch (e) { /* no existing */ }
+
+  if (existingCount >= 10) return; // Max 10 auto-ideas per hour from Vibe Terminal
+
+  var extractedCount = 0;
+  var seenTitles = {};
+  var maxNew = 10 - existingCount;
+
+  for (var i = startIndex; i < messages.length; i++) {
+    var msg = messages[i];
+    if (!msg || msg.role !== 'user' || !msg.content) continue;
+    var content = typeof msg.content === 'string' ? msg.content : '';
+    if (content.length < 15) continue;
+
+    var detection = detectIdea(content);
+    if (!detection) continue;
+
+    var title = extractSentence(content, detection.position);
+    if (!title) continue;
+
+    var titleKey = stripDiacritics(title.substring(0, 50).toLowerCase());
+    if (seenTitles[titleKey]) continue;
+    seenTitles[titleKey] = true;
+
+    // Global title dedup for this user
+    try {
+      dao.findFirstRecordByFilter(
+        'ideas',
+        'user = {:uid} && title ~ {:title}',
+        { uid: userId, title: title.substring(0, 50) }
+      );
+      continue; // Already exists
+    } catch (e) { /* not found, create */ }
+
+    try {
+      var ideaCol = dao.findCollectionByNameOrId('ideas');
+      var idea = new Record(ideaCol);
+      idea.set('user', userId);
+      idea.set('title', title);
+      idea.set('type', detection.type);
+      idea.set('status', 'inbox');
+      idea.set('priority', detection.type === 'bug' ? 'high' : 'medium');
+      idea.set('content', 'Auto-extracted from Vibe Terminal session. Signal: "' + detection.phrase + '"');
+      idea.set('tags', [detection.type, 'vibe-terminal', 'auto-extracted']);
+      if (projectId) idea.set('project', projectId);
+      dao.saveRecord(idea);
+      extractedCount++;
+    } catch (err) {
+      console.log('[IdeaExtraction] Hub create error: ' + err);
+    }
+
+    if (extractedCount >= maxNew) break;
+  }
+
+  if (extractedCount > 0) {
+    console.log('[IdeaExtraction] Extracted ' + extractedCount + ' ideas from hub_session: ' + record.getId());
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Extract ideas from NEW conversations (all messages)
 // ---------------------------------------------------------------------------
 onRecordAfterCreateRequest((e) => {
@@ -262,4 +350,29 @@ onRecordAfterUpdateRequest((e) => {
   }
 }, 'conversations');
 
-console.log('[IdeaExtraction] Registered: auto-extract ideas from conversations (create + update)');
+// ---------------------------------------------------------------------------
+// Extract ideas from NEW hub_sessions (Vibe Terminal) - all messages
+// ---------------------------------------------------------------------------
+onRecordAfterCreateRequest((e) => {
+  try {
+    extractIdeasFromHub(e.record, 0);
+  } catch (err) {
+    console.log('[IdeaExtraction] Hub create handler error: ' + err);
+  }
+}, 'hub_sessions');
+
+// ---------------------------------------------------------------------------
+// Extract ideas from UPDATED hub_sessions - only new messages
+// ---------------------------------------------------------------------------
+onRecordAfterUpdateRequest((e) => {
+  try {
+    var record = e.record;
+    var oldMessages = decodeMessagesArray(record.originalCopy().get('messages'));
+    var startIndex = oldMessages.length;
+    extractIdeasFromHub(record, startIndex);
+  } catch (err) {
+    console.log('[IdeaExtraction] Hub update handler error: ' + err);
+  }
+}, 'hub_sessions');
+
+console.log('[IdeaExtraction] Registered: auto-extract ideas from conversations + hub_sessions (Vibe Terminal)');
