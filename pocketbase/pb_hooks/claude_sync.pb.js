@@ -138,6 +138,9 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
 
   // Auto-create project from directory name and return project ID
   function ensureProject(dirName) {
+    // Skip worktree directories - they are not real projects
+    if (dirName.indexOf('worktrees') >= 0 || dirName.indexOf('worktree') >= 0) return null;
+
     // Parse: "C--Users-X-Desktop-Future-MyTrend" -> "MyTrend"
     var parts = dirName.split('-');
     var projectName = parts[parts.length - 1] || dirName;
@@ -383,6 +386,98 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/mytrend/recalculate-metrics
+// Recalculate total_conversations, total_minutes, total_ideas for all projects.
+// ---------------------------------------------------------------------------
+routerAdd('POST', '/api/mytrend/recalculate-metrics', (c) => {
+  var authRecord = c.get('authRecord');
+  var admin = c.get('admin');
+  if (!authRecord && !admin) return c.json(401, { error: 'Authentication required' });
+
+  var userId = '';
+  if (authRecord) {
+    userId = authRecord.getId();
+  } else {
+    var qUserId = c.queryParam('userId');
+    if (qUserId) {
+      userId = qUserId;
+    } else {
+      try {
+        var users = $app.dao().findRecordsByFilter('users', '1=1', '', 1, 0);
+        if (users && users.length > 0) userId = users[0].getId();
+      } catch (e) { return c.json(500, { error: 'Cannot find user' }); }
+    }
+  }
+  if (!userId) return c.json(400, { error: 'No user found' });
+  var dao = $app.dao();
+  var updates = [];
+
+  try {
+    var projects = dao.findRecordsByFilter('projects', 'user = {:uid}', '', 0, 0, { uid: userId });
+    for (var i = 0; i < projects.length; i++) {
+      var pid = projects[i].getId();
+      var pname = projects[i].getString('name');
+
+      // Count conversations
+      var convCount = 0;
+      var totalMins = 0;
+      var lastActivity = '';
+      try {
+        var convs = dao.findRecordsByFilter(
+          'conversations',
+          'user = {:uid} && project = {:pid}',
+          '', 0, 0,
+          { uid: userId, pid: pid }
+        );
+        convCount = convs.length;
+        for (var j = 0; j < convs.length; j++) {
+          totalMins += convs[j].getInt('duration_min') || 0;
+          var sa = convs[j].getString('started_at') || convs[j].getString('created');
+          if (sa > lastActivity) lastActivity = sa;
+        }
+      } catch (e) { /* */ }
+
+      // Count ideas
+      var ideaCount = 0;
+      try {
+        var ideas = dao.findRecordsByFilter(
+          'ideas',
+          'user = {:uid} && project = {:pid}',
+          '', 0, 0,
+          { uid: userId, pid: pid }
+        );
+        ideaCount = ideas.length;
+      } catch (e) { /* */ }
+
+      // Update project
+      var old = {
+        convos: projects[i].getInt('total_conversations'),
+        ideas: projects[i].getInt('total_ideas'),
+        mins: projects[i].getInt('total_minutes'),
+      };
+
+      projects[i].set('total_conversations', convCount);
+      projects[i].set('total_ideas', ideaCount);
+      projects[i].set('total_minutes', totalMins);
+      if (lastActivity) projects[i].set('last_activity', lastActivity);
+      dao.saveRecord(projects[i]);
+
+      updates.push({
+        name: pname,
+        conversations: { old: old.convos, new: convCount },
+        ideas: { old: old.ideas, new: ideaCount },
+        minutes: { old: old.mins, new: totalMins },
+      });
+    }
+  } catch (e) {
+    return c.json(500, { error: 'Recalculate failed: ' + e });
+  }
+
+  console.log('[ClaudeSync] Metrics recalculated for ' + updates.length + ' projects');
+  return c.json(200, { projects: updates });
+});
+
+// ---------------------------------------------------------------------------
 // Cron: Auto-sync every 30 minutes
 // ---------------------------------------------------------------------------
 try {
@@ -436,6 +531,9 @@ try {
 
     // Auto-create project in cron scope
     function cronEnsureProject(dirName) {
+      // Skip worktree directories - they are not real projects
+      if (dirName.indexOf('worktrees') >= 0 || dirName.indexOf('worktree') >= 0) return null;
+
       var cparts = dirName.split('-');
       var cname = cparts[cparts.length - 1] || dirName;
       if (!cname || cname.length < 2) return null;

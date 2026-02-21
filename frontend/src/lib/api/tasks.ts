@@ -13,7 +13,7 @@ import { MODEL_CONTEXT_WINDOWS, MODEL_PRICING, MODEL_CATALOG } from '$lib/types'
 function getPbUrl(): string {
   return typeof window !== 'undefined'
     ? pb.baseUrl
-    : (import.meta.env.VITE_PB_URL || 'http://pocketbase:8090');
+    : import.meta.env.VITE_PB_URL || 'http://pocketbase:8090';
 }
 
 // ---------------------------------------------------------------------------
@@ -23,19 +23,66 @@ function getPbUrl(): string {
 // Model tier routing: task keywords → recommended tier
 const TIER_KEYWORDS: Record<ModelTier, string[]> = {
   'haiku-4.5': [
-    'search', 'find', 'grep', 'read', 'check', 'list', 'look', 'show',
-    'status', 'count', 'format', 'lint', 'simple', 'quick', 'basic', 'trivial',
-    'glob', 'what', 'where', 'which', 'verify', 'confirm', 'view', 'display',
+    'search',
+    'find',
+    'grep',
+    'read',
+    'check',
+    'list',
+    'look',
+    'show',
+    'status',
+    'count',
+    'format',
+    'lint',
+    'simple',
+    'quick',
+    'basic',
+    'trivial',
+    'glob',
+    'what',
+    'where',
+    'which',
+    'verify',
+    'confirm',
+    'view',
+    'display',
   ],
-  'sonnet-4.5': [],  // not auto-routed, manual pick only
+  'sonnet-4.5': [], // not auto-routed, manual pick only
   'sonnet-4.6': [
-    'write', 'implement', 'code', 'fix', 'bug', 'test', 'refactor', 'build',
-    'create', 'add', 'update', 'feature', 'component', 'function', 'module',
+    'write',
+    'implement',
+    'code',
+    'fix',
+    'bug',
+    'test',
+    'refactor',
+    'build',
+    'create',
+    'add',
+    'update',
+    'feature',
+    'component',
+    'function',
+    'module',
   ],
   'opus-4.6': [
-    'architect', 'design', 'plan', 'security', 'audit', 'refactor large',
-    'complex', 'multi-file', 'system design', 'strategy', 'performance review',
-    'comprehensive', 'deep dive', 'full analysis', 'restructure', 'overhaul',
+    'architect',
+    'design',
+    'plan',
+    'security',
+    'audit',
+    'refactor large',
+    'complex',
+    'multi-file',
+    'system design',
+    'strategy',
+    'performance review',
+    'comprehensive',
+    'deep dive',
+    'full analysis',
+    'restructure',
+    'overhaul',
   ],
 };
 
@@ -46,20 +93,20 @@ export async function fetchTasks(options?: {
   sessionId?: string;
   status?: ClaudeTaskStatus;
   search?: string;
+  projectDir?: string;
   page?: number;
   perPage?: number;
 }): Promise<PBListResult<ClaudeTask>> {
   const filters: string[] = [];
   if (options?.sessionId) filters.push(`session_id = "${options.sessionId}"`);
   if (options?.status) filters.push(`status = "${options.status}"`);
+  if (options?.projectDir) filters.push(`project_dir ~ "${options.projectDir}"`);
 
   const filter = filters.join(' && ');
 
-  const result = await pb.collection('claude_tasks').getList<ClaudeTask>(
-    options?.page ?? 1,
-    options?.perPage ?? 500,
-    { sort: '-updated', filter },
-  );
+  const result = await pb
+    .collection('claude_tasks')
+    .getList<ClaudeTask>(options?.page ?? 1, options?.perPage ?? 500, { sort: '-updated', filter });
 
   if (options?.search) {
     const q = options.search.toLowerCase();
@@ -211,9 +258,13 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
       session.cache_create_tokens = first.cache_create_tokens || 0;
     }
 
-    const contextWindow = MODEL_CONTEXT_WINDOWS[session.model] ?? MODEL_CONTEXT_WINDOWS['default'] ?? 200_000;
+    const contextWindow =
+      MODEL_CONTEXT_WINDOWS[session.model] ?? MODEL_CONTEXT_WINDOWS['default'] ?? 200_000;
     session.total_tokens =
-      session.input_tokens + session.output_tokens + session.cache_read_tokens + session.cache_create_tokens;
+      session.input_tokens +
+      session.output_tokens +
+      session.cache_read_tokens +
+      session.cache_create_tokens;
     session.context_pct = Math.min(100, Math.round((session.total_tokens / contextWindow) * 100));
 
     session.estimated_cost = calcCost(

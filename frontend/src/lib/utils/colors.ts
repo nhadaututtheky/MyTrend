@@ -32,6 +32,9 @@ export function getActivityTypeColor(type: string): string {
     idea: '#FFE66D',
     search: '#A29BFE',
     review: '#FF9F43',
+    commit: '#6C5CE7',
+    pr: '#FDA7DF',
+    issue: '#FF4757',
   };
   return colorMap[type] ?? '#888888';
 }

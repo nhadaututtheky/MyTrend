@@ -55,6 +55,8 @@ export interface Project extends BaseRecord {
   total_ideas: number;
   total_minutes: number;
   last_activity: string | null;
+  github_repo: string;
+  github_last_synced: string | null;
 }
 
 // Conversation
@@ -198,7 +200,7 @@ export interface PlanStats {
 }
 
 // Activity
-export type ActivityType = 'conversation' | 'coding' | 'idea' | 'search' | 'review' | 'plan';
+export type ActivityType = 'conversation' | 'coding' | 'idea' | 'search' | 'review' | 'plan' | 'commit' | 'pr' | 'issue';
 
 export interface Activity extends BaseRecord {
   user: string;

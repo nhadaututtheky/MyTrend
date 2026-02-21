@@ -16,6 +16,9 @@
     idea: 'Idea',
     search: 'Search',
     review: 'Review',
+    commit: 'Commit',
+    pr: 'PR',
+    issue: 'Issue',
   };
 </script>
 

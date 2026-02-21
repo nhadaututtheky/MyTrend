@@ -8,6 +8,8 @@ import { TelegramBridge } from "./telegram/telegram-bridge.js";
 import { loadTelegramConfig } from "./telegram/telegram-config.js";
 
 const PORT = 3457;
+const PB_URL = process.env.PB_URL || "http://localhost:8090";
+const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 // ── Initialize services ──────────────────────────────────────────────────────
 
@@ -15,6 +17,12 @@ const store = new SessionStore();
 const profiles = new ProjectProfileStore();
 const bridge = new WsBridge(store);
 const launcher = new CLILauncher(store, bridge);
+
+// Sync project profiles from PocketBase on startup + periodically
+profiles.syncFromPocketBase(PB_URL).catch(() => {});
+setInterval(() => {
+  profiles.syncFromPocketBase(PB_URL).catch(() => {});
+}, PROFILE_SYNC_INTERVAL);
 
 // ── Telegram Bridge Manager ──────────────────────────────────────────────────
 // Supports dynamic start/stop from Settings UI or env vars on boot.
