@@ -8,12 +8,14 @@
   import Sidebar from '$lib/components/layout/Sidebar.svelte';
   import AIDrawer from '$lib/components/layout/AIDrawer.svelte';
   import ComicToast from '$lib/components/comic/ComicToast.svelte';
+  import CommandPalette from '$lib/components/layout/CommandPalette.svelte';
   import '../app.css';
 
   const { children } = $props();
 
   let sidebarCollapsed = $state(false);
   let drawerOpen = $state(false);
+  let commandPaletteOpen = $state(false);
   let loggedIn = $state(false);
   let currentPath = $state('/');
 
@@ -41,6 +43,16 @@
 
   onMount(() => {
     initTheme();
+
+    function handleGlobalKeydown(e: KeyboardEvent): void {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        commandPaletteOpen = !commandPaletteOpen;
+      }
+    }
+
+    document.addEventListener('keydown', handleGlobalKeydown);
+    return () => document.removeEventListener('keydown', handleGlobalKeydown);
   });
 
   function toggleSidebar(): void {
@@ -67,6 +79,7 @@
     </main>
   </div>
   <AIDrawer bind:open={drawerOpen} />
+  <CommandPalette open={commandPaletteOpen} onclose={() => { commandPaletteOpen = false; }} />
 {/if}
 
 <style>

@@ -3,6 +3,7 @@
   import { logout } from '$lib/stores/auth';
   import ThemeToggle from './ThemeToggle.svelte';
   import { goto } from '$app/navigation';
+  import { Search, Sparkles, LogOut, Menu, X } from 'lucide-svelte';
 
   interface Props {
     onToggleSidebar?: () => void;
@@ -46,7 +47,7 @@
 <header class="header" data-testid="header">
   <div class="header-left">
     <button class="menu-btn" onclick={onToggleSidebar} aria-label="Toggle sidebar">
-      ☰
+      <Menu size={20} />
     </button>
     <a href="/" class="logo">
       <span class="logo-text">MyTrend</span>
@@ -64,7 +65,7 @@
           onkeydown={handleSearchKeydown}
         />
         <button type="button" class="search-close" onclick={() => { searchExpanded = false; searchValue = ''; }} aria-label="Close search">
-          ✕
+          <X size={16} />
         </button>
       </form>
     {/if}
@@ -72,21 +73,21 @@
 
   <div class="header-right">
     {#if !searchExpanded}
-      <button class="icon-btn" onclick={() => { searchExpanded = true; }} aria-label="Search">
-        🔍
+      <button class="icon-btn" onclick={() => { searchExpanded = true; }} aria-label="Search" title="Search (Ctrl+K)">
+        <Search size={18} />
       </button>
     {/if}
     {#if onToggleDrawer}
       <button class="icon-btn ai-btn" onclick={onToggleDrawer} aria-label="Toggle AI assistant" title="AI Assistant">
-        ⚡
+        <Sparkles size={18} />
       </button>
     {/if}
     <ThemeToggle />
     {#if user}
       <div class="user-menu">
         <span class="user-name">{user.display_name ?? user.email}</span>
-        <button class="icon-btn" onclick={handleLogout} aria-label="Logout">
-          ⏏
+        <button class="icon-btn" onclick={handleLogout} aria-label="Logout" title="Logout">
+          <LogOut size={18} />
         </button>
       </div>
     {/if}

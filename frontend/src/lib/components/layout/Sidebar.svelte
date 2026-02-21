@@ -1,6 +1,12 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import type { NavItem } from '$lib/types';
+  import type { ComponentType } from 'svelte';
+  import {
+    LayoutDashboard, FolderOpen, MessageCircle, Lightbulb, ClipboardList,
+    TrendingUp, Globe, Search,
+    Terminal, Zap, Settings,
+  } from 'lucide-svelte';
 
   interface Props {
     collapsed?: boolean;
@@ -8,31 +14,36 @@
 
   const { collapsed = false }: Props = $props();
 
-  const navSections: Array<{ title: string; items: NavItem[] }> = [
+  interface NavSection {
+    title: string;
+    items: Array<NavItem & { lucideIcon: ComponentType }>;
+  }
+
+  const navSections: NavSection[] = [
     {
       title: 'Main',
       items: [
-        { label: 'Dashboard', href: '/', icon: '🏠' },
-        { label: 'Projects', href: '/projects', icon: '📁' },
-        { label: 'Conversations', href: '/conversations', icon: '💬' },
-        { label: 'Ideas', href: '/ideas', icon: '💡' },
-        { label: 'Plans', href: '/plans', icon: '📋' },
+        { label: 'Dashboard', href: '/', icon: '', lucideIcon: LayoutDashboard },
+        { label: 'Projects', href: '/projects', icon: '', lucideIcon: FolderOpen },
+        { label: 'Conversations', href: '/conversations', icon: '', lucideIcon: MessageCircle },
+        { label: 'Ideas', href: '/ideas', icon: '', lucideIcon: Lightbulb },
+        { label: 'Plans', href: '/plans', icon: '', lucideIcon: ClipboardList },
       ],
     },
     {
       title: 'Insights',
       items: [
-        { label: 'Trends', href: '/trends', icon: '📈' },
-        { label: 'Graph', href: '/graph', icon: '🌐' },
-        { label: 'Search', href: '/search', icon: '🔍' },
+        { label: 'Trends', href: '/trends', icon: '', lucideIcon: TrendingUp },
+        { label: 'Graph', href: '/graph', icon: '', lucideIcon: Globe },
+        { label: 'Search', href: '/search', icon: '', lucideIcon: Search },
       ],
     },
     {
       title: 'Tools',
       items: [
-        { label: 'Vibe', href: '/vibe', icon: '🎯' },
-        { label: 'Hub', href: '/hub', icon: '⚡' },
-        { label: 'Settings', href: '/settings', icon: '⚙' },
+        { label: 'Vibe', href: '/vibe', icon: '', lucideIcon: Terminal },
+        { label: 'Hub', href: '/hub', icon: '', lucideIcon: Zap },
+        { label: 'Settings', href: '/settings', icon: '', lucideIcon: Settings },
       ],
     },
   ];
@@ -71,7 +82,9 @@
               aria-current={isActive(item.href) ? 'page' : undefined}
               title={collapsed ? item.label : undefined}
             >
-              <span class="nav-icon">{item.icon}</span>
+              <span class="nav-icon" aria-hidden="true">
+                <item.lucideIcon size={18} strokeWidth={2.5} />
+              </span>
               {#if !collapsed}
                 <span class="nav-label">{item.label}</span>
               {/if}
@@ -171,10 +184,13 @@
   }
 
   .nav-icon {
-    font-size: 1.1rem;
-    width: 24px;
-    text-align: center;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    color: currentColor;
   }
 
   .nav-badge {

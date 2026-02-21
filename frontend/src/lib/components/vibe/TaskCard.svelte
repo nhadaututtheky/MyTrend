@@ -3,20 +3,15 @@
 
   interface Props {
     task: ClaudeTask;
+    compact?: boolean;
   }
 
-  const { task }: Props = $props();
+  const { task, compact = false }: Props = $props();
 
   const statusColors = {
     pending: 'var(--accent-yellow)',
     in_progress: 'var(--accent-orange)',
     completed: 'var(--accent-green)',
-  };
-
-  const modelColors: Record<string, string> = {
-    'claude-opus': 'purple',
-    'claude-sonnet': 'blue',
-    'claude-haiku': 'green',
   };
 
   function getModelShort(model: string): string {
@@ -76,31 +71,43 @@
 
 <div
   class="task-card task-{task.status}"
+  class:task-compact={compact}
   style="--status-color: {statusColors[task.status]}"
   aria-label="Task: {displayText}"
 >
-  {#if task.status === 'in_progress'}
+  {#if task.status === 'in_progress' && !compact}
     <div class="pulse-dot" aria-hidden="true"></div>
   {/if}
 
-  <p class="task-content">{displayText}</p>
+  <p class="task-content" class:content-truncate={compact}>{displayText}</p>
 
-  <div class="task-meta">
-    {#if task.session_title}
-      <span class="meta-badge session-badge" title={task.session_title}>
-        {task.session_title}
-      </span>
-    {/if}
-    {#if modelShort}
-      <span class="meta-badge model-badge model-{modelColor}">{modelShort}</span>
-    {/if}
-    {#if projectName}
-      <span class="meta-badge project-badge" title={task.project_dir}>{projectName}</span>
-    {/if}
-    {#if timeLabel}
-      <span class="meta-time">{timeLabel}</span>
-    {/if}
-  </div>
+  {#if !compact}
+    <div class="task-meta">
+      {#if task.session_title}
+        <span class="meta-badge session-badge" title={task.session_title}>
+          {task.session_title}
+        </span>
+      {/if}
+      {#if modelShort}
+        <span class="meta-badge model-badge model-{modelColor}">{modelShort}</span>
+      {/if}
+      {#if projectName}
+        <span class="meta-badge project-badge" title={task.project_dir}>{projectName}</span>
+      {/if}
+      {#if timeLabel}
+        <span class="meta-time">{timeLabel}</span>
+      {/if}
+    </div>
+  {:else}
+    <div class="task-meta">
+      {#if modelShort}
+        <span class="meta-badge model-badge model-{modelColor}">{modelShort}</span>
+      {/if}
+      {#if timeLabel}
+        <span class="meta-time">{timeLabel}</span>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -213,5 +220,22 @@
     font-size: var(--font-size-2xs);
     color: var(--text-muted);
     margin-left: auto;
+  }
+
+  /* Compact mode */
+  .task-compact {
+    padding: var(--spacing-sm) var(--spacing-md);
+    min-height: auto;
+  }
+
+  .task-compact .task-content {
+    font-size: var(--font-size-xs);
+    margin-bottom: 2px;
+  }
+
+  .content-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

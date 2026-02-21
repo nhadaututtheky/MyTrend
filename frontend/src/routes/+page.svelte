@@ -18,6 +18,7 @@
   import MiniTrending from '$lib/components/dashboard/MiniTrending.svelte';
   import HeatmapCalendar from '$lib/components/comic/HeatmapCalendar.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
+  import { Flame, ChevronDown, ChevronUp } from 'lucide-svelte';
   import type {
     Project, Activity, HeatmapDay, TimeSeriesPoint,
     WeeklyInsights, WeekComparison, TrendingTopic,
@@ -31,6 +32,8 @@
   let comparison = $state<WeekComparison | null>(null);
   let trendingTopics = $state<TrendingTopic[]>([]);
   let isLoading = $state(true);
+  let showAllActivity = $state(false);
+  let showHeatmap = $state(false);
 
   const totalConversations = $derived(projects.reduce((sum, p) => sum + p.total_conversations, 0));
   const totalIdeas = $derived(projects.reduce((sum, p) => sum + p.total_ideas, 0));
@@ -38,6 +41,7 @@
 
   const conversationSpark = $derived(trendData.map((d) => d.value));
   const streakDays = $derived(computeStreak(heatmapData));
+  const visibleActivities = $derived(showAllActivity ? activities : activities.slice(0, 5));
 
   function computeStreak(data: HeatmapDay[]): number {
     let streak = 0;
@@ -115,9 +119,14 @@
 
 <div class="dashboard">
   <div class="page-header">
-    <div>
+    <div class="header-left">
       <h1 class="comic-heading">Dashboard</h1>
-      <p class="greeting">{getGreeting()}! You have <strong>{streakDays}</strong> day streak</p>
+      <p class="greeting">
+        {getGreeting()}!
+        {#if streakDays > 0}
+          <span class="streak-inline"><Flame size={14} /> <strong>{streakDays}</strong> day streak</span>
+        {/if}
+      </p>
     </div>
     <div class="quick-actions">
       <a href="/ideas/new"><ComicButton variant="outline" size="sm">Quick Idea</ComicButton></a>
@@ -138,55 +147,42 @@
     </BentoGrid>
   {:else}
     <BentoGrid columns={3} gap="md">
-      <!-- Row 1: Weekly Pulse (full width) -->
+      <!-- Hero: Weekly Pulse (full width, accent border) -->
       <ComicBentoCard title="Weekly Pulse" icon="💡" span="full" neonColor="green" variant="neon">
-        <WeeklyPulse
-          {comparison}
-          topTopics={weeklyInsights?.top_topics}
-          streak={streakDays}
-        />
-      </ComicBentoCard>
-
-      <!-- Row 2: Overview Stats (span 2) + Streak -->
-      <ComicBentoCard title="Overview" icon="📊" span={2} neonColor="green" variant="neon">
-        <div class="stats-row">
-          <div class="stat-item">
-            <span class="stat-value animate-countUp">{projects.length}</span>
-            <span class="stat-label">Projects</span>
-            <ComicSparkline data={[3, 5, 4, 7, projects.length]} color="var(--accent-green)" width={64} height={20} />
-          </div>
-          <div class="stat-item">
-            <span class="stat-value animate-countUp">{totalConversations}</span>
-            <span class="stat-label">Conversations</span>
-            <ComicSparkline data={conversationSpark.slice(-7)} color="var(--accent-blue)" width={64} height={20} />
-          </div>
-          <div class="stat-item">
-            <span class="stat-value animate-countUp">{totalIdeas}</span>
-            <span class="stat-label">Ideas</span>
-            <ComicSparkline data={[2, 3, 1, 4, totalIdeas]} color="var(--accent-yellow)" width={64} height={20} />
-          </div>
-          <div class="stat-item">
-            <span class="stat-value animate-countUp">{totalHours}</span>
-            <span class="stat-label">Hours</span>
-            <ComicSparkline data={[5, 8, 6, 10, totalHours]} color="var(--accent-purple)" width={64} height={20} fill />
-          </div>
+        <div class="hero-pulse">
+          <WeeklyPulse
+            {comparison}
+            topTopics={weeklyInsights?.top_topics}
+            streak={streakDays}
+          />
         </div>
       </ComicBentoCard>
 
-      <ComicBentoCard title="Streak" icon="🔥" neonColor="orange" variant="neon">
-        <div class="streak-display">
-          <span class="streak-number">{streakDays}</span>
-          <span class="streak-unit">days</span>
+      <!-- Inline Stats Row (full width) -->
+      <div data-span="full" class="stats-inline">
+        <div class="stat-chip">
+          <span class="stat-value animate-countUp">{projects.length}</span>
+          <span class="stat-label">Projects</span>
+          <ComicSparkline data={[3, 5, 4, 7, projects.length]} color="var(--accent-green)" width={48} height={16} />
         </div>
-        <div class="streak-bar">
-          {#each Array(7) as _, i}
-            {@const active = i < Math.min(streakDays, 7)}
-            <div class="streak-dot" class:active></div>
-          {/each}
+        <div class="stat-chip">
+          <span class="stat-value animate-countUp">{totalConversations}</span>
+          <span class="stat-label">Conversations</span>
+          <ComicSparkline data={conversationSpark.slice(-7)} color="var(--accent-blue)" width={48} height={16} />
         </div>
-      </ComicBentoCard>
+        <div class="stat-chip">
+          <span class="stat-value animate-countUp">{totalIdeas}</span>
+          <span class="stat-label">Ideas</span>
+          <ComicSparkline data={[2, 3, 1, 4, totalIdeas]} color="var(--accent-yellow)" width={48} height={16} />
+        </div>
+        <div class="stat-chip">
+          <span class="stat-value animate-countUp">{totalHours}</span>
+          <span class="stat-label">Hours</span>
+          <ComicSparkline data={[5, 8, 6, 10, totalHours]} color="var(--accent-purple)" width={48} height={16} />
+        </div>
+      </div>
 
-      <!-- Row 3: Peak Hours + Focus Breakdown + Mini Trending -->
+      <!-- Row 2: Peak Hours + Focus + Trending -->
       <ComicBentoCard title="Peak Hours" icon="⏰" neonColor="blue" variant="neon">
         <PeakHoursChart peakHours={weeklyInsights?.peak_hours} />
       </ComicBentoCard>
@@ -202,31 +198,56 @@
         <MiniTrending topics={trendingTopics} />
       </ComicBentoCard>
 
-      <!-- Row 4: 30-Day Trend (span 2) + Activity -->
+      <!-- Row 3: 30-Day Trend (span 2) + Recent Activity (compact) -->
       <ComicBentoCard title="30-Day Trend" icon="📈" span={2} neonColor="blue" variant="neon">
         <TrendChart data={trendData} title="Daily Activity" />
       </ComicBentoCard>
 
       <ComicBentoCard title="Recent Activity" icon="⚡">
-        <ActivityTimeline {activities} />
+        <ActivityTimeline activities={visibleActivities} />
+        {#if activities.length > 5}
+          <button class="toggle-btn" onclick={() => { showAllActivity = !showAllActivity; }}>
+            {#if showAllActivity}
+              <ChevronUp size={14} /> Show less
+            {:else}
+              <ChevronDown size={14} /> Show all ({activities.length})
+            {/if}
+          </button>
+        {/if}
       </ComicBentoCard>
 
-      <!-- Row 5: Heatmap (full width) -->
-      <ComicBentoCard title="Activity Heatmap" icon="🗓" span="full">
-        <HeatmapCalendar data={heatmapData} />
-      </ComicBentoCard>
+      <!-- Collapsible: Heatmap -->
+      <div data-span="full" class="collapsible-section">
+        <button class="collapse-header" onclick={() => { showHeatmap = !showHeatmap; }}>
+          <span class="collapse-title">Activity Heatmap</span>
+          <span class="collapse-meta">{heatmapData.reduce((s, d) => s + d.count, 0)} activities in the last year</span>
+          {#if showHeatmap}
+            <ChevronUp size={16} />
+          {:else}
+            <ChevronDown size={16} />
+          {/if}
+        </button>
+        {#if showHeatmap}
+          <div class="collapse-content">
+            <HeatmapCalendar data={heatmapData} />
+          </div>
+        {/if}
+      </div>
 
-      <!-- Row 6: Projects (full width) -->
+      <!-- Projects (full width) -->
       <ComicBentoCard title="Active Projects" icon="📁" span="full">
         {#snippet footer()}
           <a href="/projects" class="see-all">View all projects →</a>
         {/snippet}
         <div class="projects-grid">
-          {#each projects as project (project.id)}
+          {#each projects.slice(0, 6) as project (project.id)}
             <ProjectCard {project} />
           {:else}
             <p class="empty">No active projects. <a href="/projects/new">Create one!</a></p>
           {/each}
+          {#if projects.length > 6}
+            <a href="/projects" class="see-all-card">+{projects.length - 6} more</a>
+          {/if}
         </div>
       </ComicBentoCard>
     </BentoGrid>
@@ -251,6 +272,18 @@
     font-size: var(--font-size-md);
     color: var(--text-secondary);
     margin: var(--spacing-xs) 0 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .streak-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--accent-orange);
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
   }
 
   .quick-actions {
@@ -263,81 +296,117 @@
     text-decoration: none;
   }
 
-  /* Stats Row */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--spacing-md);
+  /* Hero Pulse */
+  .hero-pulse {
+    position: relative;
   }
 
-  .stat-item {
+  /* Inline Stats Row */
+  .stats-inline {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding-left: var(--spacing-sm);
-    border-left: 3px solid var(--border-color);
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0;
   }
 
-  .stat-item:nth-child(1) { border-left-color: var(--accent-green); }
-  .stat-item:nth-child(2) { border-left-color: var(--accent-blue); }
-  .stat-item:nth-child(3) { border-left-color: var(--accent-yellow); }
-  .stat-item:nth-child(4) { border-left-color: var(--accent-purple); }
+  .stat-chip {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--bg-card);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sketch);
+    box-shadow: var(--shadow-sm);
+  }
 
-  .stat-value {
+  .stat-chip:nth-child(1) { border-left: 4px solid var(--accent-green); }
+  .stat-chip:nth-child(2) { border-left: 4px solid var(--accent-blue); }
+  .stat-chip:nth-child(3) { border-left: 4px solid var(--accent-yellow); }
+  .stat-chip:nth-child(4) { border-left: 4px solid var(--accent-purple); }
+
+  .stat-chip .stat-value {
     font-family: var(--font-display);
-    font-size: var(--font-size-5xl);
+    font-size: var(--font-size-3xl);
     font-weight: 800;
-    line-height: var(--leading-tight);
+    line-height: 1;
     letter-spacing: -0.02em;
   }
 
-  .stat-label {
-    font-size: var(--font-size-xs);
+  .stat-chip .stat-label {
+    font-size: var(--font-size-2xs);
     text-transform: uppercase;
     color: var(--text-muted);
     letter-spacing: 0.05em;
-    margin-bottom: var(--spacing-xs);
   }
 
-  /* Streak */
-  .streak-display {
+  /* Toggle button for activity */
+  .toggle-btn {
     display: flex;
-    align-items: baseline;
-    gap: var(--spacing-xs);
-    margin-bottom: var(--spacing-sm);
-  }
-
-  .streak-number {
-    font-family: var(--font-display);
-    font-size: var(--font-size-6xl);
-    font-weight: 800;
-    line-height: var(--leading-tight);
-    letter-spacing: -0.03em;
-    color: var(--accent-orange);
-  }
-
-  .streak-unit {
-    font-size: var(--font-size-md);
-    color: var(--text-muted);
-    text-transform: uppercase;
-  }
-
-  .streak-bar {
-    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 4px;
+    width: 100%;
+    padding: var(--spacing-xs) 0;
+    margin-top: var(--spacing-sm);
+    background: none;
+    border: none;
+    border-top: 1px dashed var(--border-color);
+    color: var(--accent-blue);
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    cursor: pointer;
+    transition: color var(--transition-fast);
   }
 
-  .streak-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    background: var(--bg-secondary);
-    border: 1.5px solid var(--border-color);
+  .toggle-btn:hover {
+    color: var(--accent-green);
+  }
+
+  /* Collapsible section */
+  .collapsible-section {
+    background: var(--bg-card);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sketch);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .collapse-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-lg);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-primary);
     transition: background var(--transition-fast);
   }
 
-  .streak-dot.active {
-    background: var(--accent-orange);
+  .collapse-header:hover {
+    background: var(--bg-secondary);
+  }
+
+  .collapse-title {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .collapse-meta {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  .collapse-content {
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+    animation: bentoFadeIn 200ms ease forwards;
   }
 
   /* Projects */
@@ -356,6 +425,27 @@
 
   .see-all:hover {
     text-decoration: underline;
+  }
+
+  .see-all-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-comic);
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    color: var(--text-muted);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-sketch);
+    padding: var(--spacing-xl);
+    text-decoration: none;
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .see-all-card:hover {
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    text-decoration: none;
   }
 
   .empty {
@@ -393,8 +483,12 @@
       flex-direction: column;
     }
 
-    .stats-row {
-      grid-template-columns: repeat(2, 1fr);
+    .stats-inline {
+      flex-wrap: wrap;
+    }
+
+    .stat-chip {
+      min-width: calc(50% - var(--spacing-sm));
     }
   }
 </style>
