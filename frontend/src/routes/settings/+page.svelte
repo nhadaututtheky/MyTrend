@@ -7,6 +7,8 @@
   import { toast } from '$lib/stores/toast';
   import { getTelegramStatus, testTelegramConnection, resolveChannel, setupWebhook, removeWebhook, getTelegramSettings, saveTelegramSettings } from '$lib/api/telegram';
   import type { TelegramSettings } from '$lib/api/telegram';
+  import { getTelegramBridgeStatus, getTelegramBridgeConfig, saveTelegramBridgeConfig, startTelegramBridge, stopTelegramBridge, checkCompanionHealth } from '$lib/api/companion';
+  import type { TelegramBridgeStatus, TelegramBridgeConfigResponse } from '$lib/api/companion';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
@@ -37,6 +39,17 @@
   let tgEnvChannelSet = $state(false);
   let webhookSaving = $state(false);
 
+  // Claude Bridge state
+  let cbStatus = $state<TelegramBridgeStatus | null>(null);
+  let cbConfig = $state<TelegramBridgeConfigResponse | null>(null);
+  let cbLoading = $state(false);
+  let cbSaving = $state(false);
+  let cbStarting = $state(false);
+  let cbStopping = $state(false);
+  let cbBotToken = $state('');
+  let cbChatIds = $state('');
+  let companionOnline = $state(false);
+
   $effect(() => {
     const unsub = currentUser.subscribe((u) => {
       user = u;
@@ -59,6 +72,7 @@
     deviceName = getDeviceName();
     loadTelegramStatus();
     loadTelegramSettings();
+    loadClaudeBridge();
   });
 
   async function saveProfile(): Promise<void> {
@@ -184,6 +198,100 @@
       toast.success('Webhook removed');
     } catch {
       toast.error('Failed to remove webhook');
+    }
+  }
+
+  // ── Claude Bridge functions ──────────────────────────────────────────────
+
+  async function loadClaudeBridge(): Promise<void> {
+    cbLoading = true;
+    try {
+      companionOnline = await checkCompanionHealth();
+      if (!companionOnline) return;
+
+      const [status, config] = await Promise.all([
+        getTelegramBridgeStatus(),
+        getTelegramBridgeConfig(),
+      ]);
+      cbStatus = status;
+      cbConfig = config;
+      if (config.botTokenSet && !cbBotToken) {
+        cbBotToken = config.botToken; // masked
+      }
+      if (config.allowedChatIds.length > 0 && !cbChatIds) {
+        cbChatIds = config.allowedChatIds.join(', ');
+      }
+    } catch {
+      companionOnline = false;
+    } finally {
+      cbLoading = false;
+    }
+  }
+
+  async function handleSaveClaudeBridgeConfig(): Promise<void> {
+    cbSaving = true;
+    try {
+      const ids = cbChatIds
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map(Number);
+
+      for (const id of ids) {
+        if (isNaN(id)) {
+          toast.error(`Invalid chat ID: "${id}"`);
+          cbSaving = false;
+          return;
+        }
+      }
+
+      const config: Record<string, unknown> = { allowedChatIds: ids };
+      // Only send token if it's not the masked version
+      if (cbBotToken && !cbBotToken.includes('...')) {
+        config.botToken = cbBotToken;
+      }
+
+      const result = await saveTelegramBridgeConfig(config as { botToken?: string; allowedChatIds?: number[] });
+      if (result.ok) {
+        toast.success('Claude Bridge config saved!');
+        await loadClaudeBridge();
+      } else {
+        toast.error(result.error ?? 'Save failed');
+      }
+    } catch {
+      toast.error('Failed to save config');
+    } finally {
+      cbSaving = false;
+    }
+  }
+
+  async function handleStartBridge(): Promise<void> {
+    cbStarting = true;
+    try {
+      const result = await startTelegramBridge();
+      if (result.ok) {
+        toast.success('Claude Bridge started!');
+        await loadClaudeBridge();
+      } else {
+        toast.error(result.error ?? 'Start failed');
+      }
+    } catch {
+      toast.error('Failed to start bridge');
+    } finally {
+      cbStarting = false;
+    }
+  }
+
+  async function handleStopBridge(): Promise<void> {
+    cbStopping = true;
+    try {
+      await stopTelegramBridge();
+      toast.success('Claude Bridge stopped');
+      await loadClaudeBridge();
+    } catch {
+      toast.error('Failed to stop bridge');
+    } finally {
+      cbStopping = false;
     }
   }
 
@@ -361,6 +469,83 @@
   </ComicCard>
 
   <ComicCard>
+    <div class="section-header">
+      <h2 class="section-title">Claude Bridge</h2>
+      {#if cbLoading}
+        <ComicBadge color="blue" size="sm">Loading...</ComicBadge>
+      {:else if !companionOnline}
+        <ComicBadge color="red" size="sm">Offline</ComicBadge>
+      {:else if cbStatus?.running}
+        <ComicBadge color="green" size="sm">Running</ComicBadge>
+      {:else if cbConfig?.botTokenSet}
+        <ComicBadge color="orange" size="sm">Stopped</ComicBadge>
+      {:else}
+        <ComicBadge color="orange" size="sm">Not Configured</ComicBadge>
+      {/if}
+    </div>
+
+    {#if !companionOnline && !cbLoading}
+      <p class="tg-hint">Companion service is offline. Start it with <code>cd companion && bun run dev</code></p>
+    {:else if companionOnline}
+      {#if cbConfig?.envConfigured}
+        <p class="tg-hint tg-env-note">Config managed by environment variables (TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_CHAT_IDS)</p>
+      {:else}
+        <div class="tg-credentials">
+          <ComicInput
+            bind:value={cbBotToken}
+            label="Bot Token"
+            placeholder="123456:ABC-DEF..."
+            type="password"
+          />
+          <ComicInput
+            bind:value={cbChatIds}
+            label="Allowed Chat IDs"
+            placeholder="123456789, 987654321"
+          />
+          <p class="tg-hint">Comma-separated Telegram chat/group IDs allowed to use the bot.</p>
+          <div class="actions">
+            <ComicButton variant="primary" loading={cbSaving} onclick={handleSaveClaudeBridgeConfig}>
+              Save Config
+            </ComicButton>
+          </div>
+        </div>
+      {/if}
+
+      {#if cbStatus}
+        <div class="cb-stats">
+          <div class="tg-stat">
+            <span class="tg-stat-value">{cbStatus.activeChats}</span>
+            <span class="tg-stat-label">Active Chats</span>
+          </div>
+          <div class="tg-stat">
+            <span class="tg-stat-value">{cbConfig?.allowedChatIds.length ?? 0}</span>
+            <span class="tg-stat-label">Allowed IDs</span>
+          </div>
+          <div class="tg-stat">
+            <span class="tg-stat-value">{cbStatus.running ? 'Polling' : 'Stopped'}</span>
+            <span class="tg-stat-label">Status</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          {#if cbStatus.running}
+            <ComicButton variant="danger" loading={cbStopping} onclick={handleStopBridge}>
+              Stop Bridge
+            </ComicButton>
+          {:else}
+            <ComicButton variant="primary" loading={cbStarting} onclick={handleStartBridge}>
+              Start Bridge
+            </ComicButton>
+          {/if}
+          <ComicButton variant="outline" loading={cbLoading} onclick={loadClaudeBridge}>
+            Refresh
+          </ComicButton>
+        </div>
+      {/if}
+    {/if}
+  </ComicCard>
+
+  <ComicCard>
     <h2 class="section-title">Data</h2>
     <div class="data-actions">
       <ComicButton variant="outline">Export All Data (JSON)</ComicButton>
@@ -523,5 +708,11 @@
     font-size: 0.875rem;
     text-transform: uppercase;
     margin: 0 0 4px;
+  }
+
+  .cb-stats {
+    display: flex;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
   }
 </style>

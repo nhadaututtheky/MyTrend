@@ -1,0 +1,223 @@
+// Telegram Bot API wrapper - raw fetch, no external deps
+
+import type {
+  TelegramConfig,
+  TelegramUpdate,
+  TelegramUser,
+  TelegramInlineKeyboardMarkup,
+} from "./telegram-types.js";
+
+const API_BASE = "https://api.telegram.org";
+
+interface SendMessageOptions {
+  /** Set to null to send as plain text (no parse mode). Defaults to "HTML". */
+  parseMode?: "HTML" | "MarkdownV2" | null;
+  replyTo?: number;
+  replyMarkup?: TelegramInlineKeyboardMarkup;
+  disablePreview?: boolean;
+}
+
+interface ApiResponse<T> {
+  ok: boolean;
+  result: T;
+  description?: string;
+}
+
+export class TelegramAPI {
+  private baseUrl: string;
+
+  constructor(config: TelegramConfig) {
+    this.baseUrl = `${API_BASE}/bot${config.botToken}`;
+  }
+
+  // ── Core API calls ──────────────────────────────────────────────────────
+
+  private async call<T>(method: string, body?: Record<string, unknown>): Promise<T> {
+    const res = await fetch(`${this.baseUrl}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const data = (await res.json()) as ApiResponse<T>;
+    if (!data.ok) {
+      throw new Error(`Telegram API ${method}: ${data.description ?? "Unknown error"}`);
+    }
+    return data.result;
+  }
+
+  // ── Bot identity ────────────────────────────────────────────────────────
+
+  async getMe(): Promise<TelegramUser> {
+    return this.call<TelegramUser>("getMe");
+  }
+
+  async deleteWebhook(): Promise<boolean> {
+    return this.call<boolean>("deleteWebhook", { drop_pending_updates: false });
+  }
+
+  // ── Polling ─────────────────────────────────────────────────────────────
+
+  async getUpdates(
+    offset: number,
+    timeout: number,
+    signal?: AbortSignal
+  ): Promise<TelegramUpdate[]> {
+    const res = await fetch(`${this.baseUrl}/getUpdates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        offset,
+        timeout,
+        allowed_updates: ["message"],
+      }),
+      signal,
+    });
+
+    const data = (await res.json()) as ApiResponse<TelegramUpdate[]>;
+    if (!data.ok) {
+      throw new Error(`Telegram getUpdates: ${data.description ?? "Unknown error"}`);
+    }
+    return data.result;
+  }
+
+  // ── Messaging ───────────────────────────────────────────────────────────
+
+  async sendMessage(
+    chatId: number,
+    text: string,
+    options: SendMessageOptions = {}
+  ): Promise<number> {
+    const body: Record<string, unknown> = {
+      chat_id: chatId,
+      text,
+      disable_web_page_preview: options.disablePreview ?? true,
+    };
+
+    // Default to HTML; pass null to send as plain text
+    const parseMode = options.parseMode === undefined ? "HTML" : options.parseMode;
+    if (parseMode) body.parse_mode = parseMode;
+
+    if (options.replyTo) body.reply_to_message_id = options.replyTo;
+    if (options.replyMarkup) body.reply_markup = options.replyMarkup;
+
+    const result = await this.call<{ message_id: number }>("sendMessage", body);
+    return result.message_id;
+  }
+
+  /** Send long text, auto-split at 4096 chars. Returns message IDs. */
+  async sendLongMessage(
+    chatId: number,
+    text: string,
+    options: SendMessageOptions = {}
+  ): Promise<number[]> {
+    const chunks = splitMessage(text, 4096);
+    const ids: number[] = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      // Rate limit: 1 msg/sec per chat for multi-chunk sends
+      if (i > 0) await new Promise((r) => setTimeout(r, 1_000));
+
+      let chunk = chunks[i];
+      if (chunks.length > 2) {
+        chunk = `[${i + 1}/${chunks.length}]\n${chunk}`;
+      }
+      const msgId = await this.sendMessage(chatId, chunk, options);
+      ids.push(msgId);
+    }
+
+    return ids;
+  }
+
+  async editMessageText(
+    chatId: number,
+    messageId: number,
+    text: string,
+    parseMode: "HTML" | "MarkdownV2" = "HTML"
+  ): Promise<void> {
+    await this.call("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: parseMode,
+      disable_web_page_preview: true,
+    });
+  }
+
+  async sendChatAction(chatId: number, action: "typing" | "upload_photo" = "typing"): Promise<void> {
+    await this.call("sendChatAction", {
+      chat_id: chatId,
+      action,
+    });
+  }
+
+  async sendPhoto(
+    chatId: number,
+    photoUrl: string,
+    caption?: string
+  ): Promise<number> {
+    const body: Record<string, unknown> = {
+      chat_id: chatId,
+      photo: photoUrl,
+    };
+    if (caption) {
+      body.caption = caption;
+      body.parse_mode = "HTML";
+    }
+    const result = await this.call<{ message_id: number }>("sendPhoto", body);
+    return result.message_id;
+  }
+
+  async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+    await this.call("answerCallbackQuery", {
+      callback_query_id: callbackQueryId,
+      text,
+    });
+  }
+}
+
+// ─── Message splitting utility ────────────────────────────────────────────
+
+function splitMessage(text: string, maxLen: number): string[] {
+  if (text.length <= maxLen) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > maxLen) {
+    let splitAt = -1;
+
+    // Try to split at code block boundary
+    const codeBlockEnd = remaining.lastIndexOf("</pre>", maxLen);
+    if (codeBlockEnd > maxLen * 0.3) {
+      splitAt = codeBlockEnd + 6;
+    }
+
+    // Try paragraph boundary
+    if (splitAt === -1) {
+      const para = remaining.lastIndexOf("\n\n", maxLen);
+      if (para > maxLen * 0.3) {
+        splitAt = para + 2;
+      }
+    }
+
+    // Try line boundary
+    if (splitAt === -1) {
+      const line = remaining.lastIndexOf("\n", maxLen);
+      if (line > maxLen * 0.3) {
+        splitAt = line + 1;
+      }
+    }
+
+    // Hard split as last resort
+    if (splitAt === -1) {
+      splitAt = maxLen;
+    }
+
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt);
+  }
+
+  if (remaining) chunks.push(remaining);
+  return chunks;
+}

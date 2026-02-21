@@ -41,6 +41,8 @@ interface ActiveSession {
   pendingMessages: string[];
   pendingPermissions: Map<string, PermissionRequest>;
   messageHistory: BrowserIncomingMessage[];
+  /** External subscribers (e.g. Telegram bridge) notified on CLI messages. */
+  subscribers: Map<string, (msg: BrowserIncomingMessage) => void>;
 }
 
 // ─── Bridge ──────────────────────────────────────────────────────────────────
@@ -85,11 +87,10 @@ export class WsBridge {
       state,
       cliSend: null,
       browserSockets: new Set(),
-      pendingMessages: persisted?.pendingPermissions
-        ? []
-        : [],
+      pendingMessages: [],
       pendingPermissions: new Map(persisted?.pendingPermissions ?? []),
       messageHistory: persisted?.messageHistory ?? [],
+      subscribers: new Map(),
     };
 
     this.sessions.set(sessionId, session);
@@ -102,6 +103,54 @@ export class WsBridge {
 
   getAllSessions(): ActiveSession[] {
     return [...this.sessions.values()];
+  }
+
+  // ── Subscriber system (for Telegram bridge, etc.) ─────────────────────
+
+  /** Register a callback to receive CLI messages for a session. */
+  subscribe(
+    sessionId: string,
+    subscriberId: string,
+    callback: (msg: BrowserIncomingMessage) => void
+  ): void {
+    // Use ensureSession so subscriber works even if session isn't active yet
+    const session = this.ensureSession(sessionId);
+    session.subscribers.set(subscriberId, callback);
+    console.log(`[ws-bridge] Subscriber "${subscriberId}" added to session ${sessionId.slice(0, 8)}`);
+  }
+
+  /** Remove a subscriber from a session. */
+  unsubscribe(sessionId: string, subscriberId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    session.subscribers.delete(subscriberId);
+    console.log(`[ws-bridge] Subscriber "${subscriberId}" removed from session ${sessionId.slice(0, 8)}`);
+  }
+
+  /** Inject a user message into a session's CLI (from external client). */
+  injectUserMessage(sessionId: string, content: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    this.handleUserMessage(session, content);
+  }
+
+  /** Send interrupt to a session's CLI (from external client). */
+  injectInterrupt(sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    this.handleInterrupt(session);
+  }
+
+  /** Change model for a session (from external client). */
+  injectSetModel(sessionId: string, model: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+    this.handleSetModel(session, model);
+  }
+
+  /** Read session state (for external clients). */
+  getSessionState(sessionId: string): SessionState | undefined {
+    return this.sessions.get(sessionId)?.state;
   }
 
   // ── Pipe-based CLI connection (stdin/stdout) ───────────────────────────
@@ -576,6 +625,15 @@ export class WsBridge {
         ws.send(payload);
       } catch {
         session.browserSockets.delete(ws);
+      }
+    }
+
+    // Notify external subscribers (Telegram bridge, etc.)
+    for (const [id, callback] of session.subscribers) {
+      try {
+        callback(msg);
+      } catch (err) {
+        console.error(`[ws-bridge] Subscriber "${id}" callback error:`, err);
       }
     }
   }

@@ -5,12 +5,18 @@ import type { CLILauncher } from "./cli-launcher.js";
 import type { WsBridge } from "./ws-bridge.js";
 import type { SessionStore } from "./session-store.js";
 import type { ProjectProfileStore } from "./project-profiles.js";
+import type { TelegramBridge } from "./telegram/telegram-bridge.js";
+import { loadTelegramConfig, saveTelegramConfig, isEnvConfigured } from "./telegram/telegram-config.js";
+import type { TelegramBridgeConfig } from "./telegram/telegram-config.js";
 
 interface AppContext {
   launcher: CLILauncher;
   bridge: WsBridge;
   store: SessionStore;
   profiles: ProjectProfileStore;
+  getTelegramBridge: () => TelegramBridge | null;
+  startTelegramBridge: (token: string, chatIds: number[]) => { ok: boolean; error?: string };
+  stopTelegramBridge: () => void;
 }
 
 export function createApp(ctx: AppContext): Hono {
@@ -235,6 +241,92 @@ export function createApp(ctx: AppContext): Hono {
     const slug = c.req.param("slug");
     const body = await c.req.json();
     ctx.profiles.upsert({ slug, ...body });
+    return c.json({ ok: true });
+  });
+
+  // ── Telegram Bridge ────────────────────────────────────────────────────
+
+  app.get("/api/telegram-bridge/status", (c) => {
+    const tg = ctx.getTelegramBridge();
+    const config = loadTelegramConfig();
+    return c.json({
+      enabled: !!tg,
+      running: tg?.isRunning() ?? false,
+      activeChats: tg?.getActiveChatCount() ?? 0,
+      envConfigured: isEnvConfigured(),
+      hasConfig: !!config.botToken,
+      botTokenSet: !!config.botToken,
+      allowedChatIds: config.allowedChatIds,
+    });
+  });
+
+  app.get("/api/telegram-bridge/config", (c) => {
+    const config = loadTelegramConfig();
+    return c.json({
+      // Mask bot token for security (show first 8 chars + last 4)
+      botToken: config.botToken
+        ? `${config.botToken.slice(0, 8)}...${config.botToken.slice(-4)}`
+        : "",
+      botTokenSet: !!config.botToken,
+      allowedChatIds: config.allowedChatIds,
+      enabled: config.enabled,
+      envConfigured: isEnvConfigured(),
+    });
+  });
+
+  app.put("/api/telegram-bridge/config", async (c) => {
+    if (isEnvConfigured()) {
+      return c.json({ error: "Config is managed by environment variables" }, 400);
+    }
+
+    const body = await c.req.json<{ botToken?: string; allowedChatIds?: number[]; enabled?: boolean }>();
+
+    const current = loadTelegramConfig();
+    const updated: TelegramBridgeConfig = {
+      botToken: body.botToken ?? current.botToken,
+      allowedChatIds: body.allowedChatIds ?? current.allowedChatIds,
+      enabled: body.enabled ?? current.enabled,
+    };
+
+    // Validate chat IDs
+    for (const id of updated.allowedChatIds) {
+      if (isNaN(id) || !Number.isInteger(id)) {
+        return c.json({ error: `Invalid chat ID: ${id}` }, 400);
+      }
+    }
+
+    saveTelegramConfig(updated);
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/telegram-bridge/start", (c) => {
+    const config = loadTelegramConfig();
+    if (!config.botToken) {
+      return c.json({ error: "Bot token not configured" }, 400);
+    }
+    if (config.allowedChatIds.length === 0) {
+      return c.json({ error: "No allowed chat IDs configured" }, 400);
+    }
+
+    const result = ctx.startTelegramBridge(config.botToken, config.allowedChatIds);
+    if (!result.ok) {
+      return c.json({ error: result.error }, 500);
+    }
+
+    // Mark as enabled in config
+    saveTelegramConfig({ ...config, enabled: true });
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/telegram-bridge/stop", (c) => {
+    ctx.stopTelegramBridge();
+
+    // Mark as disabled in config (but keep credentials)
+    const config = loadTelegramConfig();
+    if (!isEnvConfigured()) {
+      saveTelegramConfig({ ...config, enabled: false });
+    }
+
     return c.json({ ok: true });
   });
 

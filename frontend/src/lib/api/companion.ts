@@ -152,6 +152,61 @@ export async function listProjects(): Promise<CompanionProjectProfile[]> {
   return res.json();
 }
 
+// ─── Telegram Bridge API ────────────────────────────────────────────────────
+
+export interface TelegramBridgeStatus {
+  enabled: boolean;
+  running: boolean;
+  activeChats: number;
+  envConfigured: boolean;
+  hasConfig: boolean;
+  botTokenSet: boolean;
+  allowedChatIds: number[];
+}
+
+export interface TelegramBridgeConfigResponse {
+  botToken: string;
+  botTokenSet: boolean;
+  allowedChatIds: number[];
+  enabled: boolean;
+  envConfigured: boolean;
+}
+
+export async function getTelegramBridgeStatus(): Promise<TelegramBridgeStatus> {
+  const res = await fetch(`${COMPANION_URL}/api/telegram-bridge/status`);
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getTelegramBridgeConfig(): Promise<TelegramBridgeConfigResponse> {
+  const res = await fetch(`${COMPANION_URL}/api/telegram-bridge/config`);
+  if (!res.ok) throw new Error(`Failed: ${res.status}`);
+  return res.json();
+}
+
+export async function saveTelegramBridgeConfig(config: {
+  botToken?: string;
+  allowedChatIds?: number[];
+  enabled?: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${COMPANION_URL}/api/telegram-bridge/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  return res.json();
+}
+
+export async function startTelegramBridge(): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${COMPANION_URL}/api/telegram-bridge/start`, { method: 'POST' });
+  return res.json();
+}
+
+export async function stopTelegramBridge(): Promise<{ ok: boolean }> {
+  const res = await fetch(`${COMPANION_URL}/api/telegram-bridge/stop`, { method: 'POST' });
+  return res.json();
+}
+
 // ─── WebSocket Client ────────────────────────────────────────────────────────
 
 export interface CompanionConnection {
