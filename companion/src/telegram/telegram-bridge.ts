@@ -128,11 +128,12 @@ export class TelegramBridge {
       } catch (err) {
         if (!this.running) break;
         const msg = err instanceof Error ? err.message : "Unknown";
-        if (!msg.includes("aborted")) {
-          console.error(`[telegram] Polling error: ${msg}`);
-          // Back off on error
-          await new Promise((r) => setTimeout(r, 5_000));
+        if (msg.includes("aborted") || msg.includes("closed unexpectedly")) {
+          // Normal: abort on stop, or socket timeout between long polls
+          continue;
         }
+        console.error(`[telegram] Polling error: ${msg}`);
+        await new Promise((r) => setTimeout(r, 5_000));
       }
     }
   }
