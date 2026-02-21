@@ -6,6 +6,7 @@ import {
   formatHelp,
   formatProjectList,
   formatStatus,
+  formatPinnedStatus,
   formatWelcome,
   formatConnected,
   buildProjectKeyboard,
@@ -22,6 +23,7 @@ const commands: Record<string, CommandHandler> = {
   help: handleHelp,
   projects: handleProjects,
   project: handleProject,
+  switch: handleSwitch,
   stop: handleStop,
   cancel: handleCancel,
   status: handleStatus,
@@ -53,16 +55,34 @@ export async function dispatchCommand(
 // ── Command implementations ───────────────────────────────────────────────
 
 async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
-  const botName = bridge.getBotName() ?? "Claude Bridge";
-  await bridge.sendToChat(msg.chat.id, formatWelcome(botName));
+  const chatId = msg.chat.id;
+  const mapping = bridge.getMapping(chatId);
 
-  const profiles = bridge.getProfiles();
-  if (profiles.length > 0) {
+  // Smart /start: if session active, show status + actions instead of onboarding
+  if (mapping) {
+    const session = bridge.getSessionState(mapping.sessionId);
+    const statusText = formatPinnedStatus(mapping, session);
     await bridge.sendToChatWithKeyboard(
-      msg.chat.id,
-      "Select a project to connect:",
+      chatId,
+      statusText,
+      buildSessionActionsKeyboard(mapping.model)
+    );
+    return;
+  }
+
+  // No session: onboarding + project selection
+  const botName = bridge.getBotName() ?? "Claude Bridge";
+  const profiles = bridge.getProfiles();
+
+  if (profiles.length > 0) {
+    // Single combined message: welcome + project keyboard
+    await bridge.sendToChatWithKeyboard(
+      chatId,
+      formatWelcome(botName),
       buildProjectKeyboard(profiles)
     );
+  } else {
+    await bridge.sendToChat(chatId, formatWelcome(botName));
   }
 }
 
@@ -81,6 +101,23 @@ async function handleProjects(bridge: TelegramBridge, msg: TelegramMessage): Pro
   } else {
     await bridge.sendToChat(msg.chat.id, "No projects configured.");
   }
+}
+
+async function handleSwitch(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
+  const chatId = msg.chat.id;
+  const profiles = bridge.getProfiles();
+  if (profiles.length === 0) {
+    await bridge.sendToChat(chatId, "No projects configured.");
+    return;
+  }
+
+  const mapping = bridge.getMapping(chatId);
+  const current = mapping ? ` (current: <code>${mapping.projectSlug}</code>)` : "";
+  await bridge.sendToChatWithKeyboard(
+    chatId,
+    `Switch project${current}:`,
+    buildProjectKeyboard(profiles)
+  );
 }
 
 async function handleProject(bridge: TelegramBridge, msg: TelegramMessage, args: string): Promise<void> {

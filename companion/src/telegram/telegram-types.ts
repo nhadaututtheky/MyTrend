@@ -98,4 +98,5 @@ export interface TelegramSessionMapping {
   model: string;
   createdAt: number;
   lastActivityAt: number;
+  pinnedMessageId?: number;
 }

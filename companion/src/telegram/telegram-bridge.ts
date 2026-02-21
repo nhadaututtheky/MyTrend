@@ -28,6 +28,9 @@ import {
   formatResult,
   formatConnected,
   formatStatus,
+  formatToolFeed,
+  formatPinnedStatus,
+  buildProjectKeyboard,
   buildModelKeyboard,
   buildStopConfirmKeyboard,
   buildPermissionKeyboard,
@@ -62,6 +65,12 @@ export class TelegramBridge {
   private offset = 0;
   private botName: string | null = null;
   private botUsername: string | null = null;
+
+  // Per-chat transient state (not persisted)
+  private lastToolFeedAt = new Map<number, number>();
+  private lastUserMsgId = new Map<number, number>();
+  private costAlertsShown = new Map<number, Set<number>>();
+  private lastProjectSlug = new Map<number, string>();
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
@@ -210,7 +219,23 @@ export class TelegramBridge {
 
     const mapping = this.chatSessions.get(chatId);
     if (!mapping) {
-      await this.sendToChat(chatId, "No active session. Use <code>/project &lt;slug&gt;</code> to connect.");
+      // Offer quick reconnect if we remember the last project
+      const lastSlug = this.lastProjectSlug.get(chatId);
+      if (lastSlug) {
+        const profile = this.deps.profiles.get(lastSlug);
+        if (profile) {
+          await this.sendToChatWithKeyboard(
+            chatId,
+            `No active session. Reconnect to <b>${profile.name}</b>?`,
+            { inline_keyboard: [[
+              { text: `Connect ${profile.name}`, callback_data: `proj:${lastSlug}`, style: "primary" },
+              { text: "Other projects", callback_data: "action:projects" },
+            ]] }
+          );
+          return;
+        }
+      }
+      await this.sendToChat(chatId, "No active session. Use /start to connect.");
       return;
     }
 
@@ -220,6 +245,9 @@ export class TelegramBridge {
       cleanText = cleanText.replace(new RegExp(`@${this.botUsername}\\s*`, "gi"), "").trim();
     }
     if (!cleanText) return;
+
+    // Track message ID for reply-to and reaction updates
+    this.lastUserMsgId.set(chatId, msg.message_id);
 
     // Acknowledge receipt with reaction
     this.api.react(chatId, msg.message_id, "👀").catch(() => {});
@@ -305,6 +333,18 @@ export class TelegramBridge {
     // Subscribe to CLI messages
     this.subscribeToSession(chatId, sessionId);
 
+    // Create and pin status message
+    try {
+      const statusText = formatPinnedStatus(mapping, session.state);
+      const statusMsgId = await this.api.sendMessage(chatId, statusText, {
+        replyMarkup: buildSessionActionsKeyboard(model),
+      });
+      mapping.pinnedMessageId = statusMsgId;
+      await this.api.pinChatMessage(chatId, statusMsgId);
+    } catch {
+      // Pinning may not be available in all chats
+    }
+
     // Start idle timer
     this.resetIdleTimer(chatId);
 
@@ -316,6 +356,14 @@ export class TelegramBridge {
     const mapping = this.chatSessions.get(chatId);
     if (!mapping) return;
 
+    // Remember last project for quick reconnect
+    this.lastProjectSlug.set(chatId, mapping.projectSlug);
+
+    // Unpin status message
+    if (mapping.pinnedMessageId) {
+      this.api.unpinChatMessage(chatId, mapping.pinnedMessageId).catch(() => {});
+    }
+
     // Unsubscribe
     this.deps.bridge.unsubscribe(mapping.sessionId, `telegram:${chatId}`);
 
@@ -326,6 +374,7 @@ export class TelegramBridge {
     this.chatSessions.delete(chatId);
     this.stopTyping(chatId);
     this.clearIdleTimer(chatId);
+    this.cleanupChatState(chatId);
     this.saveMappings();
   }
 
@@ -347,13 +396,20 @@ export class TelegramBridge {
         const content = msg.message.content;
         if (!Array.isArray(content)) break;
 
-        // Only show text responses — skip tool actions (no spam)
+        // Tool activity feed (throttled, only when no text)
         const text = extractText(content);
-        if (text) {
-          const html = toTelegramHTML(text);
-          await this.api.sendLongMessage(chatId, html);
-          this.stopTyping(chatId);
+        if (!text) {
+          const toolFeed = formatToolFeed(content);
+          if (toolFeed) this.sendThrottledToolFeed(chatId, toolFeed);
+          break;
         }
+
+        // Text response — reply to user's original message
+        const html = toTelegramHTML(text);
+        const replyTo = this.lastUserMsgId.get(chatId);
+        await this.api.sendLongMessage(chatId, html, { replyTo });
+        this.lastUserMsgId.delete(chatId);
+        this.stopTyping(chatId);
         break;
       }
 
@@ -361,6 +417,20 @@ export class TelegramBridge {
         this.stopTyping(chatId);
         const resultMsg = msg.data as CLIResultMessage;
         await this.sendToChat(chatId, formatResult(resultMsg));
+
+        // Update reaction on user's message (✅ or ❌)
+        const userMsgId = this.lastUserMsgId.get(chatId);
+        if (userMsgId) {
+          const emoji = resultMsg.is_error ? "❌" : "✅";
+          this.api.react(chatId, userMsgId, emoji).catch(() => {});
+          this.lastUserMsgId.delete(chatId);
+        }
+
+        // Cost budget alert
+        this.checkCostAlert(chatId, resultMsg.total_cost_usd);
+
+        // Update pinned status
+        this.updatePinnedStatus(chatId);
         break;
       }
 
@@ -373,28 +443,37 @@ export class TelegramBridge {
       case "status_change": {
         if (msg.status === "idle") {
           this.stopTyping(chatId);
+        } else if (msg.status === "compacting") {
+          await this.sendToChat(chatId, "Context compacting... this may take a moment.");
         }
+        this.updatePinnedStatus(chatId);
         break;
       }
 
       case "cli_disconnected": {
         this.stopTyping(chatId);
-        await this.sendToChat(chatId, "Session ended.");
         const disconnectedMapping = this.chatSessions.get(chatId);
         if (disconnectedMapping) {
+          this.lastProjectSlug.set(chatId, disconnectedMapping.projectSlug);
+          // Unpin status message
+          if (disconnectedMapping.pinnedMessageId) {
+            this.api.unpinChatMessage(chatId, disconnectedMapping.pinnedMessageId).catch(() => {});
+          }
           this.deps.bridge.unsubscribe(disconnectedMapping.sessionId, `telegram:${chatId}`);
         }
+        await this.sendToChat(chatId, "Session ended.");
         this.chatSessions.delete(chatId);
         this.clearIdleTimer(chatId);
+        this.cleanupChatState(chatId);
         this.saveMappings();
         break;
       }
 
       case "permission_request": {
         const perm = msg.request;
-        const text = formatPermissionRequest(perm);
+        const permText = formatPermissionRequest(perm);
         const keyboard = buildPermissionKeyboard(perm.request_id);
-        await this.sendToChatWithKeyboard(chatId, text, keyboard);
+        await this.sendToChatWithKeyboard(chatId, permText, keyboard);
         break;
       }
 
@@ -506,17 +585,22 @@ export class TelegramBridge {
   private async onProjectSelected(
     chatId: number, messageId: number, queryId: string, slug: string
   ): Promise<void> {
-    // Check if already connected
-    const existing = this.chatSessions.get(chatId);
-    if (existing) {
-      await this.api.answerCallbackQuery(queryId, `Already connected to ${existing.projectSlug}`);
-      return;
-    }
-
     const profile = this.deps.profiles.get(slug);
     if (!profile) {
       await this.api.answerCallbackQuery(queryId, "Project not found");
       return;
+    }
+
+    // If already on same project, just acknowledge
+    const existing = this.chatSessions.get(chatId);
+    if (existing?.projectSlug === slug) {
+      await this.api.answerCallbackQuery(queryId, `Already on ${profile.name}`);
+      return;
+    }
+
+    // Auto-switch: destroy existing session if different project
+    if (existing) {
+      await this.destroySession(chatId);
     }
 
     // Remove keyboard from original message
@@ -531,12 +615,7 @@ export class TelegramBridge {
       return;
     }
 
-    const mapping = this.chatSessions.get(chatId);
-    await this.sendToChatWithKeyboard(
-      chatId,
-      formatConnected(profile, profile.defaultModel),
-      buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel)
-    );
+    await this.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
   }
 
   private async onModelSelected(
@@ -693,6 +772,18 @@ export class TelegramBridge {
         );
         break;
       }
+      case "projects": {
+        await this.api.answerCallbackQuery(queryId);
+        const profiles = this.deps.profiles.getAll();
+        if (profiles.length > 0) {
+          await this.sendToChatWithKeyboard(
+            chatId,
+            "Select a project:",
+            buildProjectKeyboard(profiles)
+          );
+        }
+        break;
+      }
       default:
         await this.api.answerCallbackQuery(queryId, "Unknown action");
     }
@@ -704,13 +795,13 @@ export class TelegramBridge {
     try {
       await this.api.setMyCommands([
         { command: "start", description: "Start bot & show projects" },
-        { command: "projects", description: "List available projects" },
-        { command: "status", description: "Current session info" },
-        { command: "model", description: "Switch model (sonnet/opus/haiku)" },
+        { command: "switch", description: "Quick-switch project" },
+        { command: "model", description: "Switch model" },
+        { command: "status", description: "Session info" },
         { command: "cancel", description: "Interrupt Claude" },
-        { command: "stop", description: "Kill current session" },
-        { command: "new", description: "Restart session (same project)" },
-        { command: "help", description: "Show all commands" },
+        { command: "stop", description: "End session" },
+        { command: "new", description: "Restart session" },
+        { command: "help", description: "All commands" },
       ]);
       console.log("[telegram] Bot menu commands registered");
     } catch (err) {
@@ -782,6 +873,7 @@ export class TelegramBridge {
     mapping.model = model;
     this.deps.bridge.injectSetModel(mapping.sessionId, model);
     this.saveMappings();
+    this.updatePinnedStatus(chatId);
   }
 
   getActiveChatCount(): number {
@@ -790,6 +882,52 @@ export class TelegramBridge {
 
   isRunning(): boolean {
     return this.running;
+  }
+
+  // ── Helper methods (tool feed, cost alerts, pinned status) ──────────
+
+  private sendThrottledToolFeed(chatId: number, text: string): void {
+    const now = Date.now();
+    const last = this.lastToolFeedAt.get(chatId) ?? 0;
+    if (now - last < 5_000) return; // Max 1 tool feed per 5 seconds
+
+    this.lastToolFeedAt.set(chatId, now);
+    this.sendToChat(chatId, text).catch(() => {});
+  }
+
+  private checkCostAlert(chatId: number, cost: number): void {
+    const thresholds = [0.50, 1.00, 2.00, 5.00];
+    const shown = this.costAlertsShown.get(chatId) ?? new Set<number>();
+
+    for (const t of thresholds) {
+      if (cost >= t && !shown.has(t)) {
+        shown.add(t);
+        this.costAlertsShown.set(chatId, shown);
+        const emoji = t >= 5 ? "🔴" : t >= 2 ? "🟠" : "🟡";
+        this.sendToChat(chatId, `${emoji} Cost alert: <code>$${cost.toFixed(3)}</code> (crossed $${t.toFixed(2)})`).catch(() => {});
+        break; // Only one alert per result
+      }
+    }
+  }
+
+  private updatePinnedStatus(chatId: number): void {
+    const mapping = this.chatSessions.get(chatId);
+    if (!mapping?.pinnedMessageId) return;
+
+    const session = this.getSessionState(mapping.sessionId);
+    const text = formatPinnedStatus(mapping, session);
+
+    this.api.editMessageText(chatId, mapping.pinnedMessageId, text, {
+      replyMarkup: buildSessionActionsKeyboard(mapping.model),
+    }).catch(() => {
+      // Message may have been deleted or is unchanged
+    });
+  }
+
+  private cleanupChatState(chatId: number): void {
+    this.lastToolFeedAt.delete(chatId);
+    this.lastUserMsgId.delete(chatId);
+    this.costAlertsShown.delete(chatId);
   }
 
   // ── Persistence ───────────────────────────────────────────────────────

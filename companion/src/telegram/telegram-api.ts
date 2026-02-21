@@ -129,7 +129,9 @@ export class TelegramAPI {
       if (chunks.length > 2) {
         chunk = `[${i + 1}/${chunks.length}]\n${chunk}`;
       }
-      const msgId = await this.sendMessage(chatId, chunk, options);
+      // Only reply-to on the first chunk
+      const chunkOpts = i === 0 ? options : { ...options, replyTo: undefined };
+      const msgId = await this.sendMessage(chatId, chunk, chunkOpts);
       ids.push(msgId);
     }
 
@@ -140,15 +142,17 @@ export class TelegramAPI {
     chatId: number,
     messageId: number,
     text: string,
-    parseMode: "HTML" | "MarkdownV2" = "HTML"
+    options: { parseMode?: "HTML" | "MarkdownV2"; replyMarkup?: TelegramInlineKeyboardMarkup } = {}
   ): Promise<void> {
-    await this.call("editMessageText", {
+    const body: Record<string, unknown> = {
       chat_id: chatId,
       message_id: messageId,
       text,
-      parse_mode: parseMode,
+      parse_mode: options.parseMode ?? "HTML",
       disable_web_page_preview: true,
-    });
+    };
+    if (options.replyMarkup) body.reply_markup = options.replyMarkup;
+    await this.call("editMessageText", body);
   }
 
   /** Remove or replace inline keyboard on an existing message. */
@@ -211,6 +215,23 @@ export class TelegramAPI {
     }
     const result = await this.call<{ message_id: number }>("sendPhoto", body);
     return result.message_id;
+  }
+
+  // ── Chat management ─────────────────────────────────────────────────
+
+  async pinChatMessage(chatId: number, messageId: number, disableNotification = true): Promise<void> {
+    await this.call("pinChatMessage", {
+      chat_id: chatId,
+      message_id: messageId,
+      disable_notification: disableNotification,
+    });
+  }
+
+  async unpinChatMessage(chatId: number, messageId: number): Promise<void> {
+    await this.call("unpinChatMessage", {
+      chat_id: chatId,
+      message_id: messageId,
+    });
   }
 
   // ── Callback queries ──────────────────────────────────────────────────

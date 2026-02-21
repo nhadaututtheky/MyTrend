@@ -1,6 +1,6 @@
 // Claude markdown → Telegram HTML converter + formatting helpers
 
-import type { CLIResultMessage, ContentBlock, PermissionRequest } from "../session-types.js";
+import type { CLIResultMessage, ContentBlock, PermissionRequest, SessionState } from "../session-types.js";
 import type {
   TelegramSessionMapping,
   TelegramInlineKeyboardMarkup,
@@ -105,6 +105,18 @@ export function extractToolActions(content: ContentBlock[]): string[] {
   return actions;
 }
 
+/** Extract tool_use actions as a single compact feed message. Returns null if no tools. */
+export function formatToolFeed(content: ContentBlock[]): string | null {
+  const actions: string[] = [];
+  for (const block of content) {
+    if (block.type === "tool_use") {
+      actions.push(formatToolAction(block.name, block.input));
+    }
+  }
+  if (actions.length === 0) return null;
+  return actions.join("\n");
+}
+
 // ─── Tool action formatting ─────────────────────────────────────────────────
 
 const TOOL_EMOJI: Record<string, string> = {
@@ -163,7 +175,20 @@ export function formatResult(msg: CLIResultMessage): string {
   parts.push(duration);
 
   const icon = msg.is_error ? "⚠️" : "✅";
-  return `${icon} Done! ${parts.join(" | ")}`;
+  let text = `${icon} Done! ${parts.join(" | ")}`;
+
+  // Add error details when present
+  if (msg.is_error) {
+    if (msg.subtype === "error_max_turns") {
+      text += "\nMax turns reached. Break into smaller tasks or /new.";
+    } else if (msg.subtype === "error_max_budget_usd") {
+      text += "\nBudget limit reached.";
+    } else if (msg.errors?.length) {
+      text += `\n${truncate(msg.errors[0], 200)}`;
+    }
+  }
+
+  return text;
 }
 
 // ─── Status formatting ──────────────────────────────────────────────────────
@@ -175,6 +200,34 @@ export function formatStatus(mapping: TelegramSessionMapping, sessionStatus: str
     `Model: <code>${mapping.model}</code> | Status: <code>${sessionStatus}</code>`,
     `Session: <code>${mapping.sessionId.slice(0, 8)}</code>`,
   ].join("\n");
+}
+
+/** Compact pinned status message — updated in-place as session progresses. */
+export function formatPinnedStatus(
+  mapping: TelegramSessionMapping,
+  session?: SessionState
+): string {
+  const status = session?.status ?? "starting";
+  const statusEmoji =
+    status === "busy" ? "🔵" :
+    status === "idle" ? "🟢" :
+    status === "compacting" ? "🟡" :
+    status === "ended" ? "⚫" : "⚪";
+
+  const lines = [
+    `<b>${mapping.projectSlug}</b> · ${mapping.model} · ${statusEmoji} ${status}`,
+  ];
+
+  if (session) {
+    const parts: string[] = [`$${session.total_cost_usd.toFixed(3)}`];
+    parts.push(`${session.num_turns} turns`);
+    if (session.total_lines_added || session.total_lines_removed) {
+      parts.push(`+${session.total_lines_added}/-${session.total_lines_removed}`);
+    }
+    lines.push(parts.join(" · "));
+  }
+
+  return lines.join("\n");
 }
 
 export function formatProjectList(profiles: ProjectProfile[]): string {
@@ -192,30 +245,30 @@ export function formatProjectList(profiles: ProjectProfile[]): string {
 
 export function formatHelp(): string {
   return [
-    "<b>Claude Bridge Commands</b>",
+    "<b>Commands</b>",
     "",
+    "/start - Projects &amp; quick start",
     "/project &lt;slug&gt; - Connect to a project",
-    "/projects - List available projects",
-    "/stop - Kill current session",
-    "/cancel - Interrupt Claude",
+    "/switch - Quick-switch project",
+    "/model - Change model",
     "/status - Session info",
-    "/model &lt;name&gt; - Switch model (sonnet/opus/haiku)",
-    "/new - Restart session (same project)",
+    "/cancel - Interrupt Claude",
+    "/stop - End session",
+    "/new - Restart session",
     "/help - This message",
     "",
-    "In private chat, just type normally to talk to Claude.",
-    "In groups, use @bot mentions or /commands.",
+    "Just type to chat. Buttons for everything else.",
   ].join("\n");
 }
 
 export function formatWelcome(botName: string): string {
   return [
-    `<b>Welcome to ${escapeHTML(botName)}</b>`,
+    `<b>${escapeHTML(botName)}</b>`,
     "",
-    "Chat with Claude Code through Telegram.",
+    "Control Claude Code from Telegram.",
+    "Select a project, then type your request.",
     "",
-    "Use <code>/projects</code> to see available projects,",
-    "then <code>/project &lt;slug&gt;</code> to start a session.",
+    "Models: <code>sonnet</code> (balanced) · <code>opus</code> (smartest) · <code>haiku</code> (fastest)",
   ].join("\n");
 }
 
