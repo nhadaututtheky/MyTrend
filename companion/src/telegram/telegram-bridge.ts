@@ -63,8 +63,8 @@ export class TelegramBridge {
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
 
-  async start(): Promise<void> {
-    if (this.running) return;
+  async start(): Promise<{ ok: boolean; error?: string }> {
+    if (this.running) return { ok: true };
 
     try {
       // Verify token + get bot info
@@ -82,9 +82,11 @@ export class TelegramBridge {
 
       this.running = true;
       this.pollingLoop();
+      return { ok: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       console.error(`[telegram] Failed to start: ${msg}`);
+      return { ok: false, error: msg };
     }
   }
 

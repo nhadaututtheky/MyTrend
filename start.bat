@@ -7,7 +7,7 @@ echo  ================================
 echo   MyTrend - Quick Launcher
 echo  ================================
 echo.
-echo  [1] Dev Mode     (frontend only, localhost:5173)
+echo  [1] Dev Mode     (companion:3457 + frontend:5173)
 echo  [2] Docker Full  (all services, localhost:80)
 echo  [3] Docker Build (rebuild + start)
 echo  [4] PocketBase Admin (open browser)
@@ -49,9 +49,13 @@ echo.
 echo  Starting all services with Docker...
 cd /d "%~dp0"
 docker-compose up -d
+echo  Starting companion service...
+cd /d "%~dp0companion"
+start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run start"
 echo.
-echo  Frontend:  http://localhost
+echo  Frontend:   http://localhost
 echo  PocketBase: http://localhost:8090/_/
+echo  Companion:  http://localhost:3457/api/health
 echo.
 pause
 goto end
@@ -61,9 +65,13 @@ echo.
 echo  Rebuilding and starting...
 cd /d "%~dp0"
 docker-compose up -d --build
+echo  Starting companion service...
+cd /d "%~dp0companion"
+start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run start"
 echo.
-echo  Frontend:  http://localhost
+echo  Frontend:   http://localhost
 echo  PocketBase: http://localhost:8090/_/
+echo  Companion:  http://localhost:3457/api/health
 echo.
 pause
 goto end
@@ -86,6 +94,8 @@ echo.
 echo  Stopping all containers...
 cd /d "%~dp0"
 docker-compose down
+echo  Stopping companion...
+taskkill /FI "WINDOWTITLE eq MyTrend Companion*" >nul 2>&1
 echo  Done.
 pause
 goto end

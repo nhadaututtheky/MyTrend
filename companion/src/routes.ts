@@ -15,7 +15,7 @@ interface AppContext {
   store: SessionStore;
   profiles: ProjectProfileStore;
   getTelegramBridge: () => TelegramBridge | null;
-  startTelegramBridge: (token: string, chatIds: number[]) => { ok: boolean; error?: string };
+  startTelegramBridge: (token: string, chatIds: number[]) => Promise<{ ok: boolean; error?: string }>;
   stopTelegramBridge: () => void;
 }
 
@@ -299,7 +299,7 @@ export function createApp(ctx: AppContext): Hono {
     return c.json({ ok: true });
   });
 
-  app.post("/api/telegram-bridge/start", (c) => {
+  app.post("/api/telegram-bridge/start", async (c) => {
     const config = loadTelegramConfig();
     if (!config.botToken) {
       return c.json({ error: "Bot token not configured" }, 400);
@@ -308,9 +308,9 @@ export function createApp(ctx: AppContext): Hono {
       return c.json({ error: "No allowed chat IDs configured" }, 400);
     }
 
-    const result = ctx.startTelegramBridge(config.botToken, config.allowedChatIds);
+    const result = await ctx.startTelegramBridge(config.botToken, config.allowedChatIds);
     if (!result.ok) {
-      return c.json({ error: result.error }, 500);
+      return c.json({ ok: false, error: result.error }, 500);
     }
 
     // Mark as enabled in config

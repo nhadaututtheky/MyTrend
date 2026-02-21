@@ -22,10 +22,10 @@ const launcher = new CLILauncher(store, bridge);
 let telegramBridge: TelegramBridge | null = null;
 
 /** Start or restart the Telegram bridge with given (or saved) config. */
-function startTelegramBridge(
+async function startTelegramBridge(
   botToken: string,
   allowedChatIds: number[]
-): { ok: boolean; error?: string } {
+): Promise<{ ok: boolean; error?: string }> {
   // Validate
   if (!botToken) return { ok: false, error: "Bot token is required" };
   if (allowedChatIds.length === 0) return { ok: false, error: "At least one allowed chat ID is required" };
@@ -46,8 +46,11 @@ function startTelegramBridge(
     { botToken, allowedChatIds: new Set(allowedChatIds) },
     { bridge, launcher, store, profiles }
   );
-  telegramBridge.start();
-  return { ok: true };
+  const result = await telegramBridge.start();
+  if (!result.ok) {
+    telegramBridge = null;
+  }
+  return result;
 }
 
 function stopTelegramBridge(): void {
@@ -60,10 +63,11 @@ function stopTelegramBridge(): void {
 // Auto-start from config (env vars or saved file)
 const initConfig = loadTelegramConfig();
 if (initConfig.enabled && initConfig.botToken && initConfig.allowedChatIds.length > 0) {
-  const result = startTelegramBridge(initConfig.botToken, initConfig.allowedChatIds);
-  if (!result.ok) {
-    console.error(`[telegram] Auto-start failed: ${result.error}`);
-  }
+  startTelegramBridge(initConfig.botToken, initConfig.allowedChatIds).then((result) => {
+    if (!result.ok) {
+      console.error(`[telegram] Auto-start failed: ${result.error}`);
+    }
+  });
 } else if (!initConfig.botToken) {
   console.log("[telegram] No config found, Telegram bridge disabled");
 }

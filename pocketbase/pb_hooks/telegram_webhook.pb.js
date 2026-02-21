@@ -29,8 +29,6 @@ routerAdd('POST', '/api/telegram/webhook', (c) => {
   var fromUser = msg.from ? (msg.from.username || msg.from.first_name || 'unknown') : 'unknown';
 
   var dao = $app.dao();
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID');
 
   // Resolve MyTrend user
   var userId = $os.getenv('MYTREND_SYNC_USER_ID') || '';
@@ -43,6 +41,17 @@ routerAdd('POST', '/api/telegram/webhook', (c) => {
   if (!userId) {
     console.log('[TelegramWebhook] No user configured, skipping');
     return c.json(200, { ok: true });
+  }
+
+  // Resolve bot token + channel (env → DB fallback)
+  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN') || '';
+  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID') || '';
+  if ((!botToken || !channelId) && userId) {
+    try {
+      var settingsRec = dao.findFirstRecordByFilter('user_settings', 'user = {:uid}', { uid: userId });
+      if (!botToken) botToken = settingsRec.getString('telegram_bot_token') || '';
+      if (!channelId) channelId = settingsRec.getString('telegram_channel_id') || '';
+    } catch (e) { /* no settings record */ }
   }
 
   // --- Handle file attachments ---
@@ -227,7 +236,15 @@ routerAdd('POST', '/api/telegram/webhook/setup', (c) => {
   var webhookUrl = (body.url || '').trim();
   if (!webhookUrl) return c.json(400, { error: 'Missing webhook URL' });
 
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
+  // Inline: resolve bot token (env → DB fallback)
+  var userId = authRecord.getId();
+  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN') || '';
+  if (!botToken && userId) {
+    try {
+      var settingsRec = $app.dao().findFirstRecordByFilter('user_settings', 'user = {:uid}', { uid: userId });
+      botToken = settingsRec.getString('telegram_bot_token') || '';
+    } catch (e) { /* no settings record */ }
+  }
   if (!botToken) return c.json(500, { error: 'Bot token not configured' });
 
   var secret = $os.getenv('TELEGRAM_WEBHOOK_SECRET') || '';
@@ -266,7 +283,15 @@ routerAdd('DELETE', '/api/telegram/webhook/setup', (c) => {
   var authRecord = c.get('authRecord');
   if (!authRecord) return c.json(401, { error: 'Authentication required' });
 
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
+  // Inline: resolve bot token (env → DB fallback)
+  var userId = authRecord.getId();
+  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN') || '';
+  if (!botToken && userId) {
+    try {
+      var settingsRec = $app.dao().findFirstRecordByFilter('user_settings', 'user = {:uid}', { uid: userId });
+      botToken = settingsRec.getString('telegram_bot_token') || '';
+    } catch (e) { /* no settings record */ }
+  }
   if (!botToken) return c.json(500, { error: 'Bot token not configured' });
 
   try {
@@ -297,8 +322,18 @@ routerAdd('POST', '/api/telegram/notify', (c) => {
   if (!message) return c.json(400, { error: 'Missing message' });
 
   var parseMode = body.parse_mode || 'Markdown';
-  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN');
-  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID');
+
+  // Inline: resolve Telegram credentials (env → DB fallback)
+  var userId = authRecord.getId();
+  var botToken = $os.getenv('TELEGRAM_BOT_TOKEN') || '';
+  var channelId = $os.getenv('TELEGRAM_STORAGE_CHANNEL_ID') || '';
+  if ((!botToken || !channelId) && userId) {
+    try {
+      var settingsRec = $app.dao().findFirstRecordByFilter('user_settings', 'user = {:uid}', { uid: userId });
+      if (!botToken) botToken = settingsRec.getString('telegram_bot_token') || '';
+      if (!channelId) channelId = settingsRec.getString('telegram_channel_id') || '';
+    } catch (e) { /* no settings record */ }
+  }
 
   if (!botToken) return c.json(500, { error: 'Bot token not configured' });
   if (!channelId) return c.json(500, { error: 'Channel ID not configured' });
