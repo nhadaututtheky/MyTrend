@@ -8,7 +8,6 @@ const PROFILES_FILE = join(import.meta.dir, "..", "data", "profiles.json");
 const SLUG_DIR_MAP: Record<string, string> = {
   mytrend: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
   "future-bot": "C:\\Users\\X\\Desktop\\Future\\Future",
-  companion: "C:\\Users\\X\\Desktop\\Future\\MyTrend\\companion",
   "feature-factory": "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
   "neural-memory": "C:\\Users\\X\\Desktop\\Future\\neural-memory",
 };
@@ -21,6 +20,7 @@ const SLUG_DIR_MAP: Record<string, string> = {
 const SLUG_ALIASES: Record<string, string> = {
   memory: "neural-memory",
   future: "future-bot",
+  companion: "mytrend",
 };
 
 /** Default profiles for all known local projects. */
@@ -43,13 +43,6 @@ const DEFAULT_PROFILES: ProjectProfile[] = [
     slug: "neural-memory",
     name: "Neural Memory",
     dir: "C:\\Users\\X\\Desktop\\Future\\neural-memory",
-    defaultModel: "sonnet",
-    permissionMode: "bypassPermissions",
-  },
-  {
-    slug: "companion",
-    name: "Companion",
-    dir: "C:\\Users\\X\\Desktop\\Future\\MyTrend\\companion",
     defaultModel: "sonnet",
     permissionMode: "bypassPermissions",
   },
