@@ -39,6 +39,8 @@ import {
   buildAutoApproveKeyboard,
   formatPermissionRequest,
   formatAutoApproveStatus,
+  extractAskUserQuestion,
+  formatAskUserQuestion,
 } from "./telegram-formatter.js";
 
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30min
@@ -474,20 +476,34 @@ export class TelegramBridge {
         const content = msg.message.content;
         if (!Array.isArray(content)) break;
 
+        // Check for AskUserQuestion — always show prominently
+        const askQuestions = extractAskUserQuestion(content);
+
         // Tool activity feed (throttled, only when no text)
         const text = extractText(content);
-        if (!text) {
+        if (!text && !askQuestions) {
           const toolFeed = formatToolFeed(content);
           if (toolFeed) this.sendThrottledToolFeed(chatId, toolFeed);
           break;
         }
 
         // Text response — reply to user's original message
-        const html = toTelegramHTML(text);
-        const replyTo = this.lastUserMsgId.get(chatId);
-        await this.api.sendLongMessage(chatId, html, { replyTo });
-        this.lastUserMsgId.delete(chatId);
-        this.stopTyping(chatId);
+        if (text) {
+          const html = toTelegramHTML(text);
+          const replyTo = this.lastUserMsgId.get(chatId);
+          await this.api.sendLongMessage(chatId, html, { replyTo });
+        }
+
+        // AskUserQuestion — send as separate prominent message
+        if (askQuestions) {
+          const askHtml = formatAskUserQuestion(askQuestions);
+          await this.api.sendMessage(chatId, askHtml);
+        }
+
+        if (text || askQuestions) {
+          this.lastUserMsgId.delete(chatId);
+          this.stopTyping(chatId);
+        }
         break;
       }
 

@@ -130,6 +130,8 @@ const TOOL_EMOJI: Record<string, string> = {
   WebFetch: "🌐",
   WebSearch: "🌐",
   NotebookEdit: "📓",
+  AskUserQuestion: "❓",
+  EnterPlanMode: "📋",
 };
 
 export function formatToolAction(name: string, input: Record<string, unknown>): string {
@@ -153,6 +155,10 @@ export function formatToolAction(name: string, input: Record<string, unknown>): 
     case "WebFetch":
     case "WebSearch":
       return `${emoji} ${name === "WebSearch" ? "Searching" : "Fetching"} web...`;
+    case "AskUserQuestion":
+      return `${emoji} Asking question...`;
+    case "EnterPlanMode":
+      return `${emoji} Entering plan mode...`;
     default:
       return `${emoji} ${name}`;
   }
@@ -480,6 +486,49 @@ export function formatPermissionRequest(perm: PermissionRequest): string {
   }
 
   return lines.join("\n");
+}
+
+// ─── AskUserQuestion extraction ──────────────────────────────────────────────
+
+interface AskQuestion {
+  question: string;
+  header?: string;
+  options: { label: string; description?: string }[];
+  multiSelect?: boolean;
+}
+
+/** Extract AskUserQuestion tool_use blocks from content. Returns null if none found. */
+export function extractAskUserQuestion(content: ContentBlock[]): AskQuestion[] | null {
+  for (const block of content) {
+    if (block.type === "tool_use" && block.name === "AskUserQuestion") {
+      const input = block.input as { questions?: AskQuestion[] };
+      if (input.questions && Array.isArray(input.questions) && input.questions.length > 0) {
+        return input.questions;
+      }
+    }
+  }
+  return null;
+}
+
+/** Format AskUserQuestion for Telegram display. */
+export function formatAskUserQuestion(questions: AskQuestion[]): string {
+  const lines: string[] = ["<b>❓ Claude is asking:</b>", ""];
+
+  for (const q of questions) {
+    lines.push(`<b>${escapeHTML(q.question)}</b>`);
+    if (q.options && q.options.length > 0) {
+      for (let i = 0; i < q.options.length; i++) {
+        const opt = q.options[i];
+        const bullet = `${i + 1}.`;
+        const desc = opt.description ? ` — ${escapeHTML(truncate(opt.description, 80))}` : "";
+        lines.push(`${bullet} <b>${escapeHTML(opt.label)}</b>${desc}`);
+      }
+    }
+    lines.push("");
+  }
+
+  lines.push("<i>Reply with your choice (number or text).</i>");
+  return lines.join("\n").trim();
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

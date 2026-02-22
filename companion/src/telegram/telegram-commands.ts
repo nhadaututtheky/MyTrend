@@ -74,7 +74,7 @@ async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promis
   }
 
   // No session: onboarding + project selection
-  const botName = bridge.getBotName() ?? "Claude Bridge";
+  const botName = bridge.getBotName() ?? "Vibe Bot";
   const profiles = bridge.getProfiles();
 
   if (profiles.length > 0) {
