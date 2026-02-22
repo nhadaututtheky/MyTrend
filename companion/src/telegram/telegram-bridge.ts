@@ -730,7 +730,7 @@ export class TelegramBridge {
   }
 
   private async onModelSelected(
-    chatId: number, messageId: number, queryId: string, model: string
+    chatId: number, _messageId: number, queryId: string, model: string
   ): Promise<void> {
     const mapping = this.chatSessions.get(chatId);
     if (!mapping) {
@@ -738,11 +738,9 @@ export class TelegramBridge {
       return;
     }
 
+    // setModel() already calls updatePinnedStatus() to restore the pinned message
     this.setModel(chatId, model);
     await this.api.answerCallbackQuery(queryId, `Model → ${model}`);
-
-    // Update keyboard to reflect new selection
-    await this.api.editMessageReplyMarkup(chatId, messageId, buildModelKeyboard(model)).catch(() => {});
   }
 
   private async onModeSelected(
@@ -842,17 +840,16 @@ export class TelegramBridge {
   }
 
   private async onActionSelected(
-    chatId: number, _messageId: number, queryId: string, action: string
+    chatId: number, messageId: number, queryId: string, action: string
   ): Promise<void> {
     switch (action) {
       case "model": {
         const mapping = this.chatSessions.get(chatId);
         await this.api.answerCallbackQuery(queryId);
-        await this.sendToChatWithKeyboard(
-          chatId,
-          "Select model:",
-          buildModelKeyboard(mapping?.model)
-        );
+        // Edit the same message inline instead of creating a new one
+        await this.api.editMessageText(chatId, messageId, "Select model:", {
+          replyMarkup: buildModelKeyboard(mapping?.model),
+        }).catch(() => {});
         break;
       }
       case "status": {

@@ -132,6 +132,7 @@ const TOOL_EMOJI: Record<string, string> = {
   NotebookEdit: "📓",
   AskUserQuestion: "❓",
   EnterPlanMode: "📋",
+  ExitPlanMode: "🏁",
 };
 
 export function formatToolAction(name: string, input: Record<string, unknown>): string {
@@ -159,6 +160,8 @@ export function formatToolAction(name: string, input: Record<string, unknown>): 
       return `${emoji} Asking question...`;
     case "EnterPlanMode":
       return `${emoji} Entering plan mode...`;
+    case "ExitPlanMode":
+      return `${emoji} Exiting plan mode...`;
     default:
       return `${emoji} ${name}`;
   }

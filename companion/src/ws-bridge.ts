@@ -529,11 +529,30 @@ export class WsBridge {
     });
   }
 
+  // Tools that are safe state transitions and should never require manual approval.
+  // NOTE: AskUserQuestion is NOT here — it requires the user to see and answer the question.
+  private static readonly ALWAYS_APPROVE_TOOLS = new Set([
+    "ExitPlanMode",
+    "EnterPlanMode",
+  ]);
+
   private handleControlRequest(
     session: ActiveSession,
     msg: CLIControlRequestMessage
   ): void {
     if (msg.request.subtype === "can_use_tool") {
+      // Auto-approve safe state transition tools immediately
+      if (WsBridge.ALWAYS_APPROVE_TOOLS.has(msg.request.tool_name)) {
+        console.log(
+          `[ws-bridge] Auto-approving safe tool ${msg.request.tool_name} (request ${msg.request_id.slice(0, 8)})`
+        );
+        this.handlePermissionResponse(session, {
+          request_id: msg.request_id,
+          behavior: "allow",
+        });
+        return;
+      }
+
       const perm: PermissionRequest = {
         request_id: msg.request_id,
         tool_name: msg.request.tool_name,
