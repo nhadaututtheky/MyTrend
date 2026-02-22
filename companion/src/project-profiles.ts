@@ -8,11 +8,19 @@ const PROFILES_FILE = join(import.meta.dir, "..", "data", "profiles.json");
 const SLUG_DIR_MAP: Record<string, string> = {
   mytrend: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
   "future-bot": "C:\\Users\\X\\Desktop\\Future\\Future",
-  future: "C:\\Users\\X\\Desktop\\Future\\Future",
   companion: "C:\\Users\\X\\Desktop\\Future\\MyTrend\\companion",
   "feature-factory": "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
   "neural-memory": "C:\\Users\\X\\Desktop\\Future\\neural-memory",
-  memory: "C:\\Users\\X\\Desktop\\Future\\neural-memory",
+};
+
+/**
+ * Slug aliases: PB may use different slugs for the same project.
+ * Maps PB slug → canonical slug used in profiles.
+ * e.g. PB "memory" = our "neural-memory", PB "future" = our "future-bot"
+ */
+const SLUG_ALIASES: Record<string, string> = {
+  memory: "neural-memory",
+  future: "future-bot",
 };
 
 /** Default profiles for all known local projects. */
@@ -116,7 +124,7 @@ export class ProjectProfileStore {
   }
 
   get(slug: string): ProjectProfile | undefined {
-    return this.profiles.get(slug);
+    return this.profiles.get(slug) ?? this.profiles.get(SLUG_ALIASES[slug] ?? "");
   }
 
   upsert(profile: ProjectProfile): void {
@@ -155,20 +163,22 @@ export class ProjectProfileStore {
       const data = (await res.json()) as { projects: PBProject[] };
 
       for (const proj of data.projects) {
-        const existing = this.profiles.get(proj.slug);
+        // Resolve alias: PB "memory" → canonical "neural-memory"
+        const canonicalSlug = SLUG_ALIASES[proj.slug] ?? proj.slug;
+        const existing = this.profiles.get(canonicalSlug);
 
         if (existing) {
-          // Update name if changed
-          if (existing.name !== proj.name) {
+          // Update name if changed (prefer PB name for canonical slug)
+          if (existing.name !== proj.name && canonicalSlug === proj.slug) {
             existing.name = proj.name;
-            this.profiles.set(proj.slug, existing);
+            this.profiles.set(canonicalSlug, existing);
             updated++;
           }
         } else {
-          // New project from PocketBase
-          const dir = SLUG_DIR_MAP[proj.slug] ?? "";
-          this.profiles.set(proj.slug, {
-            slug: proj.slug,
+          // New project from PocketBase (use canonical slug)
+          const dir = SLUG_DIR_MAP[canonicalSlug] ?? "";
+          this.profiles.set(canonicalSlug, {
+            slug: canonicalSlug,
             name: proj.name,
             dir,
             defaultModel: "sonnet",
