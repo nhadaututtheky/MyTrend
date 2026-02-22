@@ -2,8 +2,7 @@
 
 // MyTrend - FTS5 Search Indexing Hook
 // Creates FTS5 virtual tables + search endpoint.
-// Fixed: correct column names matching actual schema fields.
-// Fixed: inline functions in isolated scopes (onAfterBootstrap, routerAdd).
+// Collections indexed: conversations, ideas, projects, plans, activities, claude_tasks
 
 // ---------------------------------------------------------------------------
 // Shared upsert/delete helpers (accessible from onRecord* hooks)
@@ -44,6 +43,18 @@ function upsertIndex(dao, collection, record) {
       dao.db().newQuery(
         'INSERT INTO plans_fts (record_id, title, content, reasoning) VALUES ({:rid}, {:title}, {:content}, {:reasoning})'
       ).bind({ rid: recordId, title: plTitle, content: plContent, reasoning: plReasoning }).execute();
+    } else if (collection === 'activities') {
+      var actAction = record.getString('action') || '';
+      var actType = record.getString('type') || '';
+      dao.db().newQuery(
+        'INSERT INTO activities_fts (record_id, action, type) VALUES ({:rid}, {:action}, {:type})'
+      ).bind({ rid: recordId, action: actAction, type: actType }).execute();
+    } else if (collection === 'claude_tasks') {
+      var ctContent = record.getString('content') || '';
+      var ctSession = record.getString('session_title') || '';
+      dao.db().newQuery(
+        'INSERT INTO claude_tasks_fts (record_id, content, session_title) VALUES ({:rid}, {:content}, {:session})'
+      ).bind({ rid: recordId, content: ctContent, session: ctSession }).execute();
     }
   } catch (err) {
     console.log('[SearchIndex] Index error for ' + collection + ':' + record.getId() + ': ' + err);
@@ -79,6 +90,14 @@ onAfterBootstrap((e) => {
     {
       name: 'plans_fts',
       sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS plans_fts USING fts5(record_id UNINDEXED, title, content, reasoning, tokenize="porter unicode61")'
+    },
+    {
+      name: 'activities_fts',
+      sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS activities_fts USING fts5(record_id UNINDEXED, action, type, tokenize="porter unicode61")'
+    },
+    {
+      name: 'claude_tasks_fts',
+      sql: 'CREATE VIRTUAL TABLE IF NOT EXISTS claude_tasks_fts USING fts5(record_id UNINDEXED, content, session_title, tokenize="porter unicode61")'
     }
   ];
 
@@ -112,11 +131,17 @@ onAfterBootstrap((e) => {
       } else if (coll === 'plans') {
         d.db().newQuery('INSERT INTO plans_fts (record_id, title, content, reasoning) VALUES ({:rid}, {:t}, {:c}, {:r})')
           .bind({ rid: rid, t: rec.getString('title') || '', c: rec.getString('content') || '', r: rec.getString('reasoning') || '' }).execute();
+      } else if (coll === 'activities') {
+        d.db().newQuery('INSERT INTO activities_fts (record_id, action, type) VALUES ({:rid}, {:a}, {:tp})')
+          .bind({ rid: rid, a: rec.getString('action') || '', tp: rec.getString('type') || '' }).execute();
+      } else if (coll === 'claude_tasks') {
+        d.db().newQuery('INSERT INTO claude_tasks_fts (record_id, content, session_title) VALUES ({:rid}, {:c}, {:s})')
+          .bind({ rid: rid, c: rec.getString('content') || '', s: rec.getString('session_title') || '' }).execute();
       }
     } catch (e) {}
   }
 
-  var collections = ['conversations', 'ideas', 'projects', 'plans'];
+  var collections = ['conversations', 'ideas', 'projects', 'plans', 'activities', 'claude_tasks'];
   for (var c = 0; c < collections.length; c++) {
     try {
       var records = dao.findRecordsByFilter(collections[c], '1=1', '', 0, 0);
@@ -137,9 +162,9 @@ onAfterBootstrap((e) => {
 // ---------------------------------------------------------------------------
 // Hooks: Index on create/update/delete (onRecord* CAN access file-level vars)
 // ---------------------------------------------------------------------------
-onRecordAfterCreateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans');
-onRecordAfterUpdateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans');
-onRecordAfterDeleteRequest((e) => { deleteIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans');
+onRecordAfterCreateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans', 'activities', 'claude_tasks');
+onRecordAfterUpdateRequest((e) => { upsertIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans', 'activities', 'claude_tasks');
+onRecordAfterDeleteRequest((e) => { deleteIndex($app.dao(), e.collection.name, e.record); }, 'conversations', 'ideas', 'projects', 'plans', 'activities', 'claude_tasks');
 
 // ---------------------------------------------------------------------------
 // GET /api/mytrend/search?q=...
@@ -247,6 +272,44 @@ routerAdd('GET', '/api/mytrend/search', (c) => {
         id: topics[t].getId(),
         title: topics[t].getString('name'),
         snippet: 'Mentioned ' + topics[t].getInt('mention_count') + ' times',
+        score: 0.6,
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Search activities
+  try {
+    var acts = dao.findRecordsByFilter(
+      'activities',
+      'user = {:uid} && action ~ {:q}',
+      '-timestamp', 10, 0,
+      { uid: userId, q: q }
+    );
+    for (var ai = 0; ai < acts.length; ai++) {
+      results.push({
+        type: 'activity',
+        id: acts[ai].getId(),
+        title: acts[ai].getString('action'),
+        snippet: acts[ai].getString('type') + ' activity',
+        score: 0.65,
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Search claude_tasks
+  try {
+    var tasks = dao.findRecordsByFilter(
+      'claude_tasks',
+      'user = {:uid} && (content ~ {:q} || session_title ~ {:q})',
+      '-created', 10, 0,
+      { uid: userId, q: q }
+    );
+    for (var ct = 0; ct < tasks.length; ct++) {
+      results.push({
+        type: 'claude_task',
+        id: tasks[ct].getId(),
+        title: tasks[ct].getString('content'),
+        snippet: 'Session: ' + (tasks[ct].getString('session_title') || 'Unknown') + ' | ' + tasks[ct].getString('status'),
         score: 0.6,
       });
     }

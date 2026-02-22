@@ -344,7 +344,7 @@ export interface TopicTrendResponse {
 
 // Search
 export interface SearchResult {
-  type: 'conversation' | 'idea' | 'project' | 'topic' | 'plan';
+  type: 'conversation' | 'idea' | 'project' | 'topic' | 'plan' | 'activity' | 'claude_task';
   id: string;
   title: string;
   snippet: string;

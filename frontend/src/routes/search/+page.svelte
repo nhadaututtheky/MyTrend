@@ -24,6 +24,9 @@
     conversation: 'blue',
     idea: 'yellow',
     topic: 'purple',
+    plan: 'blue',
+    activity: 'green',
+    claude_task: 'purple',
   };
 
   const TYPE_LINKS: Record<string, string> = {
@@ -31,6 +34,9 @@
     conversation: '/conversations',
     idea: '/ideas',
     topic: '/trends',
+    plan: '/plans',
+    activity: '/activity',
+    claude_task: '/vibe',
   };
 
   function getLink(result: SearchResult): string {
