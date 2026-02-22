@@ -163,6 +163,41 @@ export class WsBridge {
     this.handleUserMessage(session, content);
   }
 
+  /** Inject a multimodal message (text + images) into a session's CLI. */
+  injectMultimodalMessage(
+    sessionId: string,
+    contentBlocks: Array<
+      | { type: "text"; text: string }
+      | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+    >
+  ): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    // Record text parts in history
+    const textParts = contentBlocks.filter((b) => b.type === "text").map((b) => (b as { text: string }).text);
+    const historyMsg: BrowserIncomingMessage = {
+      type: "user_message",
+      content: textParts.join("\n") || "[image]",
+      timestamp: Date.now(),
+    };
+    session.messageHistory.push(historyMsg);
+    this.broadcastToBrowsers(session, historyMsg);
+
+    // Send multimodal content to CLI
+    const ndjson = JSON.stringify({
+      type: "user",
+      message: { role: "user", content: contentBlocks },
+    });
+    this.sendToCLI(session, ndjson);
+    this.updateStatus(session, "busy");
+
+    // Idea extraction from text parts only
+    for (const text of textParts) {
+      extractIdeaFromMessage(text);
+    }
+  }
+
   /** Send interrupt to a session's CLI (from external client). */
   injectInterrupt(sessionId: string): void {
     const session = this.sessions.get(sessionId);
@@ -200,6 +235,11 @@ export class WsBridge {
   /** Read session state (for external clients). */
   getSessionState(sessionId: string): SessionState | undefined {
     return this.sessions.get(sessionId)?.state;
+  }
+
+  /** Get message history for a session (for conversation sync). */
+  getMessageHistory(sessionId: string): BrowserIncomingMessage[] {
+    return this.sessions.get(sessionId)?.messageHistory ?? [];
   }
 
   // ── Pipe-based CLI connection (stdin/stdout) ───────────────────────────

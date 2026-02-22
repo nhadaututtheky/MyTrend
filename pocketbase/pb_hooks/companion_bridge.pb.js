@@ -158,3 +158,82 @@ routerAdd('POST', '/api/internal/idea', (c) => {
 });
 
 console.log('[CompanionBridge] Registered: POST /api/internal/idea');
+
+// ---------------------------------------------------------------------------
+// POST /api/internal/conversation - Save Vibe Bot conversation to PocketBase
+// ---------------------------------------------------------------------------
+routerAdd('POST', '/api/internal/conversation', (c) => {
+  // Auth check
+  var secret = $os.getenv('COMPANION_INTERNAL_SECRET') || '';
+  if (secret) {
+    var headerSecret = '';
+    try { headerSecret = c.request().header.get('X-Internal-Secret') || ''; } catch (e) {}
+    if (headerSecret !== secret) {
+      return c.json(403, { error: 'Forbidden' });
+    }
+  }
+
+  var body = $apis.requestInfo(c).data;
+  var userId = (body.userId || '').trim();
+  var title = (body.title || '').trim();
+  var content = (body.content || '').trim();
+  var projectSlug = (body.projectSlug || '').trim();
+  var tags = body.tags || [];
+  var model = (body.model || '').trim();
+  var sessionId = (body.sessionId || '').trim();
+
+  if (!userId || !content || content.length < 20) {
+    return c.json(400, { error: 'Missing userId or content too short' });
+  }
+
+  if (!title) title = content.substring(0, 100);
+
+  var dao = $app.dao();
+
+  // Deduplicate by sessionId
+  if (sessionId) {
+    try {
+      dao.findFirstRecordByFilter(
+        'conversations',
+        'user = {:uid} && tags ~ {:sid}',
+        { uid: userId, sid: 'session:' + sessionId.substring(0, 8) }
+      );
+      return c.json(200, { skipped: true, reason: 'Session already synced' });
+    } catch (e) { /* not found, proceed */ }
+  }
+
+  // Resolve project relation
+  var projectId = '';
+  if (projectSlug && projectSlug !== 'hub') {
+    try {
+      var proj = dao.findFirstRecordByFilter('projects', 'user = {:uid} && slug = {:slug}', { uid: userId, slug: projectSlug });
+      projectId = proj.getId();
+    } catch (e) { /* project not found, skip relation */ }
+  }
+
+  // Add session tag for dedup
+  if (sessionId) {
+    tags.push('session:' + sessionId.substring(0, 8));
+  }
+  if (model) tags.push('model:' + model);
+
+  try {
+    var col = dao.findCollectionByNameOrId('conversations');
+    var rec = new Record(col);
+    rec.set('user', userId);
+    rec.set('title', title);
+    rec.set('content', content);
+    rec.set('source', 'vibe-bot');
+    rec.set('tags', tags);
+    if (projectId) rec.set('project', projectId);
+    dao.saveRecord(rec);
+
+    console.log('[CompanionBridge] Conversation saved: ' + title.substring(0, 50));
+    return c.json(200, { id: rec.getId(), title: title });
+  } catch (err) {
+    console.log('[CompanionBridge] Conversation save error: ' + err);
+    return c.json(500, { error: String(err) });
+  }
+});
+
+console.log('[CompanionBridge] Registered: POST /api/internal/conversation');

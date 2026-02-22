@@ -285,22 +285,30 @@ export function formatConnected(profile: ProjectProfile, model: string): string 
 
 // ─── Inline Keyboard Builders ────────────────────────────────────────────────
 
-/** Project selection keyboard — 2 per row, primary style. */
+/** Project selection keyboard — 2 per row, primary style. HQ at bottom. */
 export function buildProjectKeyboard(profiles: ProjectProfile[]): TelegramInlineKeyboardMarkup {
   const rows: TelegramInlineKeyboardButton[][] = [];
-  for (let i = 0; i < profiles.length; i += 2) {
+  const regular = profiles.filter((p) => p.slug !== "hub");
+  const hub = profiles.find((p) => p.slug === "hub");
+
+  for (let i = 0; i < regular.length; i += 2) {
     const row: TelegramInlineKeyboardButton[] = [
-      { text: profiles[i].name, callback_data: `proj:${profiles[i].slug}`, style: "primary" },
+      { text: regular[i].name, callback_data: `proj:${regular[i].slug}`, style: "primary" },
     ];
-    if (profiles[i + 1]) {
+    if (regular[i + 1]) {
       row.push({
-        text: profiles[i + 1].name,
-        callback_data: `proj:${profiles[i + 1].slug}`,
+        text: regular[i + 1].name,
+        callback_data: `proj:${regular[i + 1].slug}`,
         style: "primary",
       });
     }
     rows.push(row);
   }
+
+  if (hub) {
+    rows.push([{ text: "\u{1F3E0} HQ \u2014 Cross-Project", callback_data: "proj:hub" }]);
+  }
+
   return { inline_keyboard: rows };
 }
 

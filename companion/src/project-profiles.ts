@@ -10,6 +10,7 @@ const SLUG_DIR_MAP: Record<string, string> = {
   "future-bot": "C:\\Users\\X\\Desktop\\Future\\Future",
   "feature-factory": "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
   "neural-memory": "C:\\Users\\X\\Desktop\\Future\\neural-memory",
+  hub: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
 };
 
 /**
@@ -50,6 +51,13 @@ const DEFAULT_PROFILES: ProjectProfile[] = [
     slug: "feature-factory",
     name: "Feature Factory",
     dir: "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
+    defaultModel: "sonnet",
+    permissionMode: "bypassPermissions",
+  },
+  {
+    slug: "hub",
+    name: "HQ",
+    dir: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
     defaultModel: "sonnet",
     permissionMode: "bypassPermissions",
   },

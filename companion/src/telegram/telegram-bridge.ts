@@ -75,6 +75,7 @@ export class TelegramBridge {
   private costAlertsShown = new Map<number, Set<number>>();
   private lastProjectSlug = new Map<number, string>();
   private autoApproveConfigs = new Map<number, AutoApproveConfig>();
+  private hubFirstMsg = new Set<number>();
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
@@ -212,6 +213,12 @@ export class TelegramBridge {
       return;
     }
 
+    // Photo message → download and send as multimodal
+    if (msg.photo && msg.photo.length > 0) {
+      await this.handlePhotoMessage(msg);
+      return;
+    }
+
     // Text message → send to Claude
     await this.handleTextMessage(msg);
   }
@@ -262,12 +269,70 @@ export class TelegramBridge {
     // Start typing indicator
     this.startTyping(chatId);
 
+    // Hub mode: enrich message with project context
+    if (mapping.projectSlug === "hub") {
+      cleanText = this.enrichHubMessage(chatId, cleanText);
+    }
+
     // Inject message to CLI
     this.deps.bridge.injectUserMessage(mapping.sessionId, cleanText);
 
     // Update activity
     mapping.lastActivityAt = Date.now();
     this.saveMappings();
+  }
+
+  private async handlePhotoMessage(msg: TelegramMessage): Promise<void> {
+    const chatId = msg.chat.id;
+    const mapping = this.chatSessions.get(chatId);
+    if (!mapping) {
+      await this.sendToChat(chatId, "No active session. Use /start to connect.");
+      return;
+    }
+
+    // Get highest resolution photo (last in array)
+    const photo = msg.photo![msg.photo!.length - 1];
+    const caption = msg.caption ?? "";
+
+    // Acknowledge receipt
+    this.lastUserMsgId.set(chatId, msg.message_id);
+    this.api.react(chatId, msg.message_id, "👀").catch(() => {});
+    this.resetIdleTimer(chatId);
+    this.startTyping(chatId);
+
+    try {
+      // Download image from Telegram
+      const fileInfo = await this.api.getFile(photo.file_id);
+      const buffer = await this.api.downloadFile(fileInfo.file_path);
+      const base64 = buffer.toString("base64");
+
+      // Determine media type
+      const ext = fileInfo.file_path.split(".").pop()?.toLowerCase() ?? "jpg";
+      const mediaType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+
+      // Build multimodal content blocks
+      const blocks: Array<
+        | { type: "text"; text: string }
+        | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+      > = [
+        { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
+      ];
+
+      if (caption.trim()) {
+        blocks.push({ type: "text", text: caption.trim() });
+      } else {
+        blocks.push({ type: "text", text: "What do you see in this image?" });
+      }
+
+      this.deps.bridge.injectMultimodalMessage(mapping.sessionId, blocks);
+      mapping.lastActivityAt = Date.now();
+      this.saveMappings();
+    } catch (err) {
+      const error = err instanceof Error ? err.message : "Unknown error";
+      console.error("[telegram] Photo download error:", error);
+      this.stopTyping(chatId);
+      await this.sendToChat(chatId, `Failed to process image: ${error}`);
+    }
   }
 
   // ── Session management ────────────────────────────────────────────────
@@ -365,6 +430,9 @@ export class TelegramBridge {
   async destroySession(chatId: number): Promise<void> {
     const mapping = this.chatSessions.get(chatId);
     if (!mapping) return;
+
+    // Sync conversation to PocketBase before cleanup
+    this.syncConversationToPB(mapping);
 
     // Remember last project for quick reconnect
     this.lastProjectSlug.set(chatId, mapping.projectSlug);
@@ -464,6 +532,8 @@ export class TelegramBridge {
         this.stopTyping(chatId);
         const disconnectedMapping = this.chatSessions.get(chatId);
         if (disconnectedMapping) {
+          // Sync conversation before cleanup
+          this.syncConversationToPB(disconnectedMapping);
           this.lastProjectSlug.set(chatId, disconnectedMapping.projectSlug);
           // Unpin status message
           if (disconnectedMapping.pinnedMessageId) {
@@ -1011,6 +1081,112 @@ export class TelegramBridge {
     this.lastUserMsgId.delete(chatId);
     this.costAlertsShown.delete(chatId);
     this.autoApproveConfigs.delete(chatId);
+    this.hubFirstMsg.delete(chatId);
+  }
+
+  // ── Hub Mode ───────────────────────────────────────────────────────────
+
+  /** Enrich user message for Hub sessions: @mention → project context, first msg → project list */
+  private enrichHubMessage(chatId: number, text: string): string {
+    const profiles = this.deps.profiles.getAll().filter((p) => p.slug !== "hub");
+    let context = "";
+
+    // Detect @slug mentions and inject project context
+    const mentionPattern = /@([\w-]+)/g;
+    let match: RegExpExecArray | null;
+    const mentioned: string[] = [];
+
+    while ((match = mentionPattern.exec(text)) !== null) {
+      const slug = match[1].toLowerCase();
+      const profile = this.deps.profiles.get(slug);
+      if (profile && profile.slug !== "hub") {
+        mentioned.push(`[Project "${profile.name}" → dir: ${profile.dir}]`);
+        // Replace @slug with project name in text
+        text = text.replace(match[0], profile.name);
+      }
+    }
+
+    if (mentioned.length > 0) {
+      context += mentioned.join("\n") + "\n\n";
+    }
+
+    // First message: include project overview
+    if (!this.hubFirstMsg.has(chatId)) {
+      this.hubFirstMsg.add(chatId);
+      const projectList = profiles.map((p) => `- ${p.name} (@${p.slug}): ${p.dir}`).join("\n");
+      context = [
+        "[Hub Mode — Cross-project discussion]",
+        "Available projects:",
+        projectList,
+        "",
+        "Mention @slug to focus on a specific project.",
+        "",
+        context,
+      ].join("\n");
+    }
+
+    return context ? `${context}${text}` : text;
+  }
+
+  // ── Conversation sync to PocketBase ─────────────────────────────────
+
+  /** Sync conversation transcript to PocketBase on session end. Fire-and-forget. */
+  private syncConversationToPB(mapping: TelegramSessionMapping): void {
+    const pbUrl = process.env.POCKETBASE_URL || "http://localhost:8090";
+    const secret = process.env.COMPANION_INTERNAL_SECRET || "";
+    const userId = process.env.MYTREND_SYNC_USER_ID || "";
+    if (!secret || !userId) return;
+
+    const history = this.deps.bridge.getMessageHistory(mapping.sessionId);
+    if (history.length === 0) return;
+
+    // Build transcript from message history
+    const lines: string[] = [];
+    let firstUserMsg = "";
+
+    for (const msg of history) {
+      if (msg.type === "user_message") {
+        const content = (msg as { content: string }).content;
+        if (!firstUserMsg) firstUserMsg = content;
+        lines.push(`[User] ${content}`);
+      } else if (msg.type === "assistant") {
+        const assistantMsg = msg as { message: { content: Array<{ type: string; text?: string }> } };
+        const texts: string[] = [];
+        for (const block of assistantMsg.message.content) {
+          if (block.type === "text" && block.text) texts.push(block.text);
+        }
+        if (texts.length > 0) lines.push(`[Assistant] ${texts.join("\n")}`);
+      } else if (msg.type === "result") {
+        const result = msg as { data: { total_cost_usd: number; num_turns: number } };
+        lines.push(`[Result] Cost: $${result.data.total_cost_usd.toFixed(3)} | Turns: ${result.data.num_turns}`);
+      }
+    }
+
+    if (lines.length < 2) return; // Need at least 1 exchange
+
+    const title = firstUserMsg.length > 100 ? firstUserMsg.slice(0, 97) + "..." : firstUserMsg;
+    const content = lines.join("\n\n");
+    const tags = ["vibe-bot", mapping.projectSlug];
+    if (mapping.projectSlug === "hub") tags.push("cross-project");
+
+    fetch(`${pbUrl}/api/internal/conversation`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": secret,
+      },
+      body: JSON.stringify({
+        userId,
+        title,
+        content,
+        projectSlug: mapping.projectSlug,
+        tags,
+        model: mapping.model,
+        sessionId: mapping.sessionId,
+      }),
+    }).catch((err) => {
+      console.error("[telegram] Conversation sync failed:", err);
+    });
   }
 
   // ── Persistence ───────────────────────────────────────────────────────

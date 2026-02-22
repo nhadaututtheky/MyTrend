@@ -24,6 +24,7 @@ export interface TelegramMessage {
   chat: TelegramChat;
   date: number;
   text?: string;
+  caption?: string;
   photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
   reply_to_message?: TelegramMessage;

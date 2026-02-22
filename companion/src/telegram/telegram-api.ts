@@ -27,8 +27,10 @@ interface ApiResponse<T> {
 
 export class TelegramAPI {
   private baseUrl: string;
+  private botToken: string;
 
   constructor(config: TelegramConfig) {
+    this.botToken = config.botToken;
     this.baseUrl = `${API_BASE}/bot${config.botToken}`;
   }
 
@@ -196,6 +198,21 @@ export class TelegramAPI {
     } catch {
       // Reactions may not be available in all chat types
     }
+  }
+
+  // ── File download ────────────────────────────────────────────────────
+
+  /** Get file path for downloading via getFile API. */
+  async getFile(fileId: string): Promise<{ file_id: string; file_path: string; file_size?: number }> {
+    return this.call("getFile", { file_id: fileId });
+  }
+
+  /** Download file content as Buffer via Telegram file API. */
+  async downloadFile(filePath: string): Promise<Buffer> {
+    const url = `${API_BASE}/file/bot${this.botToken}/${filePath}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`File download failed: ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
   }
 
   // ── Media ─────────────────────────────────────────────────────────────
