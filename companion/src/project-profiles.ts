@@ -8,12 +8,14 @@ const PROFILES_FILE = join(import.meta.dir, "..", "data", "profiles.json");
 const SLUG_DIR_MAP: Record<string, string> = {
   mytrend: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
   "future-bot": "C:\\Users\\X\\Desktop\\Future\\Future",
+  future: "C:\\Users\\X\\Desktop\\Future\\Future",
   companion: "C:\\Users\\X\\Desktop\\Future\\MyTrend\\companion",
   "feature-factory": "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
-  "neural-memory": "",
+  "neural-memory": "C:\\Users\\X\\Desktop\\Future\\neural-memory",
+  memory: "C:\\Users\\X\\Desktop\\Future\\neural-memory",
 };
 
-/** Default profiles for local projects (fallback if PocketBase unavailable). */
+/** Default profiles for all known local projects. */
 const DEFAULT_PROFILES: ProjectProfile[] = [
   {
     slug: "mytrend",
@@ -29,14 +31,33 @@ const DEFAULT_PROFILES: ProjectProfile[] = [
     defaultModel: "sonnet",
     permissionMode: "bypassPermissions",
   },
+  {
+    slug: "neural-memory",
+    name: "Neural Memory",
+    dir: "C:\\Users\\X\\Desktop\\Future\\neural-memory",
+    defaultModel: "sonnet",
+    permissionMode: "bypassPermissions",
+  },
+  {
+    slug: "companion",
+    name: "Companion",
+    dir: "C:\\Users\\X\\Desktop\\Future\\MyTrend\\companion",
+    defaultModel: "sonnet",
+    permissionMode: "bypassPermissions",
+  },
+  {
+    slug: "feature-factory",
+    name: "Feature Factory",
+    dir: "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
+    defaultModel: "sonnet",
+    permissionMode: "bypassPermissions",
+  },
 ];
 
-/** PocketBase project record (minimal fields we need). */
+/** PocketBase project record from companion endpoint. */
 interface PBProject {
-  id: string;
   slug: string;
   name: string;
-  status: string;
 }
 
 export class ProjectProfileStore {
@@ -54,6 +75,8 @@ export class ProjectProfileStore {
       for (const p of list) {
         this.profiles.set(p.slug, p);
       }
+      // Ensure all defaults exist (new projects added to code)
+      this.mergeDefaults();
     } catch {
       // First run - seed defaults
       for (const p of DEFAULT_PROFILES) {
@@ -61,6 +84,18 @@ export class ProjectProfileStore {
       }
       this.persist();
     }
+  }
+
+  /** Merge DEFAULT_PROFILES into loaded profiles (add missing, don't overwrite). */
+  private mergeDefaults(): void {
+    let changed = false;
+    for (const p of DEFAULT_PROFILES) {
+      if (!this.profiles.has(p.slug)) {
+        this.profiles.set(p.slug, p);
+        changed = true;
+      }
+    }
+    if (changed) this.persist();
   }
 
   private persist(): void {
@@ -96,8 +131,8 @@ export class ProjectProfileStore {
   }
 
   /**
-   * Sync project profiles from PocketBase.
-   * Fetches all active projects and upserts them as profiles.
+   * Sync project profiles from PocketBase via internal companion endpoint.
+   * Uses /api/mytrend/companion/projects (no auth required).
    * Preserves existing dir/model/permission settings if already configured.
    */
   async syncFromPocketBase(pbUrl: string): Promise<{
@@ -110,18 +145,16 @@ export class ProjectProfileStore {
 
     try {
       const res = await fetch(
-        `${pbUrl}/api/collections/projects/records?perPage=50&filter=(status='active')&fields=id,slug,name,status`,
+        `${pbUrl}/api/mytrend/companion/projects`,
       );
       if (!res.ok) {
         console.error(`[profiles] PB sync failed: ${res.status}`);
         return { added: 0, updated: 0, total: this.profiles.size };
       }
 
-      const data = (await res.json()) as { items: PBProject[] };
-      const pbSlugs = new Set<string>();
+      const data = (await res.json()) as { projects: PBProject[] };
 
-      for (const proj of data.items) {
-        pbSlugs.add(proj.slug);
+      for (const proj of data.projects) {
         const existing = this.profiles.get(proj.slug);
 
         if (existing) {
