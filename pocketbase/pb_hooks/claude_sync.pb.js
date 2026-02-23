@@ -140,6 +140,8 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
   function ensureProject(dirName) {
     // Skip worktree directories - they are not real projects
     if (dirName.indexOf('worktrees') >= 0 || dirName.indexOf('worktree') >= 0) return null;
+    // Skip bare drive letter directories (e.g. "D--", "C--")
+    if (/^[A-Z]--$/.test(dirName)) return null;
 
     // Parse: "C--Users-X-Desktop-Future-MyTrend" -> "MyTrend"
     var parts = dirName.split('-');
@@ -147,7 +149,7 @@ routerAdd('POST', '/api/mytrend/sync-claude', (c) => {
     if (!projectName || projectName.length < 2) return null;
 
     var slug = projectName.toLowerCase().replace(/[^a-z0-9\-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    if (!slug) return null;
+    if (!slug || slug.length < 2) return null;
 
     // Check existing
     try {
@@ -529,9 +531,8 @@ try {
       }
     } catch(e) {}
 
-    // Auto-create project in cron scope
+    // Lookup existing project only — cron does NOT auto-create to avoid zombie projects
     function cronEnsureProject(dirName) {
-      // Skip worktree directories - they are not real projects
       if (dirName.indexOf('worktrees') >= 0 || dirName.indexOf('worktree') >= 0) return null;
 
       var cparts = dirName.split('-');
@@ -540,17 +541,8 @@ try {
       var cslug = cname.toLowerCase().replace(/[^a-z0-9\-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
       if (!cslug) return null;
       try { var ex = dao.findFirstRecordByFilter('projects', 'user = {:uid} && slug = {:slug}', { uid: uid, slug: cslug }); return ex.getId(); } catch (e) {}
-      try {
-        var pc = dao.findCollectionByNameOrId('projects');
-        var pr = new Record(pc);
-        pr.set('user', uid); pr.set('name', cname); pr.set('slug', cslug);
-        pr.set('description', 'Auto-created from Claude Code'); pr.set('color', '#4ECDC4');
-        pr.set('status', 'active'); pr.set('total_conversations', 0);
-        pr.set('total_ideas', 0); pr.set('total_minutes', 0);
-        pr.set('last_activity', new Date().toISOString()); pr.set('dna', JSON.stringify({}));
-        dao.saveRecord(pr); console.log('[ClaudeSync] Cron: auto-created project: ' + cname);
-        return pr.getId();
-      } catch (err) { return null; }
+      // No auto-create — only manual sync or companion can create projects
+      return null;
     }
 
     var imp = 0;
