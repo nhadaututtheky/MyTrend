@@ -32,8 +32,10 @@ goto end
 
 :dev
 echo.
-echo  Starting companion + frontend dev servers...
+echo  Installing companion dependencies...
 cd /d "%~dp0companion"
+call bun install
+echo  Starting companion + frontend dev servers...
 start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run dev"
 timeout /t 2 /nobreak >nul
 cd /d "%~dp0frontend"
@@ -49,9 +51,6 @@ echo.
 echo  Starting all services with Docker...
 cd /d "%~dp0"
 docker-compose up -d
-echo  Starting companion service...
-cd /d "%~dp0companion"
-start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run start"
 echo.
 echo  Frontend:   http://localhost
 echo  PocketBase: http://localhost:8090/_/
@@ -65,9 +64,6 @@ echo.
 echo  Rebuilding and starting...
 cd /d "%~dp0"
 docker-compose up -d --build
-echo  Starting companion service...
-cd /d "%~dp0companion"
-start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run start"
 echo.
 echo  Frontend:   http://localhost
 echo  PocketBase: http://localhost:8090/_/
@@ -94,8 +90,6 @@ echo.
 echo  Stopping all containers...
 cd /d "%~dp0"
 docker-compose down
-echo  Stopping companion...
-taskkill /FI "WINDOWTITLE eq MyTrend Companion*" >nul 2>&1
 echo  Done.
 pause
 goto end

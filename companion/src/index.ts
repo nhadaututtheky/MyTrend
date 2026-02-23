@@ -7,7 +7,7 @@ import { createApp } from "./routes.js";
 import { TelegramBridge } from "./telegram/telegram-bridge.js";
 import { loadTelegramConfig } from "./telegram/telegram-config.js";
 
-const PORT = 3457;
+const PORT = parseInt(process.env.PORT || "3457", 10);
 const PB_URL = process.env.PB_URL || "http://localhost:8090";
 const PROFILE_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
 

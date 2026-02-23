@@ -55,6 +55,24 @@ services:
       pocketbase:
         condition: service_healthy
 
+  companion:
+    build: ./companion
+    container_name: mytrend-companion
+    restart: unless-stopped
+    ports:
+      - "3457:3457"
+    environment:
+      - PORT=3457
+      - PB_URL=http://pocketbase:8090
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS:-}
+    volumes:
+      - companion_data:/app/data
+      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/root/.claude:ro
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+
   nginx:
     image: nginx:alpine
     container_name: mytrend-nginx
@@ -68,7 +86,9 @@ services:
       - frontend
       - pocketbase
       - neural-memory
+      - companion
 
 volumes:
   pb_data:
   nm_data:
+  companion_data:
