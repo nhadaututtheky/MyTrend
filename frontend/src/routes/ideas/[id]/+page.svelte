@@ -11,14 +11,9 @@
   import { formatDate } from '$lib/utils/date';
   import type { Idea } from '$lib/types';
 
-  let ideaId = $state('');
+  let ideaId = $derived($page.params['id'] ?? '');
   let idea = $state<Idea | null>(null);
   let isLoading = $state(true);
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => { ideaId = p.params['id'] ?? ''; });
-    return unsub;
-  });
 
   onMount(async () => {
     try { idea = await fetchIdea(ideaId); }

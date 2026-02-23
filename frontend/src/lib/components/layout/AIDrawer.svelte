@@ -12,14 +12,7 @@
   let inputValue = $state('');
   let messages = $state<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   let isStreaming = $state(false);
-  let currentPath = $state('/');
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => {
-      currentPath = p.url.pathname;
-    });
-    return unsub;
-  });
+  let currentPath = $derived($page.url.pathname);
 
   const quickPrompts = [
     { label: 'Summarize today', prompt: 'Summarize my activity today' },

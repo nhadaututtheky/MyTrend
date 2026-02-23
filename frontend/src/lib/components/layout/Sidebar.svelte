@@ -50,14 +50,7 @@
     },
   ];
 
-  let currentPath = $state('/');
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => {
-      currentPath = p.url.pathname;
-    });
-    return unsub;
-  });
+  let currentPath = $derived($page.url.pathname);
 
   function isActive(href: string): boolean {
     if (href === '/') return currentPath === '/';

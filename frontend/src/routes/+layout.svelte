@@ -16,24 +16,10 @@
   let sidebarCollapsed = $state(false);
   let drawerOpen = $state(false);
   let commandPaletteOpen = $state(false);
-  let loggedIn = $state(false);
-  let currentPath = $state('/');
+  let loggedIn = $derived($isLoggedIn);
+  let currentPath = $derived($page.url.pathname);
 
   const PUBLIC_ROUTES = ['/auth/login', '/auth/register'];
-
-  $effect(() => {
-    const unsub = isLoggedIn.subscribe((v) => {
-      loggedIn = v;
-    });
-    return unsub;
-  });
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => {
-      currentPath = p.url.pathname;
-    });
-    return unsub;
-  });
 
   $effect(() => {
     if (!loggedIn && !PUBLIC_ROUTES.includes(currentPath)) {

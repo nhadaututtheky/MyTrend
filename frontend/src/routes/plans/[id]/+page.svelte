@@ -44,12 +44,7 @@
     abandoned: ['draft'],
   };
 
-  let planId = $state('');
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => { planId = p.params.id ?? ''; });
-    return unsub;
-  });
+  let planId = $derived($page.params.id ?? '');
 
   const plan = $derived(data?.plan);
   const allowedTransitions = $derived(plan ? (TRANSITIONS[plan.status] || []) : []);

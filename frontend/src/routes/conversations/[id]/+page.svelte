@@ -7,14 +7,9 @@
   import { formatDateTime, formatDuration } from '$lib/utils/date';
   import type { Conversation } from '$lib/types';
 
-  let convId = $state('');
+  let convId = $derived($page.params['id'] ?? '');
   let conversation = $state<Conversation | null>(null);
   let isLoading = $state(true);
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => { convId = p.params['id'] ?? ''; });
-    return unsub;
-  });
 
   onMount(async () => {
     try {

@@ -11,7 +11,7 @@
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import type { ClaudeTask } from '$lib/types';
 
-  let sessionId = $state('');
+  let sessionId = $derived($page.params.sessionId ?? '');
   let tasks = $state<ClaudeTask[]>([]);
   let highwatermark = $state(0);
   let isLoading = $state(true);
@@ -25,13 +25,6 @@
       : onDiskCompleted,
   );
   const total = $derived(highwatermark > 0 ? highwatermark : tasks.length);
-
-  $effect(() => {
-    const unsub = page.subscribe((p) => {
-      sessionId = p.params.sessionId ?? '';
-    });
-    return unsub;
-  });
 
   async function loadTasks(): Promise<void> {
     if (!sessionId) return;

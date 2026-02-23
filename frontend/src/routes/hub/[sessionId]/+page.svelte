@@ -14,7 +14,6 @@
   import { toast } from '$lib/stores/toast';
   import type { HubSession, HubMessage } from '$lib/types';
 
-  let sessionId = $state('');
   let session = $state<HubSession | null>(null);
   let sessions = $state<HubSession[]>([]);
   let messages = $state<HubMessage[]>([]);
@@ -55,12 +54,7 @@
     return result;
   }
 
-  $effect(() => {
-    const unsub = page.subscribe((p) => {
-      sessionId = p.params['sessionId'] ?? '';
-    });
-    return unsub;
-  });
+  let sessionId = $derived($page.params['sessionId'] ?? '');
 
   onMount(async () => {
     try {
