@@ -308,6 +308,61 @@ export function createApp(ctx: AppContext): Hono {
     return c.json({ ok: true });
   });
 
+  // ── Directory Browser ─────────────────────────────────────────────────
+
+  app.get("/api/browse-dir", async (c) => {
+    const requestPath = c.req.query("path") || "";
+
+    try {
+      // No path = list drive roots (Windows) or /home (Linux/Mac)
+      if (!requestPath) {
+        const isWindows = process.platform === "win32";
+        if (isWindows) {
+          // List available drive letters
+          const { execSync } = await import("node:child_process");
+          const raw = execSync("wmic logicaldisk get name", { encoding: "utf-8" });
+          const drives = raw
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => /^[A-Z]:$/.test(l))
+            .map((d) => d + "\\");
+          return c.json({ path: "", dirs: drives, isRoot: true });
+        }
+        return c.json({ path: "/", dirs: ["/home", "/root", "/tmp"], isRoot: true });
+      }
+
+      const { readdirSync, statSync } = await import("node:fs");
+      const { resolve, join: pathJoin } = await import("node:path");
+
+      const resolved = resolve(requestPath);
+      const entries = readdirSync(resolved, { withFileTypes: true });
+      const dirs = entries
+        .filter((e) => {
+          if (!e.isDirectory()) return false;
+          // Skip hidden/system dirs
+          if (e.name.startsWith(".") || e.name === "node_modules" || e.name === "__pycache__") return false;
+          if (e.name === "$Recycle.Bin" || e.name === "System Volume Information") return false;
+          return true;
+        })
+        .map((e) => pathJoin(resolved, e.name))
+        .sort();
+
+      // Check if current dir has .git (is a project root)
+      let hasGit = false;
+      try {
+        statSync(pathJoin(resolved, ".git"));
+        hasGit = true;
+      } catch {
+        // no .git
+      }
+
+      return c.json({ path: resolved, dirs, hasGit, isRoot: false });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to read directory";
+      return c.json({ path: requestPath, dirs: [], error: msg, isRoot: false });
+    }
+  });
+
   // ── Telegram Bridge ────────────────────────────────────────────────────
 
   app.get("/api/telegram-bridge/status", (c) => {

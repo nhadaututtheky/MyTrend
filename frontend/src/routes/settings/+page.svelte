@@ -13,6 +13,7 @@
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import FolderPicker from '$lib/components/comic/FolderPicker.svelte';
   import type { User, TelegramStatus, TelegramChannel } from '$lib/types';
 
   let displayName = $state('');
@@ -499,7 +500,7 @@
               <div class="project-item project-editing">
                 <div class="form-fields">
                   <ComicInput bind:value={editName} label="Name" />
-                  <ComicInput bind:value={editDir} label="Local Directory" placeholder="D:\Project\MyProject" />
+                  <FolderPicker bind:value={editDir} label="Local Directory" placeholder="Select project folder..." />
                   <div class="project-row">
                     <div class="project-field">
                       <label class="label" for="edit-model">Model</label>
@@ -552,7 +553,7 @@
           <h3 class="subsection-title">Add Project</h3>
           <div class="form-fields">
             <ComicInput bind:value={newProjectName} label="Project Name" placeholder="My Awesome Project" />
-            <ComicInput bind:value={newProjectDir} label="Local Directory" placeholder="D:\Project\MyProject" />
+            <FolderPicker bind:value={newProjectDir} label="Local Directory" placeholder="Select project folder..." />
             <div class="project-row">
               <div class="project-field">
                 <label class="label" for="new-model">Model</label>

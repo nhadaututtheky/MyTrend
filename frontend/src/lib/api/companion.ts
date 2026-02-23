@@ -185,6 +185,25 @@ export async function deleteCompanionProject(slug: string): Promise<{ ok: boolea
   return res.json();
 }
 
+// ─── Directory Browser API ──────────────────────────────────────────────────
+
+export interface BrowseDirResult {
+  path: string;
+  dirs: string[];
+  hasGit?: boolean;
+  isRoot?: boolean;
+  error?: string;
+}
+
+export async function browseDir(path?: string): Promise<BrowseDirResult> {
+  const url = path
+    ? `${COMPANION_URL}/api/browse-dir?path=${encodeURIComponent(path)}`
+    : `${COMPANION_URL}/api/browse-dir`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Browse failed: ${res.status}`);
+  return res.json();
+}
+
 // ─── Telegram Bridge API ────────────────────────────────────────────────────
 
 export interface TelegramBridgeStatus {
