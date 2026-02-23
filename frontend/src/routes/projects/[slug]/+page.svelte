@@ -28,7 +28,6 @@
     ClaudeTask,
   } from '$lib/types';
 
-  let slug = $state('');
   let project = $state<Project | null>(null);
   let conversations = $state<Conversation[]>([]);
   let ideas = $state<Idea[]>([]);
@@ -49,12 +48,7 @@
     { id: 'dna', label: 'DNA' },
   ];
 
-  $effect(() => {
-    const unsub = page.subscribe((p) => {
-      slug = p.params['slug'] ?? '';
-    });
-    return unsub;
-  });
+  let slug = $derived($page.params['slug'] ?? '');
 
   const stats = $derived(
     project
