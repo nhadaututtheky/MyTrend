@@ -48,7 +48,14 @@ routerAdd('POST', '/api/mytrend/companion/sync-project', (c) => {
       // no records found, proceed to create
     }
 
+    // Get first user as owner (single-user platform)
+    var users = dao.findRecordsByFilter('users', "id != ''", '', 1, 0);
+    if (!users || users.length === 0) {
+      return c.json(400, { ok: false, error: 'No users found — register first' });
+    }
+
     var record = new Record(collection);
+    record.set('user', users[0].getId());
     record.set('slug', slug);
     record.set('name', name || slug);
     record.set('status', 'active');
