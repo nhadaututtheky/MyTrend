@@ -444,6 +444,8 @@
               <option value="haiku">Haiku 4.5</option>
               <option value="sonnet">Sonnet 4.6</option>
               <option value="opus">Opus 4.6</option>
+              <option value="opus-1m">Opus 4.6 (1M)</option>
+              <option value="sonnet-1m">Sonnet 4.6 (1M)</option>
             </select>
           </div>
 
