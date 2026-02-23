@@ -308,12 +308,12 @@ export class TelegramBridge {
     this.startTyping(chatId);
 
     // Auto-translate Vietnamese → English before sending to Claude
-    if (this.isTranslateEnabled(chatId) && isVietnamese(cleanText)) {
+    // Only translate longer messages (>=30 chars) — short commands like "làm đi bro" Claude understands natively
+    if (this.isTranslateEnabled(chatId) && cleanText.length >= 30 && isVietnamese(cleanText)) {
       const { translated, error } = await translateText(cleanText);
       if (translated && !error) {
-        // Show translation preview as reply to user's message
+        // Subtle inline indicator — not a reply (avoids quote block clutter)
         this.api.sendMessage(chatId, `🌐 <i>${translated}</i>`, {
-          replyTo: msg.message_id,
           disablePreview: true,
         }).catch(() => {});
         cleanText = translated;
