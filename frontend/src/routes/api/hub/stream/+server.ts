@@ -1,13 +1,36 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
+async function getApiKey(): Promise<string> {
+  // 1. Check env var
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  if (envKey) return envKey;
+
+  // 2. Fallback: fetch from PocketBase internal endpoint
+  const pbUrl = process.env.VITE_PB_URL ?? 'http://pocketbase:8090';
+  try {
+    const res = await fetch(`${pbUrl}/api/mytrend/internal/api-key`);
+    if (res.ok) {
+      const data = (await res.json()) as { key: string; source: string };
+      if (data.key) return data.key;
+    }
+  } catch {
+    // PocketBase unreachable
+  }
+
+  return '';
+}
+
 export const POST: RequestHandler = async ({ request }) => {
   const { content, model, systemPrompt, history } = await request.json();
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = await getApiKey();
 
   if (!apiKey) {
-    return json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
+    return json(
+      { error: 'ANTHROPIC_API_KEY not configured. Set it in Settings or .env file.' },
+      { status: 500 },
+    );
   }
 
   const messages = [
@@ -43,10 +66,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     if (!response.ok || !response.body) {
       const status = response.status;
-      return json(
-        { error: `Claude API returned status ${status}` },
-        { status },
-      );
+      return json({ error: `Claude API returned status ${status}` }, { status });
     }
 
     // Return the stream directly as SSE

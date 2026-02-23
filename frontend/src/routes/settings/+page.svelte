@@ -5,6 +5,8 @@
   import { theme, toggleTheme } from '$lib/stores/theme';
   import { getDeviceName, setDeviceName } from '$lib/stores/sync';
   import { toast } from '$lib/stores/toast';
+  import { getHubSettings, saveHubApiKey } from '$lib/api/hub';
+  import type { HubSettings } from '$lib/api/hub';
   import { getTelegramStatus, testTelegramConnection, resolveChannel, setupWebhook, removeWebhook, getTelegramSettings, saveTelegramSettings } from '$lib/api/telegram';
   import type { TelegramSettings } from '$lib/api/telegram';
   import { getTelegramBridgeStatus, getTelegramBridgeConfig, saveTelegramBridgeConfig, startTelegramBridge, stopTelegramBridge, checkCompanionHealth, listProjects, createCompanionProject, updateCompanionProject, deleteCompanionProject } from '$lib/api/companion';
@@ -23,6 +25,12 @@
   let isSaving = $state(false);
   let user = $state<User | null>(null);
   let isSeeding = $state(false);
+
+  // Hub API Key state
+  let hubSettings = $state<HubSettings | null>(null);
+  let hubApiKey = $state('');
+  let hubKeyLoading = $state(false);
+  let hubKeySaving = $state(false);
 
   // Telegram state
   let tgStatus = $state<TelegramStatus | null>(null);
@@ -87,6 +95,7 @@
 
   onMount(() => {
     deviceName = getDeviceName();
+    loadHubSettings();
     loadTelegramStatus();
     loadTelegramSettings();
     loadClaudeBridge();
@@ -113,6 +122,48 @@
   function saveDeviceName(): void {
     setDeviceName(deviceName);
     toast.success('Device name updated!');
+  }
+
+  async function loadHubSettings(): Promise<void> {
+    hubKeyLoading = true;
+    try {
+      hubSettings = await getHubSettings();
+    } catch {
+      hubSettings = null;
+    } finally {
+      hubKeyLoading = false;
+    }
+  }
+
+  async function handleSaveApiKey(): Promise<void> {
+    if (!hubApiKey.trim()) {
+      toast.warning('Enter your API key');
+      return;
+    }
+    hubKeySaving = true;
+    try {
+      await saveHubApiKey(hubApiKey.trim());
+      toast.success('API key saved!');
+      hubApiKey = '';
+      await loadHubSettings();
+    } catch {
+      toast.error('Failed to save API key');
+    } finally {
+      hubKeySaving = false;
+    }
+  }
+
+  async function handleRemoveApiKey(): Promise<void> {
+    hubKeySaving = true;
+    try {
+      await saveHubApiKey('');
+      toast.success('API key removed');
+      await loadHubSettings();
+    } catch {
+      toast.error('Failed to remove API key');
+    } finally {
+      hubKeySaving = false;
+    }
   }
 
   async function loadTelegramStatus(): Promise<void> {
@@ -476,6 +527,53 @@
         Save Device Name
       </ComicButton>
     </div>
+  </ComicCard>
+
+  <ComicCard>
+    <div class="section-header">
+      <h2 class="section-title">AI Hub (Claude API)</h2>
+      {#if hubKeyLoading}
+        <ComicBadge color="blue" size="sm">Loading...</ComicBadge>
+      {:else if hubSettings?.env_api_key_set}
+        <ComicBadge color="green" size="sm">ENV Set</ComicBadge>
+      {:else if hubSettings?.anthropic_api_key_set}
+        <ComicBadge color="green" size="sm">DB Set</ComicBadge>
+      {:else}
+        <ComicBadge color="red" size="sm">Not Configured</ComicBadge>
+      {/if}
+    </div>
+
+    {#if hubSettings?.env_api_key_set}
+      <p class="tg-hint tg-env-note">API Key: set via environment variable (ANTHROPIC_API_KEY)</p>
+    {/if}
+
+    {#if hubSettings?.anthropic_api_key_set && !hubSettings?.env_api_key_set}
+      <div class="api-key-status">
+        <span class="api-key-masked">{hubSettings.anthropic_api_key_masked}</span>
+        <ComicButton variant="danger" size="sm" loading={hubKeySaving} onclick={handleRemoveApiKey}>
+          Remove
+        </ComicButton>
+      </div>
+    {/if}
+
+    {#if !hubSettings?.env_api_key_set}
+      <div class="form-fields">
+        <ComicInput
+          bind:value={hubApiKey}
+          label={hubSettings?.anthropic_api_key_set ? 'Replace API Key' : 'Anthropic API Key'}
+          placeholder="sk-ant-api03-..."
+          type="password"
+        />
+      </div>
+      <div class="actions">
+        <ComicButton variant="primary" loading={hubKeySaving} onclick={handleSaveApiKey}>
+          Save API Key
+        </ComicButton>
+      </div>
+      <p class="tg-hint">
+        Get your key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a>
+      </p>
+    {/if}
   </ComicCard>
 
   <ComicCard>
@@ -1043,6 +1141,22 @@
     font-family: var(--font-comic);
     font-size: 0.75rem;
     font-weight: 700;
+  }
+
+  .api-key-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .api-key-masked {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    background: var(--bg-secondary);
+    padding: 4px var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
   }
 
   .project-add-form {

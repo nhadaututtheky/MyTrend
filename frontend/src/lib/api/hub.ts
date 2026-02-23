@@ -114,6 +114,36 @@ export async function updateCronJob(
   return pb.collection('hub_cron_jobs').update<HubCronJob>(id, data);
 }
 
+// Hub Settings (API Key)
+export interface HubSettings {
+  anthropic_api_key_set: boolean;
+  anthropic_api_key_masked: string;
+  env_api_key_set: boolean;
+}
+
+export async function getHubSettings(): Promise<HubSettings> {
+  const pbUrl = import.meta.env.VITE_PB_URL || 'http://localhost:8090';
+  const res = await fetch(`${pbUrl}/api/mytrend/settings/hub`, {
+    headers: { Authorization: pb.authStore.token },
+  });
+  if (!res.ok) throw new Error('Failed to load Hub settings');
+  return res.json();
+}
+
+export async function saveHubApiKey(apiKey: string): Promise<{ success: boolean }> {
+  const pbUrl = import.meta.env.VITE_PB_URL || 'http://localhost:8090';
+  const res = await fetch(`${pbUrl}/api/mytrend/settings/hub`, {
+    method: 'PUT',
+    headers: {
+      Authorization: pb.authStore.token,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ anthropic_api_key: apiKey }),
+  });
+  if (!res.ok) throw new Error('Failed to save API key');
+  return res.json();
+}
+
 // Streaming - sends message to Claude API via server route
 export async function sendHubMessage(
   sessionId: string,
