@@ -9,9 +9,11 @@
   import TokenCounter from '$lib/components/hub/TokenCounter.svelte';
   import DeviceIndicator from '$lib/components/hub/DeviceIndicator.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
   import { goto } from '$app/navigation';
   import { toast } from '$lib/stores/toast';
+  import { MODEL_PRICING } from '$lib/types';
   import type { HubSession, HubMessage } from '$lib/types';
 
   let session = $state<HubSession | null>(null);
@@ -21,6 +23,7 @@
   let isStreaming = $state(false);
   let isLoading = $state(true);
   let unsubscribe: (() => void) | undefined;
+  let abortController: AbortController | null = null;
 
   interface SSEParsed {
     text: string;
@@ -36,17 +39,29 @@
       const data = line.slice(6).trim();
       if (data === '[DONE]') break;
       try {
-        const parsed = JSON.parse(data) as {
-          type?: string;
-          text?: string;
-          input_tokens?: number;
-          output_tokens?: number;
-        };
-        if (parsed.type === 'content_block_delta' || parsed.text) {
-          result.text += parsed.text ?? '';
+        const parsed = JSON.parse(data) as Record<string, unknown>;
+        // Text: content_block_delta → delta.text
+        if (parsed.type === 'content_block_delta') {
+          const delta = parsed.delta as Record<string, unknown> | undefined;
+          if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+            result.text += delta.text;
+          }
         }
-        if (parsed.input_tokens) result.inputTokens = parsed.input_tokens;
-        if (parsed.output_tokens) result.outputTokens = parsed.output_tokens;
+        // Input tokens: message_start → message.usage.input_tokens
+        if (parsed.type === 'message_start') {
+          const msg = parsed.message as Record<string, unknown> | undefined;
+          const usage = msg?.usage as Record<string, unknown> | undefined;
+          if (typeof usage?.input_tokens === 'number') {
+            result.inputTokens = usage.input_tokens;
+          }
+        }
+        // Output tokens: message_delta → usage.output_tokens
+        if (parsed.type === 'message_delta') {
+          const usage = parsed.usage as Record<string, unknown> | undefined;
+          if (typeof usage?.output_tokens === 'number') {
+            result.outputTokens = usage.output_tokens;
+          }
+        }
       } catch {
         // Skip non-JSON lines
       }
@@ -87,6 +102,7 @@
 
   onDestroy(() => {
     unsubscribe?.();
+    abortController?.abort();
   });
 
   async function handleSend(content: string): Promise<void> {
@@ -102,6 +118,8 @@
     isStreaming = true;
     streamingText = '';
 
+    abortController = new AbortController();
+
     try {
       const response = await fetch('/api/hub/stream', {
         method: 'POST',
@@ -113,6 +131,7 @@
           systemPrompt: session.system_prompt,
           history: messages.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
         }),
+        signal: abortController.signal,
       });
 
       if (!response.ok || !response.body) {
@@ -148,8 +167,10 @@
       messages = [...messages, assistantMsg];
       streamingText = '';
 
+      const pricing = MODEL_PRICING[session.model] ?? MODEL_PRICING['default'] ?? [3, 15];
+      const [inputRate, outputRate] = pricing;
       const estimatedCost =
-        (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
+        (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000;
 
       await updateSession(session.id, {
         messages,
@@ -168,10 +189,54 @@
         estimated_cost: (session.estimated_cost ?? 0) + estimatedCost,
       };
     } catch (err: unknown) {
-      console.error('[Hub/Stream]', err);
-      toast.error('Streaming error');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // User cancelled — save partial response
+        if (streamingText.trim()) {
+          const partialMsg: HubMessage = {
+            role: 'assistant',
+            content: streamingText,
+            timestamp: new Date().toISOString(),
+            tokens: 0,
+          };
+          messages = [...messages, partialMsg];
+          streamingText = '';
+        }
+        toast.info('Stopped');
+      } else {
+        console.error('[Hub/Stream]', err);
+        toast.error('Streaming error');
+      }
     } finally {
       isStreaming = false;
+      abortController = null;
+    }
+  }
+
+  function handleStop(): void {
+    abortController?.abort();
+  }
+
+  function exportAsMarkdown(): void {
+    if (!session) return;
+    const md = messages
+      .map((m) =>
+        m.role === 'user' ? `## User\n${m.content}` : `## Assistant\n${m.content}`,
+      )
+      .join('\n\n---\n\n');
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${session.name ?? 'hub-session'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function copyLastResponse(): void {
+    const last = messages.findLast((m) => m.role === 'assistant');
+    if (last) {
+      navigator.clipboard.writeText(last.content);
+      toast.success('Copied!');
     }
   }
 
@@ -210,6 +275,14 @@
           {/if}
         </div>
       </div>
+      <div class="chat-actions">
+        <ComicButton variant="outline" size="sm" onclick={copyLastResponse}>
+          Copy Last
+        </ComicButton>
+        <ComicButton variant="outline" size="sm" onclick={exportAsMarkdown}>
+          Export .md
+        </ComicButton>
+      </div>
     </div>
 
     <MessageFeed {messages} {streamingText} {isStreaming} />
@@ -220,7 +293,7 @@
       estimatedCost={session.estimated_cost}
     />
 
-    <Composer disabled={isStreaming} onsend={handleSend} />
+    <Composer disabled={isStreaming} onsend={handleSend} onstop={handleStop} />
   {/if}
 </div>
 
@@ -253,6 +326,11 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
+  }
+
+  .chat-actions {
+    display: flex;
+    gap: var(--spacing-xs);
   }
 
   .session-name {
@@ -293,6 +371,10 @@
   @media (max-width: 768px) {
     .hub-sidebar {
       display: none;
+    }
+
+    .chat-actions {
+      flex-direction: column;
     }
   }
 </style>

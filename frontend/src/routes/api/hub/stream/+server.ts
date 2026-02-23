@@ -18,6 +18,18 @@ export const POST: RequestHandler = async ({ request }) => {
     { role: 'user', content },
   ];
 
+  const body: Record<string, unknown> = {
+    model: model ?? 'claude-sonnet-4-6',
+    max_tokens: 8192,
+    messages,
+    stream: true,
+  };
+
+  // Only include system if non-empty
+  if (systemPrompt && typeof systemPrompt === 'string' && systemPrompt.trim()) {
+    body.system = systemPrompt;
+  }
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -26,18 +38,15 @@ export const POST: RequestHandler = async ({ request }) => {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({
-        model: model ?? 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        system: systemPrompt ?? '',
-        messages,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok || !response.body) {
-      const errorText = await response.text();
-      return json({ error: `API error: ${response.status} - ${errorText}` }, { status: response.status });
+      const status = response.status;
+      return json(
+        { error: `Claude API returned status ${status}` },
+        { status },
+      );
     }
 
     // Return the stream directly as SSE
@@ -45,7 +54,7 @@ export const POST: RequestHandler = async ({ request }) => {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
   } catch (err: unknown) {

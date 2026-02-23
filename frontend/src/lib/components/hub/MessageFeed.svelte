@@ -40,7 +40,7 @@
       <p class="empty-hint">Type a message below to chat with Claude</p>
     </div>
   {:else}
-    {#each messages as message, i (i)}
+    {#each messages as message, i (message.timestamp + '-' + i)}
       <MessageBubble {message} />
     {/each}
 

@@ -7,20 +7,15 @@
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import { onMount } from 'svelte';
+  import { MODEL_CATALOG } from '$lib/types';
   import type { Project } from '$lib/types';
 
   let name = $state('');
   let selectedProject = $state('');
-  let model = $state('claude-sonnet-4-5-20250929');
+  let model = $state('claude-sonnet-4-6');
   let systemPrompt = $state('');
   let isCreating = $state(false);
   let projects = $state<Project[]>([]);
-
-  const MODELS = [
-    { value: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5' },
-    { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
-    { value: 'claude-opus-4-6', label: 'Opus 4.6' },
-  ];
 
   onMount(async () => {
     try {
@@ -79,8 +74,8 @@
       <div class="field">
         <label class="label" for="model-select">Model</label>
         <select id="model-select" class="comic-input" bind:value={model}>
-          {#each MODELS as m (m.value)}
-            <option value={m.value}>{m.label}</option>
+          {#each MODEL_CATALOG as m (m.tier)}
+            <option value={m.model_id}>{m.emoji} {m.label} — {m.reason}</option>
           {/each}
         </select>
       </div>

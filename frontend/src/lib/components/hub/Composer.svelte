@@ -4,9 +4,10 @@
   interface Props {
     disabled?: boolean;
     onsend?: (content: string) => void;
+    onstop?: () => void;
   }
 
-  const { disabled = false, onsend }: Props = $props();
+  const { disabled = false, onsend, onstop }: Props = $props();
 
   let content = $state('');
   let textareaEl: HTMLTextAreaElement;
@@ -45,19 +46,25 @@
       class="message-input"
       placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
       rows="1"
-      {disabled}
+      disabled={disabled}
       onkeydown={handleKeydown}
       oninput={resizeTextarea}
     ></textarea>
   </div>
-  <ComicButton
-    variant="primary"
-    type="submit"
-    disabled={!content.trim() || disabled}
-    size="md"
-  >
-    Send
-  </ComicButton>
+  {#if disabled}
+    <ComicButton variant="danger" onclick={onstop} size="md">
+      Stop
+    </ComicButton>
+  {:else}
+    <ComicButton
+      variant="primary"
+      type="submit"
+      disabled={!content.trim()}
+      size="md"
+    >
+      Send
+    </ComicButton>
+  {/if}
 </form>
 
 <style>
@@ -92,6 +99,11 @@
   .message-input:focus {
     outline: none;
     box-shadow: var(--shadow-md);
+  }
+
+  .message-input:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
   }
 
   .message-input::placeholder {
