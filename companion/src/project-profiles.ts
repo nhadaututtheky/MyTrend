@@ -14,6 +14,15 @@ const SLUG_ALIASES: Record<string, string> = {
   companion: "mytrend",
 };
 
+/** Hub is a built-in cross-project profile — always present. */
+const DEFAULT_HUB: ProjectProfile = {
+  slug: "hub",
+  name: "HQ — Cross-Project",
+  dir: process.platform === "win32" ? "D:\\Project" : "/home/project",
+  defaultModel: "opus",
+  permissionMode: "bypassPermissions",
+};
+
 /** PocketBase project record from companion endpoint. */
 interface PBProject {
   slug: string;
@@ -26,6 +35,7 @@ export class ProjectProfileStore {
   constructor() {
     this.profiles = new Map();
     this.load();
+    this.ensureHub();
   }
 
   private load(): void {
@@ -37,6 +47,14 @@ export class ProjectProfileStore {
       }
     } catch {
       // First run - no profiles yet, will be populated from PB sync
+      this.persist();
+    }
+  }
+
+  /** Ensure hub profile always exists. */
+  private ensureHub(): void {
+    if (!this.profiles.has("hub")) {
+      this.profiles.set("hub", DEFAULT_HUB);
       this.persist();
     }
   }
@@ -68,6 +86,7 @@ export class ProjectProfileStore {
   }
 
   remove(slug: string): boolean {
+    if (slug === "hub") return false; // Hub is built-in, cannot be deleted
     const deleted = this.profiles.delete(slug);
     if (deleted) this.persist();
     return deleted;

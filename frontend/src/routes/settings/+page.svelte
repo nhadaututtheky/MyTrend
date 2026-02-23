@@ -540,7 +540,11 @@
                 </div>
                 <div class="project-actions">
                   <ComicButton variant="outline" onclick={() => startEdit(p)}>Edit</ComicButton>
-                  <ComicButton variant="danger" onclick={() => handleDeleteProject(p.slug, p.name)}>✕</ComicButton>
+                  {#if p.slug !== 'hub'}
+                    <ComicButton variant="danger" onclick={() => handleDeleteProject(p.slug, p.name)}>✕</ComicButton>
+                  {:else}
+                    <ComicBadge color="purple" size="sm">Built-in</ComicBadge>
+                  {/if}
                 </div>
               </div>
             {/if}

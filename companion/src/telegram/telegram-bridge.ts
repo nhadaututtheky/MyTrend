@@ -225,31 +225,61 @@ export class TelegramBridge {
     await this.handleTextMessage(msg);
   }
 
+  /** Auto-connect to Hub if no active session. Returns the mapping or undefined. */
+  private async autoConnectHub(chatId: number): Promise<TelegramSessionMapping | undefined> {
+    const hubProfile = this.deps.profiles.get("hub");
+    if (!hubProfile) return undefined;
+
+    await this.sendToChat(chatId, "🏠 Auto-connecting to <b>HQ</b>...");
+    const result = await this.createSession(chatId, hubProfile);
+    if (!result.ok) {
+      await this.sendToChat(chatId, `Failed to auto-connect HQ: ${result.error}`);
+      return undefined;
+    }
+
+    const mapping = this.chatSessions.get(chatId);
+    if (mapping) {
+      // Send connected notification with session actions
+      const msgId = await this.api.sendMessage(
+        chatId,
+        formatConnected(hubProfile, hubProfile.defaultModel),
+        { replyMarkup: buildSessionActionsKeyboard(mapping.model ?? hubProfile.defaultModel) }
+      );
+      mapping.pinnedMessageId = msgId;
+      await this.api.pinChatMessage(chatId, msgId).catch(() => {});
+    }
+    return mapping;
+  }
+
   private async handleTextMessage(msg: TelegramMessage): Promise<void> {
     const chatId = msg.chat.id;
     const text = msg.text?.trim();
     if (!text) return;
 
-    const mapping = this.chatSessions.get(chatId);
+    let mapping = this.chatSessions.get(chatId);
     if (!mapping) {
-      // Offer quick reconnect if we remember the last project
-      const lastSlug = this.lastProjectSlug.get(chatId);
-      if (lastSlug) {
-        const profile = this.deps.profiles.get(lastSlug);
-        if (profile) {
-          await this.sendToChatWithKeyboard(
-            chatId,
-            `No active session. Reconnect to <b>${profile.name}</b>?`,
-            { inline_keyboard: [[
-              { text: `Connect ${profile.name}`, callback_data: `proj:${lastSlug}`, style: "primary" },
-              { text: "Other projects", callback_data: "action:projects" },
-            ]] }
-          );
-          return;
+      // Auto-connect to Hub — no project selection required
+      mapping = await this.autoConnectHub(chatId);
+      if (!mapping) {
+        // Hub not available, fall back to project selection
+        const lastSlug = this.lastProjectSlug.get(chatId);
+        if (lastSlug) {
+          const profile = this.deps.profiles.get(lastSlug);
+          if (profile) {
+            await this.sendToChatWithKeyboard(
+              chatId,
+              `No active session. Reconnect to <b>${profile.name}</b>?`,
+              { inline_keyboard: [[
+                { text: `Connect ${profile.name}`, callback_data: `proj:${lastSlug}`, style: "primary" },
+                { text: "Other projects", callback_data: "action:projects" },
+              ]] }
+            );
+            return;
+          }
         }
+        await this.sendToChat(chatId, "No active session. Use /start to connect.");
+        return;
       }
-      await this.sendToChat(chatId, "No active session. Use /start to connect.");
-      return;
     }
 
     // Strip @botname from message in groups
@@ -286,10 +316,13 @@ export class TelegramBridge {
 
   private async handlePhotoMessage(msg: TelegramMessage): Promise<void> {
     const chatId = msg.chat.id;
-    const mapping = this.chatSessions.get(chatId);
+    let mapping = this.chatSessions.get(chatId);
     if (!mapping) {
-      await this.sendToChat(chatId, "No active session. Use /start to connect.");
-      return;
+      mapping = await this.autoConnectHub(chatId);
+      if (!mapping) {
+        await this.sendToChat(chatId, "No active session. Use /start to connect.");
+        return;
+      }
     }
 
     // Get highest resolution photo (last in array)
