@@ -92,4 +92,47 @@ routerAdd('DELETE', '/api/mytrend/companion/sync-project', (c) => {
   }
 });
 
+// POST /api/mytrend/companion/recount-projects
+// Recalculates total_conversations and total_ideas counters on each project.
+routerAdd('POST', '/api/mytrend/companion/recount-projects', (c) => {
+  try {
+    var dao = $app.dao();
+    var projects = dao.findRecordsByFilter('projects', "id != ''", '', 100, 0);
+    var results = [];
+
+    for (var i = 0; i < projects.length; i++) {
+      var proj = projects[i];
+      var projId = proj.getId();
+      var convCount = 0;
+      var ideaCount = 0;
+
+      try {
+        var convs = dao.findRecordsByFilter('conversations', "project = '" + projId + "'", '', 1000, 0);
+        convCount = convs.length;
+      } catch (e) { /* no conversations */ }
+
+      try {
+        var ideas = dao.findRecordsByFilter('ideas', "project = '" + projId + "'", '', 1000, 0);
+        ideaCount = ideas.length;
+      } catch (e) { /* no ideas */ }
+
+      proj.set('total_conversations', convCount);
+      proj.set('total_ideas', ideaCount);
+      dao.saveRecord(proj);
+
+      results.push({
+        slug: proj.getString('slug'),
+        name: proj.getString('name'),
+        total_conversations: convCount,
+        total_ideas: ideaCount,
+      });
+    }
+
+    return c.json(200, { ok: true, projects: results });
+  } catch (e) {
+    console.log('[CompanionAPI] recount error: ' + e);
+    return c.json(500, { ok: false, error: '' + e });
+  }
+});
+
 console.log('[CompanionAPI] Registered: GET /api/mytrend/companion/projects');
