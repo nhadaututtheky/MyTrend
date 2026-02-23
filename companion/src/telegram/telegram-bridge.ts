@@ -410,17 +410,8 @@ export class TelegramBridge {
       this.deps.bridge.setAutoApprove(sessionId, existingConfig);
     }
 
-    // Create and pin status message
-    try {
-      const statusText = formatPinnedStatus(mapping, session.state);
-      const statusMsgId = await this.api.sendMessage(chatId, statusText, {
-        replyMarkup: buildSessionActionsKeyboard(model),
-      });
-      mapping.pinnedMessageId = statusMsgId;
-      await this.api.pinChatMessage(chatId, statusMsgId);
-    } catch {
-      // Pinning may not be available in all chats
-    }
+    // Note: pinned status message is created by the caller (onProjectSelected/handleProject)
+    // to consolidate into a single message flow.
 
     // Start idle timer
     this.resetIdleTimer(chatId);
@@ -718,15 +709,30 @@ export class TelegramBridge {
     await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
     await this.api.answerCallbackQuery(queryId, `Connecting to ${profile.name}...`);
 
-    await this.sendToChat(chatId, `Connecting to ${profile.name}...`);
+    // Single progress message — will be edited through stages
+    const progressMsgId = await this.api.sendMessage(chatId, `Connecting to ${profile.name}...`);
     const result = await this.createSession(chatId, profile);
 
     if (!result.ok) {
-      await this.sendToChat(chatId, `Failed to connect: ${result.error}`);
+      await this.api.editMessageText(chatId, progressMsgId, `Failed to connect: ${result.error}`);
       return;
     }
 
-    await this.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
+    // Edit progress message into final "Connected" with details
+    const mapping = this.chatSessions.get(chatId);
+    try {
+      await this.api.editMessageText(chatId, progressMsgId, formatConnected(profile, profile.defaultModel), {
+        replyMarkup: buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel),
+      });
+      // Use this message as pinned status
+      if (mapping) {
+        mapping.pinnedMessageId = progressMsgId;
+        await this.api.pinChatMessage(chatId, progressMsgId);
+      }
+    } catch {
+      // Fallback: send separate message
+      await this.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
+    }
   }
 
   private async onModelSelected(

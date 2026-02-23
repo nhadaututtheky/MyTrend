@@ -155,20 +155,27 @@ async function handleProject(bridge: TelegramBridge, msg: TelegramMessage, args:
     return;
   }
 
-  await bridge.sendToChat(chatId, `Connecting to ${profile.name}...`);
+  const progressMsgId = await bridge.getAPI().sendMessage(chatId, `Connecting to ${profile.name}...`);
 
   const result = await bridge.createSession(chatId, profile);
   if (!result.ok) {
-    await bridge.sendToChat(chatId, `Failed to connect: ${result.error}`);
+    await bridge.getAPI().editMessageText(chatId, progressMsgId, `Failed to connect: ${result.error}`);
     return;
   }
 
+  // Edit progress message into connected status + pin it
   const mapping = bridge.getMapping(chatId);
-  await bridge.sendToChatWithKeyboard(
-    chatId,
-    formatConnected(profile, profile.defaultModel),
-    buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel)
-  );
+  try {
+    await bridge.getAPI().editMessageText(chatId, progressMsgId, formatConnected(profile, profile.defaultModel), {
+      replyMarkup: buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel),
+    });
+    if (mapping) {
+      mapping.pinnedMessageId = progressMsgId;
+      await bridge.getAPI().pinChatMessage(chatId, progressMsgId);
+    }
+  } catch {
+    await bridge.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
+  }
 }
 
 async function handleStop(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
