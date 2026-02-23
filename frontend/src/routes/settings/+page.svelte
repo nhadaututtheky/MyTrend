@@ -513,9 +513,9 @@
                     <div class="project-field">
                       <label class="label" for="edit-perm">Permission</label>
                       <select id="edit-perm" class="comic-input" bind:value={editPermission}>
-                        <option value="ask">Ask</option>
-                        <option value="allow-all">Allow All</option>
-                        <option value="bypasstool">Bypass Tool</option>
+                        <option value="default">Default</option>
+                        <option value="acceptEdits">Accept Edits</option>
+                        <option value="bypassPermissions">Bypass All</option>
                         <option value="plan">Plan</option>
                       </select>
                     </div>
