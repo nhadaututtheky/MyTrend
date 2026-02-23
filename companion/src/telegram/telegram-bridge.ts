@@ -23,6 +23,7 @@ import type { SessionStore } from "../session-store.js";
 import type { ProjectProfileStore } from "../project-profiles.js";
 import { TelegramAPI } from "./telegram-api.js";
 import { dispatchCommand } from "./telegram-commands.js";
+import { isVietnamese, translateText } from "../translate.js";
 import {
   toTelegramHTML,
   extractText,
@@ -77,7 +78,12 @@ export class TelegramBridge {
   private costAlertsShown = new Map<number, Set<number>>();
   private lastProjectSlug = new Map<number, string>();
   private autoApproveConfigs = new Map<number, AutoApproveConfig>();
+  private translateEnabled = new Map<number, boolean>(); // auto-translate Vi→En, default ON
   private hubFirstMsg = new Set<number>();
+
+  // Streaming state: progressive editMessageText instead of multi-message
+  private streamingMsg = new Map<number, { msgId: number; lastText: string; lastEditAt: number }>();
+  private readonly STREAM_EDIT_INTERVAL_MS = 1_500; // min interval between edits
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
@@ -301,6 +307,19 @@ export class TelegramBridge {
     // Start typing indicator
     this.startTyping(chatId);
 
+    // Auto-translate Vietnamese → English before sending to Claude
+    if (this.isTranslateEnabled(chatId) && isVietnamese(cleanText)) {
+      const { translated, error } = await translateText(cleanText);
+      if (translated && !error) {
+        // Show translation preview as reply to user's message
+        this.api.sendMessage(chatId, `🌐 <i>${translated}</i>`, {
+          replyTo: msg.message_id,
+          disablePreview: true,
+        }).catch(() => {});
+        cleanText = translated;
+      }
+    }
+
     // Hub mode: enrich message with project context
     if (mapping.projectSlug === "hub") {
       cleanText = this.enrichHubMessage(chatId, cleanText);
@@ -511,11 +530,37 @@ export class TelegramBridge {
           break;
         }
 
-        // Text response — reply to user's original message
+        // Streaming text response via sendMessage + editMessageText
         if (text) {
           const html = toTelegramHTML(text);
-          const replyTo = this.lastUserMsgId.get(chatId);
-          await this.api.sendLongMessage(chatId, html, { replyTo });
+          const streaming = this.streamingMsg.get(chatId);
+          const now = Date.now();
+
+          if (!streaming) {
+            // First text chunk: send new message with streaming cursor
+            const replyTo = this.lastUserMsgId.get(chatId);
+            try {
+              const msgId = await this.api.sendMessage(chatId, html + " ▌", { replyTo });
+              this.streamingMsg.set(chatId, { msgId, lastText: html, lastEditAt: now });
+              this.stopTyping(chatId);
+            } catch {
+              // Fallback: send without cursor
+              await this.api.sendLongMessage(chatId, html, { replyTo: this.lastUserMsgId.get(chatId) });
+            }
+          } else if (html !== streaming.lastText) {
+            // Text exceeded Telegram limit: finalize current, start new message
+            if (html.length > 4000) {
+              this.api.editMessageText(chatId, streaming.msgId, streaming.lastText).catch(() => {});
+              this.streamingMsg.delete(chatId);
+              // Send remaining text as new message(s)
+              await this.api.sendLongMessage(chatId, html);
+            } else if (now - streaming.lastEditAt >= this.STREAM_EDIT_INTERVAL_MS) {
+              // Normal streaming edit (throttled)
+              this.api.editMessageText(chatId, streaming.msgId, html + " ▌").catch(() => {});
+              streaming.lastText = html;
+              streaming.lastEditAt = now;
+            }
+          }
         }
 
         // AskUserQuestion — send as separate prominent message
@@ -524,7 +569,7 @@ export class TelegramBridge {
           await this.api.sendMessage(chatId, askHtml);
         }
 
-        if (text || askQuestions) {
+        if (askQuestions) {
           this.lastUserMsgId.delete(chatId);
           this.stopTyping(chatId);
         }
@@ -533,6 +578,15 @@ export class TelegramBridge {
 
       case "result": {
         this.stopTyping(chatId);
+
+        // Finalize streaming: remove cursor, send final text if it changed
+        const streamState = this.streamingMsg.get(chatId);
+        if (streamState) {
+          this.api.editMessageText(chatId, streamState.msgId, streamState.lastText).catch(() => {});
+          this.streamingMsg.delete(chatId);
+          this.lastUserMsgId.delete(chatId);
+        }
+
         const resultMsg = msg.data as CLIResultMessage;
         await this.sendToChat(chatId, formatResult(resultMsg));
 
@@ -990,6 +1044,7 @@ export class TelegramBridge {
         { command: "model", description: "Switch model" },
         { command: "status", description: "Session info" },
         { command: "autoapprove", description: "Auto-approve settings" },
+        { command: "translate", description: "Toggle Vi→En auto-translate" },
         { command: "cancel", description: "Interrupt Claude" },
         { command: "stop", description: "End session" },
         { command: "new", description: "Restart session" },
@@ -1080,6 +1135,14 @@ export class TelegramBridge {
     }
   }
 
+  isTranslateEnabled(chatId: number): boolean {
+    return this.translateEnabled.get(chatId) ?? true; // ON by default
+  }
+
+  setTranslateEnabled(chatId: number, enabled: boolean): void {
+    this.translateEnabled.set(chatId, enabled);
+  }
+
   getActiveChatCount(): number {
     return this.chatSessions.size;
   }
@@ -1133,6 +1196,8 @@ export class TelegramBridge {
     this.lastUserMsgId.delete(chatId);
     this.costAlertsShown.delete(chatId);
     this.autoApproveConfigs.delete(chatId);
+    this.translateEnabled.delete(chatId);
+    this.streamingMsg.delete(chatId);
     this.hubFirstMsg.delete(chatId);
   }
 

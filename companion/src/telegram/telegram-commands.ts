@@ -32,6 +32,7 @@ const commands: Record<string, CommandHandler> = {
   model: handleModel,
   new: handleNew,
   autoapprove: handleAutoApprove,
+  translate: handleTranslate,
 };
 
 /** Dispatch a /command to its handler. Returns true if handled. */
@@ -293,4 +294,16 @@ async function handleAutoApprove(bridge: TelegramBridge, msg: TelegramMessage): 
     formatAutoApproveStatus(config),
     buildAutoApproveKeyboard(config)
   );
+}
+
+async function handleTranslate(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
+  const chatId = msg.chat.id;
+  const current = bridge.isTranslateEnabled(chatId);
+  const next = !current;
+  bridge.setTranslateEnabled(chatId, next);
+
+  const status = next
+    ? "🌐 Auto-translate: <b>ON</b>\nVietnamese messages will be translated to English before sending to Claude."
+    : "🌐 Auto-translate: <b>OFF</b>\nMessages sent as-is.";
+  await bridge.sendToChat(chatId, status);
 }

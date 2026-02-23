@@ -262,6 +262,7 @@ export function formatHelp(): string {
     "/model - Change model",
     "/status - Session info",
     "/autoapprove - Auto-approve settings",
+    "/translate - Toggle Vi→En auto-translate",
     "/cancel - Interrupt Claude",
     "/stop - End session",
     "/new - Restart session",

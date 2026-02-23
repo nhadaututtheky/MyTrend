@@ -8,6 +8,7 @@ import type { ProjectProfileStore } from "./project-profiles.js";
 import type { TelegramBridge } from "./telegram/telegram-bridge.js";
 import { loadTelegramConfig, saveTelegramConfig, isEnvConfigured } from "./telegram/telegram-config.js";
 import type { TelegramBridgeConfig } from "./telegram/telegram-config.js";
+import { translateText } from "./translate.js";
 
 interface AppContext {
   launcher: CLILauncher;
@@ -233,37 +234,11 @@ export function createApp(ctx: AppContext): Hono {
 
   app.post("/api/translate", async (c) => {
     const body = await c.req.json<{ text: string; from?: string; to?: string }>();
-    if (!body.text?.trim()) {
-      return c.json({ translated: "" });
+    const result = await translateText(body.text ?? "", body.from, body.to);
+    if (result.error) {
+      return c.json(result, 502);
     }
-
-    const sl = body.from ?? "vi";
-    const tl = body.to ?? "en";
-
-    try {
-      const url = new URL("https://translate.googleapis.com/translate_a/single");
-      url.searchParams.set("client", "gtx");
-      url.searchParams.set("sl", sl);
-      url.searchParams.set("tl", tl);
-      url.searchParams.set("dt", "t");
-      url.searchParams.set("q", body.text);
-
-      const res = await fetch(url.toString(), {
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (!res.ok) {
-        return c.json({ translated: "", error: `Google API ${res.status}` }, 502);
-      }
-
-      const result = (await res.json()) as [string, unknown][][] | null;
-      const translated =
-        result?.[0]?.map((seg) => seg[0]).join("") ?? "";
-      return c.json({ translated });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Translation failed";
-      return c.json({ translated: "", error: msg }, 502);
-    }
+    return c.json(result);
   });
 
   // ── Project profiles ───────────────────────────────────────────────────
