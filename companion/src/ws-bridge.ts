@@ -70,6 +70,8 @@ interface ActiveSession {
   autoApproveConfig: AutoApproveConfig;
   /** Active auto-approve timers keyed by request_id. */
   autoApproveTimers: Map<string, ReturnType<typeof setTimeout>>;
+  /** Flag: auto-send plan approval after next result (set when ExitPlanMode is auto-approved). */
+  pendingPlanApproval: boolean;
 }
 
 // ─── Bridge ──────────────────────────────────────────────────────────────────
@@ -120,6 +122,7 @@ export class WsBridge {
       subscribers: new Map(),
       autoApproveConfig: { enabled: false, timeoutSeconds: 0, allowBash: false },
       autoApproveTimers: new Map(),
+      pendingPlanApproval: false,
     };
 
     this.sessions.set(sessionId, session);
@@ -515,6 +518,18 @@ export class WsBridge {
     session.messageHistory.push(browserMsg);
     this.broadcastToBrowsers(session, browserMsg);
     this.updateStatus(session, "idle");
+
+    // Auto-approve plan after ExitPlanMode completes
+    if (session.pendingPlanApproval) {
+      session.pendingPlanApproval = false;
+      console.log(
+        `[ws-bridge] Auto-approving plan for session ${session.id.slice(0, 8)} — sending approval message`
+      );
+      // Small delay to let the CLI fully settle before sending next input
+      setTimeout(() => {
+        this.handleUserMessage(session, "Approved. Proceed with implementation.");
+      }, 500);
+    }
   }
 
   private handleStreamEvent(
@@ -552,8 +567,42 @@ export class WsBridge {
         request_id: msg.request_id,
         behavior: "allow",
       });
+
+      // When ExitPlanMode is auto-approved, flag session to auto-send plan approval
+      // after the CLI finishes processing and sends the result.
+      if (toolName === "ExitPlanMode") {
+        session.pendingPlanApproval = true;
+        console.log(
+          `[ws-bridge] Flagged session ${session.id.slice(0, 8)} for auto plan approval`
+        );
+      }
       return;
     }
+
+    // Fallback: auto-approve plan mode requests even if tool_name field is missing/different.
+    // CLI may send plan approval as subtype or description instead of tool_name.
+    const desc = msg.request.description ?? "";
+    const isPlanRelated =
+      subtype === "plan_mode_response" ||
+      subtype === "exit_plan_mode" ||
+      desc.toLowerCase().includes("exitplanmode") ||
+      desc.toLowerCase().includes("plan mode");
+    if (isPlanRelated) {
+      console.log(
+        `[ws-bridge] Auto-approving plan-related request (subtype=${subtype}, desc=${desc.slice(0, 60)}, request ${msg.request_id.slice(0, 8)})`
+      );
+      this.handlePermissionResponse(session, {
+        request_id: msg.request_id,
+        behavior: "allow",
+      });
+      session.pendingPlanApproval = true;
+      return;
+    }
+
+    // Debug: log unrecognized control_request for troubleshooting
+    console.log(
+      `[ws-bridge] control_request: tool_name=${toolName}, subtype=${subtype}, desc=${desc.slice(0, 80)}, request_id=${msg.request_id.slice(0, 8)}, keys=${Object.keys(msg.request).join(",")}`
+    );
 
     // For unrecognized subtypes, still create a permission request so it's not silently dropped
     const perm: PermissionRequest = {
