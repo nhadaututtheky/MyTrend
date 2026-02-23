@@ -35,7 +35,7 @@ export async function createSession(data: {
     user: pb.authStore.model?.id,
     name: data.name ?? `Session ${new Date().toLocaleDateString()}`,
     status: 'active',
-    model: data.model ?? 'claude-sonnet-4-5-20250929',
+    model: data.model ?? 'claude-sonnet-4-6',
     system_prompt: data.system_prompt ?? '',
     messages: [],
     message_count: 0,

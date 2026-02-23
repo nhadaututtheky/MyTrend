@@ -27,7 +27,7 @@ export const POST: RequestHandler = async ({ request }) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: model ?? 'claude-sonnet-4-5-20250929',
+        model: model ?? 'claude-sonnet-4-6',
         max_tokens: 4096,
         system: systemPrompt ?? '',
         messages,

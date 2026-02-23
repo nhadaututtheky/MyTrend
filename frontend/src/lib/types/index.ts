@@ -569,7 +569,9 @@ export interface VibeSession {
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'claude-opus-4-6': 200_000,
+  'claude-opus-4-6-1m': 1_000_000,
   'claude-sonnet-4-6': 200_000,
+  'claude-sonnet-4-6-1m': 1_000_000,
   'claude-sonnet-4-5-20250929': 200_000,
   'claude-haiku-4-5-20251001': 200_000,
   default: 200_000,
@@ -578,13 +580,15 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 // USD per million tokens: [input, output]
 export const MODEL_PRICING: Record<string, [number, number]> = {
   'claude-opus-4-6': [15, 75],
+  'claude-opus-4-6-1m': [10, 37.5],
   'claude-sonnet-4-6': [3, 15],
+  'claude-sonnet-4-6-1m': [6, 22.5],
   'claude-sonnet-4-5-20250929': [3, 15],
   'claude-haiku-4-5-20251001': [0.8, 4],
   default: [3, 15],
 };
 
-export type ModelTier = 'haiku-4.5' | 'sonnet-4.5' | 'sonnet-4.6' | 'opus-4.6';
+export type ModelTier = 'haiku-4.5' | 'sonnet-4.5' | 'sonnet-4.6' | 'opus-4.6' | 'opus-4.6-1m' | 'sonnet-4.6-1m';
 
 export interface ModelInfo {
   tier: ModelTier;
@@ -592,7 +596,7 @@ export interface ModelInfo {
   model_id: string;
   family: 'haiku' | 'sonnet' | 'opus';
   version: '4.5' | '4.6';
-  color: 'green' | 'blue' | 'purple';
+  color: 'green' | 'blue' | 'purple' | 'orange';
   emoji: string;
   reason: string;
   input_price: number;
@@ -623,6 +627,18 @@ export const MODEL_CATALOG: ModelInfo[] = [
     family: 'opus', version: '4.6', color: 'purple', emoji: '🏔️',
     reason: 'Maximum reasoning — architecture & complex tasks',
     input_price: 15, output_price: 75,
+  },
+  {
+    tier: 'opus-4.6-1m', label: 'Opus 4.6 (1M)', model_id: 'claude-opus-4-6-1m',
+    family: 'opus', version: '4.6', color: 'orange', emoji: '🏔️',
+    reason: '1M context — massive codebase analysis',
+    input_price: 10, output_price: 37.5,
+  },
+  {
+    tier: 'sonnet-4.6-1m', label: 'Sonnet 4.6 (1M)', model_id: 'claude-sonnet-4-6-1m',
+    family: 'sonnet', version: '4.6', color: 'orange', emoji: '⚡',
+    reason: '1M context — large file processing',
+    input_price: 6, output_price: 22.5,
   },
 ];
 

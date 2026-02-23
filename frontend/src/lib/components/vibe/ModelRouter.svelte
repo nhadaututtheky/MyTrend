@@ -263,6 +263,7 @@
   .model-tile.model-green:hover, .model-tile.model-green.active { border-color: var(--accent-green); }
   .model-tile.model-blue:hover, .model-tile.model-blue.active { border-color: var(--accent-blue); }
   .model-tile.model-purple:hover, .model-tile.model-purple.active { border-color: var(--accent-purple); }
+  .model-tile.model-orange:hover, .model-tile.model-orange.active { border-color: var(--accent-yellow, #FFE66D); }
 
   .model-tile.active {
     box-shadow: 2px 2px 0 var(--border-color);
@@ -317,6 +318,7 @@
   .model-green { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); border-color: var(--accent-green); }
   .model-blue { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); border-color: var(--accent-blue); }
   .model-purple { background: rgba(162, 155, 254, 0.15); color: var(--accent-purple); border-color: var(--accent-purple); }
+  .model-orange { background: rgba(255, 230, 109, 0.15); color: var(--accent-yellow, #FFE66D); border-color: var(--accent-yellow, #FFE66D); }
 
   .rec-reason {
     font-size: var(--font-size-sm);

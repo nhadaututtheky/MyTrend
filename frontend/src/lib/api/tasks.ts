@@ -84,6 +84,8 @@ const TIER_KEYWORDS: Record<ModelTier, string[]> = {
     'restructure',
     'overhaul',
   ],
+  'opus-4.6-1m': [], // manual pick — 1M context for massive codebases
+  'sonnet-4.6-1m': [], // manual pick — 1M context for large files
 };
 
 // ---------------------------------------------------------------------------
