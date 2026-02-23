@@ -87,23 +87,52 @@ export class CLILauncher {
       }
       cleanEnv.HOME = process.env.USERPROFILE ?? process.env.HOME ?? "";
 
-      // On Windows, bypass .cmd wrapper to avoid pipe buffering issues.
-      // claude.cmd just calls: node <npm_prefix>/node_modules/@anthropic-ai/claude-code/cli.js
+      // Resolve node + claude CLI paths explicitly.
+      // Bun.spawn on Windows can't resolve bare "node" from PATH — need full path or .exe suffix.
       let spawnArgs: string[];
+      const { existsSync } = await import("node:fs");
+      const { execSync } = await import("node:child_process");
+
       if (process.platform === "win32") {
         const npmPrefix = process.env.APPDATA
           ? `${process.env.APPDATA}\\npm`
           : "";
         const cliScript = `${npmPrefix}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`;
-        // Try direct node invocation first, fallback to claude.cmd
-        const { existsSync } = await import("node:fs");
+
+        // Resolve full node.exe path — Bun.spawn needs .exe on Windows
+        let nodeBin = "node.exe";
+        try {
+          const resolved = execSync("where node", { encoding: "utf-8" }).trim().split("\n")[0].trim();
+          if (resolved) nodeBin = resolved;
+        } catch { /* fallback to node.exe in PATH */ }
+
         if (existsSync(cliScript)) {
-          spawnArgs = ["node", cliScript, ...args];
+          spawnArgs = [nodeBin, cliScript, ...args];
         } else {
           spawnArgs = ["claude.cmd", ...args];
         }
       } else {
-        spawnArgs = ["claude", ...args];
+        // Linux/Docker: resolve node path, use claude CLI script directly
+        let nodeBin = "/usr/local/bin/node";
+        if (!existsSync(nodeBin)) {
+          try {
+            const resolved = execSync("which node", { encoding: "utf-8" }).trim();
+            if (resolved) nodeBin = resolved;
+          } catch { nodeBin = "node"; }
+        }
+
+        // Try direct CLI script (faster, avoids shebang resolution issues)
+        const globalCliPaths = [
+          "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+          "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+        ];
+        const cliScript = globalCliPaths.find((p) => existsSync(p));
+
+        if (cliScript) {
+          spawnArgs = [nodeBin, cliScript, ...args];
+        } else {
+          spawnArgs = ["claude", ...args];
+        }
       }
 
       console.log(`[cli-launcher] Spawn command: ${spawnArgs[0]} ${spawnArgs.length > 3 ? spawnArgs.slice(1, 4).join(" ") + "..." : spawnArgs.slice(1).join(" ")}`);
