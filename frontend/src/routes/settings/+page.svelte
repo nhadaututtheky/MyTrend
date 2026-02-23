@@ -508,6 +508,8 @@
                         <option value="haiku">Haiku</option>
                         <option value="sonnet">Sonnet</option>
                         <option value="opus">Opus</option>
+                        <option value="opus-1m">Opus 1M</option>
+                        <option value="sonnet-1m">Sonnet 1M</option>
                       </select>
                     </div>
                     <div class="project-field">

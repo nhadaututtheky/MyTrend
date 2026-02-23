@@ -278,7 +278,7 @@ export function formatWelcome(botName: string): string {
     "Control Claude Code from Telegram.",
     "Select a project, then type your request.",
     "",
-    "Models: <code>sonnet</code> (balanced) · <code>opus</code> (smartest) · <code>haiku</code> (fastest)",
+    "Models: <code>opus</code> · <code>sonnet</code> · <code>haiku</code> · <code>opus-1m</code> · <code>sonnet-1m</code>",
   ].join("\n");
 }
 
@@ -323,13 +323,17 @@ export function buildProjectKeyboard(profiles: ProjectProfile[]): TelegramInline
 
 /** Model selection keyboard — checkmark on current model. */
 export function buildModelKeyboard(currentModel?: string): TelegramInlineKeyboardMarkup {
-  const models = ["sonnet", "opus", "haiku"];
-  const row: TelegramInlineKeyboardButton[] = models.map((m) => ({
+  const row1: TelegramInlineKeyboardButton[] = ["sonnet", "opus", "haiku"].map((m) => ({
     text: m === currentModel ? `${m} ✓` : m,
     callback_data: `model:${m}`,
     style: m === currentModel ? "success" : undefined,
   }));
-  return { inline_keyboard: [row] };
+  const row2: TelegramInlineKeyboardButton[] = ["opus-1m", "sonnet-1m"].map((m) => ({
+    text: m === currentModel ? `${m} ✓` : m,
+    callback_data: `model:${m}`,
+    style: m === currentModel ? "success" : undefined,
+  }));
+  return { inline_keyboard: [row1, row2] };
 }
 
 /** Permission mode selection keyboard. */

@@ -243,7 +243,7 @@ async function handleModel(bridge: TelegramBridge, msg: TelegramMessage, args: s
   }
 
   const model = args.trim().toLowerCase();
-  const valid = ["sonnet", "opus", "haiku"];
+  const valid = ["sonnet", "opus", "haiku", "opus-1m", "sonnet-1m"];
 
   // No args: show model keyboard
   if (!model) {
