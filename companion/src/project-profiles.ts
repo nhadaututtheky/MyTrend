@@ -4,19 +4,9 @@ import type { ProjectProfile } from "./session-types.js";
 
 const PROFILES_FILE = join(import.meta.dir, "..", "data", "profiles.json");
 
-/** Known slug → local directory mapping for projects that have code dirs. */
-const SLUG_DIR_MAP: Record<string, string> = {
-  mytrend: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
-  "future-bot": "C:\\Users\\X\\Desktop\\Future\\Future",
-  "feature-factory": "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
-  "neural-memory": "C:\\Users\\X\\Desktop\\Future\\neural-memory",
-  hub: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
-};
-
 /**
  * Slug aliases: PB may use different slugs for the same project.
  * Maps PB slug → canonical slug used in profiles.
- * e.g. PB "memory" = our "neural-memory", PB "future" = our "future-bot"
  */
 const SLUG_ALIASES: Record<string, string> = {
   memory: "neural-memory",
@@ -24,49 +14,13 @@ const SLUG_ALIASES: Record<string, string> = {
   companion: "mytrend",
 };
 
-/** Default profiles for all known local projects. */
-const DEFAULT_PROFILES: ProjectProfile[] = [
-  {
-    slug: "mytrend",
-    name: "MyTrend",
-    dir: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
-    defaultModel: "sonnet",
-    permissionMode: "bypassPermissions",
-  },
-  {
-    slug: "future-bot",
-    name: "Future Bot",
-    dir: "C:\\Users\\X\\Desktop\\Future\\Future",
-    defaultModel: "sonnet",
-    permissionMode: "bypassPermissions",
-  },
-  {
-    slug: "neural-memory",
-    name: "Neural Memory",
-    dir: "C:\\Users\\X\\Desktop\\Future\\neural-memory",
-    defaultModel: "sonnet",
-    permissionMode: "bypassPermissions",
-  },
-  {
-    slug: "feature-factory",
-    name: "Feature Factory",
-    dir: "C:\\Users\\X\\Desktop\\Future\\FeatureFactory",
-    defaultModel: "sonnet",
-    permissionMode: "bypassPermissions",
-  },
-  {
-    slug: "hub",
-    name: "HQ",
-    dir: "C:\\Users\\X\\Desktop\\Future\\MyTrend",
-    defaultModel: "sonnet",
-    permissionMode: "bypassPermissions",
-  },
-];
-
 /** PocketBase project record from companion endpoint. */
 interface PBProject {
   slug: string;
   name: string;
+  local_dir: string;
+  default_model: string;
+  permission_mode: string;
 }
 
 export class ProjectProfileStore {
@@ -84,27 +38,10 @@ export class ProjectProfileStore {
       for (const p of list) {
         this.profiles.set(p.slug, p);
       }
-      // Ensure all defaults exist (new projects added to code)
-      this.mergeDefaults();
     } catch {
-      // First run - seed defaults
-      for (const p of DEFAULT_PROFILES) {
-        this.profiles.set(p.slug, p);
-      }
+      // First run - no profiles yet, will be populated from PB sync
       this.persist();
     }
-  }
-
-  /** Merge DEFAULT_PROFILES into loaded profiles (add missing, don't overwrite). */
-  private mergeDefaults(): void {
-    let changed = false;
-    for (const p of DEFAULT_PROFILES) {
-      if (!this.profiles.has(p.slug)) {
-        this.profiles.set(p.slug, p);
-        changed = true;
-      }
-    }
-    if (changed) this.persist();
   }
 
   private persist(): void {
@@ -142,11 +79,12 @@ export class ProjectProfileStore {
   /**
    * Sync project profiles from PocketBase via internal companion endpoint.
    * Uses /api/mytrend/companion/projects (no auth required).
-   * Preserves existing dir/model/permission settings if already configured.
+   * Reads local_dir, default_model, permission_mode from PB.
    */
   async syncFromPocketBase(pbUrl: string): Promise<{
     added: number;
     updated: number;
+    removed: number;
     total: number;
   }> {
     let added = 0;
@@ -158,48 +96,66 @@ export class ProjectProfileStore {
       );
       if (!res.ok) {
         console.error(`[profiles] PB sync failed: ${res.status}`);
-        return { added: 0, updated: 0, total: this.profiles.size };
+        return { added: 0, updated: 0, removed: 0, total: this.profiles.size };
       }
 
       const data = (await res.json()) as { projects: PBProject[] };
+      const pbSlugs = new Set<string>();
 
       for (const proj of data.projects) {
-        // Resolve alias: PB "memory" → canonical "neural-memory"
         const canonicalSlug = SLUG_ALIASES[proj.slug] ?? proj.slug;
-        const existing = this.profiles.get(canonicalSlug);
+        pbSlugs.add(canonicalSlug);
 
-        if (existing) {
-          // Update name if changed (prefer PB name for canonical slug)
-          if (existing.name !== proj.name && canonicalSlug === proj.slug) {
-            existing.name = proj.name;
-            this.profiles.set(canonicalSlug, existing);
+        const existing = this.profiles.get(canonicalSlug);
+        const profile: ProjectProfile = {
+          slug: canonicalSlug,
+          name: proj.name,
+          dir: proj.local_dir || existing?.dir || "",
+          defaultModel: proj.default_model || existing?.defaultModel || "sonnet",
+          permissionMode: proj.permission_mode || existing?.permissionMode || "bypassPermissions",
+        };
+
+        if (!existing) {
+          this.profiles.set(canonicalSlug, profile);
+          added++;
+        } else {
+          // Update from PB if changed
+          const changed =
+            existing.name !== profile.name ||
+            (proj.local_dir && existing.dir !== proj.local_dir) ||
+            (proj.default_model && existing.defaultModel !== proj.default_model) ||
+            (proj.permission_mode && existing.permissionMode !== proj.permission_mode);
+
+          if (changed) {
+            this.profiles.set(canonicalSlug, profile);
             updated++;
           }
-        } else {
-          // New project from PocketBase (use canonical slug)
-          const dir = SLUG_DIR_MAP[canonicalSlug] ?? "";
-          this.profiles.set(canonicalSlug, {
-            slug: canonicalSlug,
-            name: proj.name,
-            dir,
-            defaultModel: "sonnet",
-            permissionMode: "bypassPermissions",
-          });
-          added++;
         }
       }
 
-      if (added > 0 || updated > 0) {
+      // Remove profiles that no longer exist in PB
+      const toRemove: string[] = [];
+      for (const slug of this.profiles.keys()) {
+        if (!pbSlugs.has(slug)) {
+          toRemove.push(slug);
+        }
+      }
+      for (const slug of toRemove) {
+        this.profiles.delete(slug);
+      }
+
+      if (added > 0 || updated > 0 || toRemove.length > 0) {
         this.persist();
       }
 
       console.log(
-        `[profiles] PB sync: ${added} added, ${updated} updated, ${this.profiles.size} total`,
+        `[profiles] PB sync: ${added} added, ${updated} updated, ${toRemove.length} removed, ${this.profiles.size} total`,
       );
+
+      return { added, updated, removed: toRemove.length, total: this.profiles.size };
     } catch (err) {
       console.error("[profiles] PB sync error:", err);
+      return { added: 0, updated: 0, removed: 0, total: this.profiles.size };
     }
-
-    return { added, updated, total: this.profiles.size };
   }
 }

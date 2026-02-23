@@ -35,6 +35,9 @@ coverage/
 playwright-report/
 test-results/
 
+# Companion data (user-specific config, sessions)
+companion/data/
+
 # Misc
 *.log
 *.tsbuildinfo

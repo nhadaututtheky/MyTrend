@@ -152,6 +152,39 @@ export async function listProjects(): Promise<CompanionProjectProfile[]> {
   return res.json();
 }
 
+export async function createCompanionProject(data: {
+  name: string;
+  dir: string;
+  defaultModel?: string;
+  permissionMode?: string;
+}): Promise<{ ok: boolean; slug?: string; error?: string }> {
+  const res = await fetch(`${COMPANION_URL}/api/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function updateCompanionProject(
+  slug: string,
+  data: { name?: string; dir?: string; defaultModel?: string; permissionMode?: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${COMPANION_URL}/api/projects/${slug}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function deleteCompanionProject(slug: string): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch(`${COMPANION_URL}/api/projects/${slug}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
 // ─── Telegram Bridge API ────────────────────────────────────────────────────
 
 export interface TelegramBridgeStatus {

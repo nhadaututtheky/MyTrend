@@ -7,8 +7,8 @@
   import { toast } from '$lib/stores/toast';
   import { getTelegramStatus, testTelegramConnection, resolveChannel, setupWebhook, removeWebhook, getTelegramSettings, saveTelegramSettings } from '$lib/api/telegram';
   import type { TelegramSettings } from '$lib/api/telegram';
-  import { getTelegramBridgeStatus, getTelegramBridgeConfig, saveTelegramBridgeConfig, startTelegramBridge, stopTelegramBridge, checkCompanionHealth } from '$lib/api/companion';
-  import type { TelegramBridgeStatus, TelegramBridgeConfigResponse } from '$lib/api/companion';
+  import { getTelegramBridgeStatus, getTelegramBridgeConfig, saveTelegramBridgeConfig, startTelegramBridge, stopTelegramBridge, checkCompanionHealth, listProjects, createCompanionProject, updateCompanionProject, deleteCompanionProject } from '$lib/api/companion';
+  import type { TelegramBridgeStatus, TelegramBridgeConfigResponse, CompanionProjectProfile } from '$lib/api/companion';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
@@ -39,6 +39,21 @@
   let tgEnvTokenSet = $state(false);
   let tgEnvChannelSet = $state(false);
   let webhookSaving = $state(false);
+
+  // Project profiles state
+  let projectProfiles = $state<CompanionProjectProfile[]>([]);
+  let projectsLoading = $state(false);
+  let editingProject = $state<string | null>(null);
+  let editName = $state('');
+  let editDir = $state('');
+  let editModel = $state('sonnet');
+  let editPermission = $state('bypassPermissions');
+  let newProjectName = $state('');
+  let newProjectDir = $state('');
+  let newProjectModel = $state('sonnet');
+  let newProjectPermission = $state('bypassPermissions');
+  let showAddProject = $state(false);
+  let projectSaving = $state(false);
 
   // Claude Bridge state
   let cbStatus = $state<TelegramBridgeStatus | null>(null);
@@ -74,6 +89,7 @@
     loadTelegramStatus();
     loadTelegramSettings();
     loadClaudeBridge();
+    loadProjectProfiles();
   });
 
   async function saveProfile(): Promise<void> {
@@ -296,6 +312,104 @@
     }
   }
 
+  // ── Project Profile functions ──────────────────────────────────────────────
+
+  async function loadProjectProfiles(): Promise<void> {
+    projectsLoading = true;
+    try {
+      const online = await checkCompanionHealth();
+      if (online) {
+        projectProfiles = await listProjects();
+      }
+    } catch {
+      projectProfiles = [];
+    } finally {
+      projectsLoading = false;
+    }
+  }
+
+  function startEdit(p: CompanionProjectProfile): void {
+    editingProject = p.slug;
+    editName = p.name;
+    editDir = p.dir;
+    editModel = p.defaultModel;
+    editPermission = p.permissionMode;
+  }
+
+  function cancelEdit(): void {
+    editingProject = null;
+  }
+
+  async function saveEdit(): Promise<void> {
+    if (!editingProject) return;
+    projectSaving = true;
+    try {
+      const result = await updateCompanionProject(editingProject, {
+        name: editName,
+        dir: editDir,
+        defaultModel: editModel,
+        permissionMode: editPermission,
+      });
+      if (result.ok) {
+        toast.success('Project updated!');
+        editingProject = null;
+        await loadProjectProfiles();
+      } else {
+        toast.error(result.error ?? 'Update failed');
+      }
+    } catch {
+      toast.error('Failed to update project');
+    } finally {
+      projectSaving = false;
+    }
+  }
+
+  async function handleAddProject(): Promise<void> {
+    if (!newProjectName.trim()) {
+      toast.warning('Project name is required');
+      return;
+    }
+    projectSaving = true;
+    try {
+      const result = await createCompanionProject({
+        name: newProjectName.trim(),
+        dir: newProjectDir.trim(),
+        defaultModel: newProjectModel,
+        permissionMode: newProjectPermission,
+      });
+      if (result.ok) {
+        toast.success('Project added!');
+        newProjectName = '';
+        newProjectDir = '';
+        newProjectModel = 'sonnet';
+        newProjectPermission = 'bypassPermissions';
+        showAddProject = false;
+        await loadProjectProfiles();
+      } else {
+        toast.error(result.error ?? 'Create failed');
+      }
+    } catch {
+      toast.error('Failed to add project');
+    } finally {
+      projectSaving = false;
+    }
+  }
+
+  async function handleDeleteProject(slug: string, name: string): Promise<void> {
+    if (!confirm(`Delete project "${name}"?`)) return;
+    try {
+      const result = await deleteCompanionProject(slug);
+      if (result.ok) {
+        toast.success('Project removed');
+        await loadProjectProfiles();
+      } else {
+        toast.error(result.error ?? 'Delete failed');
+      }
+    } catch {
+      toast.error('Failed to delete project');
+    }
+  }
+
   function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -361,6 +475,116 @@
         Save Device Name
       </ComicButton>
     </div>
+  </ComicCard>
+
+  <ComicCard>
+    <div class="section-header">
+      <h2 class="section-title">Claude Code Projects</h2>
+      {#if projectsLoading}
+        <ComicBadge color="blue" size="sm">Loading...</ComicBadge>
+      {:else if !companionOnline}
+        <ComicBadge color="red" size="sm">Companion Offline</ComicBadge>
+      {:else}
+        <ComicBadge color="green" size="sm">{projectProfiles.length} projects</ComicBadge>
+      {/if}
+    </div>
+
+    {#if !companionOnline && !projectsLoading}
+      <p class="tg-hint">Companion service is offline. Start it with <code>cd companion && bun run dev</code></p>
+    {:else}
+      {#if projectProfiles.length > 0}
+        <div class="project-list">
+          {#each projectProfiles as p (p.slug)}
+            {#if editingProject === p.slug}
+              <div class="project-item project-editing">
+                <div class="form-fields">
+                  <ComicInput bind:value={editName} label="Name" />
+                  <ComicInput bind:value={editDir} label="Local Directory" placeholder="D:\Project\MyProject" />
+                  <div class="project-row">
+                    <div class="project-field">
+                      <label class="label" for="edit-model">Model</label>
+                      <select id="edit-model" class="comic-input" bind:value={editModel}>
+                        <option value="haiku">Haiku</option>
+                        <option value="sonnet">Sonnet</option>
+                        <option value="opus">Opus</option>
+                      </select>
+                    </div>
+                    <div class="project-field">
+                      <label class="label" for="edit-perm">Permission</label>
+                      <select id="edit-perm" class="comic-input" bind:value={editPermission}>
+                        <option value="ask">Ask</option>
+                        <option value="allow-all">Allow All</option>
+                        <option value="bypasstool">Bypass Tool</option>
+                        <option value="plan">Plan</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="actions">
+                  <ComicButton variant="primary" loading={projectSaving} onclick={saveEdit}>Save</ComicButton>
+                  <ComicButton variant="outline" onclick={cancelEdit}>Cancel</ComicButton>
+                </div>
+              </div>
+            {:else}
+              <div class="project-item">
+                <div class="project-info">
+                  <strong class="project-name">{p.name}</strong>
+                  <code class="project-dir">{p.dir || '(no directory set)'}</code>
+                  <div class="project-meta">
+                    <ComicBadge color="blue" size="sm">{p.defaultModel}</ComicBadge>
+                    <ComicBadge color="green" size="sm">{p.permissionMode}</ComicBadge>
+                  </div>
+                </div>
+                <div class="project-actions">
+                  <ComicButton variant="outline" onclick={() => startEdit(p)}>Edit</ComicButton>
+                  <ComicButton variant="danger" onclick={() => handleDeleteProject(p.slug, p.name)}>✕</ComicButton>
+                </div>
+              </div>
+            {/if}
+          {/each}
+        </div>
+      {:else if !projectsLoading}
+        <p class="tg-hint">No projects configured. Add your first project below.</p>
+      {/if}
+
+      {#if showAddProject}
+        <div class="project-add-form">
+          <h3 class="subsection-title">Add Project</h3>
+          <div class="form-fields">
+            <ComicInput bind:value={newProjectName} label="Project Name" placeholder="My Awesome Project" />
+            <ComicInput bind:value={newProjectDir} label="Local Directory" placeholder="D:\Project\MyProject" />
+            <div class="project-row">
+              <div class="project-field">
+                <label class="label" for="new-model">Model</label>
+                <select id="new-model" class="comic-input" bind:value={newProjectModel}>
+                  <option value="haiku">Haiku</option>
+                  <option value="sonnet">Sonnet</option>
+                  <option value="opus">Opus</option>
+                </select>
+              </div>
+              <div class="project-field">
+                <label class="label" for="new-perm">Permission</label>
+                <select id="new-perm" class="comic-input" bind:value={newProjectPermission}>
+                  <option value="ask">Ask</option>
+                  <option value="allow-all">Allow All</option>
+                  <option value="bypasstool">Bypass Tool</option>
+                  <option value="plan">Plan</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <ComicButton variant="primary" loading={projectSaving} onclick={handleAddProject}>Add Project</ComicButton>
+            <ComicButton variant="outline" onclick={() => { showAddProject = false; }}>Cancel</ComicButton>
+          </div>
+        </div>
+      {:else}
+        <div class="actions" style="margin-top: var(--spacing-md)">
+          <ComicButton variant="secondary" onclick={() => { showAddProject = true; }}>+ Add Project</ComicButton>
+          <ComicButton variant="outline" loading={projectsLoading} onclick={loadProjectProfiles}>Refresh</ComicButton>
+        </div>
+      {/if}
+    {/if}
   </ComicCard>
 
   <ComicCard>
@@ -738,5 +962,85 @@
     display: flex;
     gap: var(--spacing-lg);
     margin-bottom: var(--spacing-md);
+  }
+
+  .project-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .project-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+  }
+
+  .project-editing {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .project-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .project-name {
+    font-family: var(--font-comic);
+    font-size: 0.9rem;
+  }
+
+  .project-dir {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    word-break: break-all;
+    background: none;
+    padding: 0;
+  }
+
+  .project-meta {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .project-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .project-row {
+    display: flex;
+    gap: var(--spacing-md);
+  }
+
+  .project-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .project-field .label {
+    font-family: var(--font-comic);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .project-add-form {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px dashed var(--border-color);
   }
 </style>

@@ -237,10 +237,74 @@ export function createApp(ctx: AppContext): Hono {
     return c.json(ctx.profiles.getAll());
   });
 
+  app.post("/api/projects", async (c) => {
+    const body = await c.req.json<{
+      name: string;
+      dir: string;
+      defaultModel?: string;
+      permissionMode?: string;
+    }>();
+
+    if (!body.name?.trim()) {
+      return c.json({ error: "name is required" }, 400);
+    }
+
+    const slug = body.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    if (!slug) {
+      return c.json({ error: "Invalid name" }, 400);
+    }
+
+    const existing = ctx.profiles.get(slug);
+    if (existing) {
+      return c.json({ error: "Project with this name already exists" }, 409);
+    }
+
+    ctx.profiles.upsert({
+      slug,
+      name: body.name.trim(),
+      dir: body.dir?.trim() || "",
+      defaultModel: body.defaultModel || "sonnet",
+      permissionMode: body.permissionMode || "bypassPermissions",
+    });
+
+    return c.json({ ok: true, slug });
+  });
+
   app.put("/api/projects/:slug", async (c) => {
     const slug = c.req.param("slug");
-    const body = await c.req.json();
-    ctx.profiles.upsert({ slug, ...body });
+    const existing = ctx.profiles.get(slug);
+    if (!existing) {
+      return c.json({ error: "Project not found" }, 404);
+    }
+
+    const body = await c.req.json<{
+      name?: string;
+      dir?: string;
+      defaultModel?: string;
+      permissionMode?: string;
+    }>();
+
+    ctx.profiles.upsert({
+      ...existing,
+      name: body.name?.trim() || existing.name,
+      dir: body.dir?.trim() ?? existing.dir,
+      defaultModel: body.defaultModel || existing.defaultModel,
+      permissionMode: body.permissionMode || existing.permissionMode,
+    });
+
+    return c.json({ ok: true });
+  });
+
+  app.delete("/api/projects/:slug", (c) => {
+    const slug = c.req.param("slug");
+    const deleted = ctx.profiles.remove(slug);
+    if (!deleted) {
+      return c.json({ error: "Project not found" }, 404);
+    }
     return c.json({ ok: true });
   });
 
