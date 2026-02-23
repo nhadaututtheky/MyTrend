@@ -540,39 +540,41 @@ export class WsBridge {
     session: ActiveSession,
     msg: CLIControlRequestMessage
   ): void {
-    if (msg.request.subtype === "can_use_tool") {
-      // Auto-approve safe state transition tools immediately
-      if (WsBridge.ALWAYS_APPROVE_TOOLS.has(msg.request.tool_name)) {
-        console.log(
-          `[ws-bridge] Auto-approving safe tool ${msg.request.tool_name} (request ${msg.request_id.slice(0, 8)})`
-        );
-        this.handlePermissionResponse(session, {
-          request_id: msg.request_id,
-          behavior: "allow",
-        });
-        return;
-      }
+    const toolName = msg.request.tool_name ?? "";
+    const subtype = msg.request.subtype;
 
-      const perm: PermissionRequest = {
+    // Auto-approve safe state transition tools immediately (any subtype)
+    if (WsBridge.ALWAYS_APPROVE_TOOLS.has(toolName)) {
+      console.log(
+        `[ws-bridge] Auto-approving safe tool ${toolName} (subtype=${subtype}, request ${msg.request_id.slice(0, 8)})`
+      );
+      this.handlePermissionResponse(session, {
         request_id: msg.request_id,
-        tool_name: msg.request.tool_name,
-        input: msg.request.input,
-        permission_suggestions: msg.request.permission_suggestions,
-        description: msg.request.description,
-        tool_use_id: msg.request.tool_use_id,
-        timestamp: Date.now(),
-      };
-
-      session.pendingPermissions.set(msg.request_id, perm);
-
-      this.broadcastToBrowsers(session, {
-        type: "permission_request",
-        request: perm,
+        behavior: "allow",
       });
-
-      // Auto-approve timer
-      this.startAutoApproveTimer(session, perm);
+      return;
     }
+
+    // For unrecognized subtypes, still create a permission request so it's not silently dropped
+    const perm: PermissionRequest = {
+      request_id: msg.request_id,
+      tool_name: toolName || subtype || "unknown",
+      input: msg.request.input ?? {},
+      permission_suggestions: msg.request.permission_suggestions,
+      description: msg.request.description,
+      tool_use_id: msg.request.tool_use_id ?? "",
+      timestamp: Date.now(),
+    };
+
+    session.pendingPermissions.set(msg.request_id, perm);
+
+    this.broadcastToBrowsers(session, {
+      type: "permission_request",
+      request: perm,
+    });
+
+    // Auto-approve timer
+    this.startAutoApproveTimer(session, perm);
   }
 
   private handleToolProgress(

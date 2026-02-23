@@ -87,12 +87,12 @@ export interface CLIControlRequestMessage {
   type: "control_request";
   request_id: string;
   request: {
-    subtype: "can_use_tool";
-    tool_name: string;
-    input: Record<string, unknown>;
+    subtype: string;
+    tool_name?: string;
+    input?: Record<string, unknown>;
     permission_suggestions?: PermissionUpdate[];
     description?: string;
-    tool_use_id: string;
+    tool_use_id?: string;
   };
 }
 
