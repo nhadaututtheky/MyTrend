@@ -19,6 +19,41 @@ interface AppContext {
   stopTelegramBridge: () => void;
 }
 
+const PB_URL = process.env.PB_URL || "http://localhost:8090";
+
+/** Sync a project profile to PocketBase projects collection. */
+async function syncProjectToPB(slug: string, name: string): Promise<void> {
+  try {
+    // Check if exists via companion endpoint
+    const res = await fetch(`${PB_URL}/api/mytrend/companion/projects`);
+    if (!res.ok) return;
+    const data = (await res.json()) as { projects: { slug: string; name: string }[] };
+    const exists = data.projects.some((p) => p.slug === slug);
+
+    if (!exists) {
+      // Create via PB API (projects collection)
+      await fetch(`${PB_URL}/api/mytrend/companion/sync-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug, name }),
+      });
+    }
+  } catch {
+    // PB offline or endpoint missing — non-critical
+  }
+}
+
+/** Remove a project from PocketBase projects collection. */
+async function removeProjectFromPB(slug: string): Promise<void> {
+  try {
+    await fetch(`${PB_URL}/api/mytrend/companion/sync-project?slug=${slug}`, {
+      method: "DELETE",
+    });
+  } catch {
+    // PB offline — non-critical
+  }
+}
+
 export function createApp(ctx: AppContext): Hono {
   const app = new Hono();
 
@@ -263,13 +298,17 @@ export function createApp(ctx: AppContext): Hono {
       return c.json({ error: "Project with this name already exists" }, 409);
     }
 
+    const projectName = body.name.trim();
     ctx.profiles.upsert({
       slug,
-      name: body.name.trim(),
+      name: projectName,
       dir: body.dir?.trim() || "",
       defaultModel: body.defaultModel || "sonnet",
       permissionMode: body.permissionMode || "bypassPermissions",
     });
+
+    // Sync to PocketBase (fire-and-forget)
+    syncProjectToPB(slug, projectName).catch(() => {});
 
     return c.json({ ok: true, slug });
   });
@@ -305,6 +344,10 @@ export function createApp(ctx: AppContext): Hono {
     if (!deleted) {
       return c.json({ error: "Project not found" }, 404);
     }
+
+    // Remove from PocketBase (fire-and-forget)
+    removeProjectFromPB(slug).catch(() => {});
+
     return c.json({ ok: true });
   });
 
