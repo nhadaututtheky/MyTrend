@@ -44,7 +44,7 @@ import {
   formatAskUserQuestion,
 } from "./telegram-formatter.js";
 
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30min
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60min
 const TYPING_INTERVAL_MS = 4_000;
 const POLLING_TIMEOUT = 30; // seconds
 const DATA_DIR = join(import.meta.dir, "..", "..", "data");
@@ -517,6 +517,11 @@ export class TelegramBridge {
   // ── CLI response handling ─────────────────────────────────────────────
 
   private async handleCLIResponse(chatId: number, msg: BrowserIncomingMessage): Promise<void> {
+    // Reset idle timer on ANY CLI activity — Claude is working, don't timeout
+    if (msg.type === "assistant" || msg.type === "tool_progress" || msg.type === "result" || msg.type === "status_change") {
+      this.resetIdleTimer(chatId);
+    }
+
     switch (msg.type) {
       case "assistant": {
         const content = msg.message.content;
