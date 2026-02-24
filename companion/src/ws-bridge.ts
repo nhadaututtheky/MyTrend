@@ -755,12 +755,25 @@ export class WsBridge {
     this.sendToCLI(session, ndjson);
   }
 
+  /** Map display model names to valid Claude Code CLI model identifiers.
+   *  See: https://code.claude.com/docs/en/model-config#extended-context */
+  private static readonly MODEL_MAP: Record<string, string> = {
+    "sonnet": "sonnet",
+    "opus": "opus",
+    "haiku": "haiku",
+    "opus-1m": "opus[1m]",
+    "sonnet-1m": "sonnet[1m]",
+    "opusplan": "opusplan",
+  };
+
   private handleSetModel(session: ActiveSession, model: string): void {
+    const cliModel = WsBridge.MODEL_MAP[model] ?? model;
     const ndjson = JSON.stringify({
       type: "control_request",
-      request: { subtype: "set_model", model },
+      request: { subtype: "set_model", model: cliModel },
     });
     this.sendToCLI(session, ndjson);
+    // Store the display name for UI, but CLI uses the mapped name
     session.state.model = model;
 
     this.broadcastToBrowsers(session, {

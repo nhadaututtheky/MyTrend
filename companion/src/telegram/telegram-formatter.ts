@@ -279,7 +279,7 @@ export function formatWelcome(botName: string): string {
     "Control Claude Code from Telegram.",
     "Select a project, then type your request.",
     "",
-    "Models: <code>opus</code> · <code>sonnet</code> · <code>haiku</code> · <code>opus-1m</code> · <code>sonnet-1m</code>",
+    "Models: <code>sonnet</code> · <code>opus</code> · <code>haiku</code> · <code>sonnet 1M</code> · <code>opus 1M</code> · <code>opusplan</code>",
   ].join("\n");
 }
 
@@ -324,17 +324,17 @@ export function buildProjectKeyboard(profiles: ProjectProfile[]): TelegramInline
 
 /** Model selection keyboard — checkmark on current model. */
 export function buildModelKeyboard(currentModel?: string): TelegramInlineKeyboardMarkup {
-  const row1: TelegramInlineKeyboardButton[] = ["sonnet", "opus", "haiku"].map((m) => ({
-    text: m === currentModel ? `${m} ✓` : m,
+  const btn = (m: string, label?: string): TelegramInlineKeyboardButton => ({
+    text: m === currentModel ? `${label ?? m} ✓` : (label ?? m),
     callback_data: `model:${m}`,
     style: m === currentModel ? "success" : undefined,
-  }));
-  const row2: TelegramInlineKeyboardButton[] = ["opus-1m", "sonnet-1m"].map((m) => ({
-    text: m === currentModel ? `${m} ✓` : m,
-    callback_data: `model:${m}`,
-    style: m === currentModel ? "success" : undefined,
-  }));
-  return { inline_keyboard: [row1, row2] };
+  });
+  return {
+    inline_keyboard: [
+      [btn("sonnet"), btn("opus"), btn("haiku")],
+      [btn("sonnet-1m", "sonnet 1M"), btn("opus-1m", "opus 1M"), btn("opusplan")],
+    ],
+  };
 }
 
 /** Permission mode selection keyboard. */

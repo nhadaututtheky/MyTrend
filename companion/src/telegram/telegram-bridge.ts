@@ -714,7 +714,7 @@ export class TelegramBridge {
     const timer = setTimeout(() => {
       console.log(`[telegram] Chat ${chatId} idle timeout, destroying session`);
       this.destroySession(chatId).then(() => {
-        this.sendToChat(chatId, "Session timed out after 30 minutes of inactivity.").catch(() => {});
+        this.sendToChat(chatId, "Session timed out after 60 minutes of inactivity.").catch(() => {});
       });
     }, IDLE_TIMEOUT_MS);
     this.idleTimers.set(chatId, timer);

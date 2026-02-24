@@ -80,12 +80,13 @@ Browser (SvelteKit)  ←WS JSON→  Companion (Bun+Hono :3457)  ←WS NDJSON→ 
 
 ### CLI Launch Flags
 ```bash
-claude --sdk-url ws://localhost:3457/ws/cli/{sessionId} \
-  --print --output-format stream-json --input-format stream-json \
-  --verbose --model sonnet --permission-mode bypasstool
+claude --print --output-format stream-json --input-format stream-json \
+  --include-partial-messages --verbose \
+  --model sonnet --permission-mode bypassPermissions
 ```
-- Valid permission modes: `ask`, `allow-all`, `bypasstool`, `plan`
-- NO `-p ""` flag — SDK mode handles I/O via WebSocket
+- Valid permission modes: `default`, `acceptEdits`, `bypassPermissions`, `dontAsk`, `plan`
+- Valid models: `sonnet`, `opus`, `haiku`, `sonnet[1m]`, `opus[1m]`, `opusplan`
+- Companion spawns CLI via Bun.spawn with stdin/stdout piping (not SDK WebSocket)
 
 ### WebSocket Protocol
 - **CLI → Bridge**: NDJSON (system/init, assistant, result, stream_event, control_request, tool_progress, keep_alive)
@@ -113,6 +114,20 @@ Comic hand-drawn style with:
 - Comic Mono font
 - Light/dark mode via [data-theme] attribute
 - Accent colors: green (#00D26A), red (#FF4757), yellow (#FFE66D), blue (#4ECDC4)
+
+## Lessons Learned
+- **Read `LESSONS.md` at session start** — contains architecture decisions, incident post-mortems, and hard-won rules.
+- **Max 2 fix attempts** — If fix #2 for the same issue doesn't work, STOP and re-plan. Don't chain fixes.
+- **Companion is NATIVE only** — Never dockerize companion. It needs full host access (MCP, skills, filesystem, Kanban sync).
+- **Commit after each logical unit** — Don't batch. Sessions can timeout mid-work.
+
+## Session TODO (2026-02-24)
+- [ ] Telegram auto-translate: threshold 30 chars — monitor if too aggressive or too lenient
+- [ ] sendMessageDraft (Bot API 9.3) — revisit if Telegram fixes TEXTDRAFT_PEER_INVALID for regular bots
+- [x] ~~Companion dockerized~~ — REVERTED to native. Docker companion is sandboxed, breaks MCP/skills/Kanban.
+- [x] cli-launcher model mapping — opus-1m→opus[1m], sonnet-1m→sonnet[1m], added opusplan
+- [x] Idle timeout: reset on CLI activity, increased to 60min
+- [x] Telegram reply race condition: responseOriginMsg lock
 
 ## Git Workflow (BẮT BUỘC)
 

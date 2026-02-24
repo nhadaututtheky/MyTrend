@@ -11,6 +11,17 @@ const VALID_PERMISSION_MODES = new Set([
   "plan",
 ]);
 
+/** Map display model names to valid Claude Code CLI model identifiers.
+ *  See: https://code.claude.com/docs/en/model-config#extended-context */
+const MODEL_MAP: Record<string, string> = {
+  "sonnet": "sonnet",
+  "opus": "opus",
+  "haiku": "haiku",
+  "opus-1m": "opus[1m]",
+  "sonnet-1m": "sonnet[1m]",
+  "opusplan": "opusplan",
+};
+
 interface LaunchInfo {
   sessionId: string;
   proc: Subprocess;
@@ -46,9 +57,10 @@ export class CLILauncher {
       "--verbose",
     ];
 
-    // Model selection
+    // Model selection — map display names to valid CLI model identifiers
     const model = options.model ?? "sonnet";
-    args.push("--model", model);
+    const cliModel = MODEL_MAP[model] ?? model;
+    args.push("--model", cliModel);
 
     // Permission mode - validate before passing to CLI
     const permMode = options.permissionMode ?? "bypassPermissions";
