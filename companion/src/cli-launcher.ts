@@ -113,8 +113,37 @@ export class CLILauncher {
           spawnArgs = ["claude.cmd", ...args];
         }
       } else {
-        // Linux/Docker: use claude CLI directly (installed globally via npm)
-        spawnArgs = ["claude", ...args];
+        // Linux/Docker: Bun.spawn can't exec symlinks, so resolve the real path
+        // and invoke via node directly. "claude" is a symlink → cli.js with shebang.
+        const { existsSync, realpathSync } = await import("node:fs");
+        const { execSync } = await import("node:child_process");
+
+        let nodeBin = "node";
+        try {
+          nodeBin = execSync("which node", { encoding: "utf-8" }).trim();
+        } catch { /* fallback */ }
+
+        // Find cli.js via symlink resolution or known paths
+        let cliScript = "";
+        try {
+          const claudePath = execSync("which claude", { encoding: "utf-8" }).trim();
+          cliScript = realpathSync(claudePath);
+        } catch { /* fallback */ }
+
+        if (!cliScript) {
+          const knownPaths = [
+            "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+            "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js",
+          ];
+          cliScript = knownPaths.find((p) => existsSync(p)) ?? "";
+        }
+
+        if (cliScript) {
+          spawnArgs = [nodeBin, cliScript, ...args];
+        } else {
+          // Last resort: wrap in sh -c to let shell handle symlink
+          spawnArgs = ["/bin/sh", "-c", `claude ${args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}`];
+        }
       }
 
       // Resolve cwd — Windows paths don't exist in Docker containers

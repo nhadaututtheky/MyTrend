@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Claude Code CLI globally via npm
 RUN npm install -g @anthropic-ai/claude-code
 
-# Create non-root user (Claude Code blocks root + bypassPermissions)
-RUN useradd -u 1000 -g 1000 -m claude 2>/dev/null || useradd -m claude
+# oven/bun:1 has built-in user "bun" (uid 1000) — use it
+# Claude Code blocks bypassPermissions as root, so non-root is required
 
 WORKDIR /app
 
@@ -24,10 +24,10 @@ RUN bun install --frozen-lockfile --production
 COPY . .
 
 # Data directory for session persistence
-RUN mkdir -p /app/data && chown -R claude:claude /app
+RUN mkdir -p /app/data && chown -R bun:bun /app
 
 EXPOSE 3457
 
-USER claude
+USER bun
 
 CMD ["bun", "run", "src/index.ts"]

@@ -67,11 +67,11 @@ services:
       - PB_URL=http://pocketbase:8090
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS:-}
-      - HOME=/home/claude
+      - HOME=/home/bun
     volumes:
       - ./companion/data:/app/data
-      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/home/claude/.claude
-      - ${CLAUDE_CONFIG_FILE:-~/.claude.json}:/home/claude/.claude.json
+      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/home/bun/.claude
+      - ${CLAUDE_CONFIG_FILE:-~/.claude.json}:/home/bun/.claude.json
     depends_on:
       pocketbase:
         condition: service_healthy
