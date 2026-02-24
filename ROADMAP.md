@@ -123,3 +123,5 @@
 - [x] Permission UI Redesign: batch 2s, severity, bypassPermissions suppress (commit 57c5ec9)
 - [x] PWA: manifest + service worker + icons + Apple meta tags (commit ec3e89d)
 - [x] Daily/Weekly Digest: PocketBase cron → Telegram HTML digest (commit 1a8743c)
+- [x] NM Auto-Ingest Pipeline: smart classification, doc training, insight extraction (commits cc9b160..3eadf06)
+- [x] Auto Backup SQLite: daily cron + manual endpoint + Telegram upload + rotation (keep 7)
