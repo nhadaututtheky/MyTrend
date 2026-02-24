@@ -41,3 +41,7 @@ export async function updateIdea(id: string, data: Partial<Idea>): Promise<Idea>
 export async function deleteIdea(id: string): Promise<boolean> {
   return pb.collection('ideas').delete(id);
 }
+
+export async function promoteIdeaToPlan(id: string): Promise<Idea> {
+  return pb.collection('ideas').update<Idea>(id, { status: 'planned' });
+}

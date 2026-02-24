@@ -104,6 +104,7 @@ export interface Idea extends BaseRecord {
   tags: readonly string[];
   related_ideas: readonly string[];
   attachments: readonly string[];
+  linked_plan: string;
 }
 
 // Plan

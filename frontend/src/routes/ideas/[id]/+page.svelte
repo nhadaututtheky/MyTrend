@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
-  import { fetchIdea } from '$lib/api/ideas';
+  import { fetchIdea, promoteIdeaToPlan } from '$lib/api/ideas';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import ComicSkeleton from '$lib/components/comic/ComicSkeleton.svelte';
@@ -14,12 +14,26 @@
   let ideaId = $derived($page.params['id'] ?? '');
   let idea = $state<Idea | null>(null);
   let isLoading = $state(true);
+  let isPromoting = $state(false);
 
   onMount(async () => {
     try { idea = await fetchIdea(ideaId); }
     catch (err: unknown) { console.error('[Idea]', err); }
     finally { isLoading = false; }
   });
+
+  async function handlePromote() {
+    if (!idea || isPromoting) return;
+    isPromoting = true;
+    try {
+      const updated = await promoteIdeaToPlan(idea.id);
+      idea = updated;
+    } catch (err: unknown) {
+      console.error('[Idea] Promote failed:', err);
+    } finally {
+      isPromoting = false;
+    }
+  }
 </script>
 
 <svelte:head><title>{idea?.title ?? 'Idea'} - MyTrend</title></svelte:head>
@@ -46,6 +60,27 @@
       </div>
       <span class="date">Created {formatDate(idea.created)}</span>
     </div>
+
+    <!-- Plan Link Section -->
+    {#if idea.linked_plan}
+      <ComicCard>
+        <div class="plan-link-section">
+          <h3 class="section-title">Linked Plan</h3>
+          <a href="/plans/{idea.linked_plan}" class="plan-link">
+            View Plan →
+          </a>
+        </div>
+      </ComicCard>
+    {:else if idea.status === 'considering' || idea.status === 'inbox'}
+      <button
+        class="comic-btn promote-btn"
+        onclick={handlePromote}
+        disabled={isPromoting}
+        aria-label="Promote this idea to a plan"
+      >
+        {isPromoting ? 'Creating Plan...' : 'Promote to Plan'}
+      </button>
+    {/if}
 
     {#if idea.content}
       <ComicCard>
@@ -84,4 +119,49 @@
   .section-title { font-size: 0.875rem; text-transform: uppercase; margin: 0 0 var(--spacing-sm); }
   .related-list { padding-left: var(--spacing-lg); font-size: 0.85rem; }
   .related-link { color: var(--accent-blue); }
+
+  .plan-link-section { display: flex; align-items: center; justify-content: space-between; }
+  .plan-link {
+    color: var(--accent-green);
+    font-family: 'Comic Mono', monospace;
+    font-weight: 700;
+    text-decoration: none;
+    border: 2px solid var(--accent-green);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: 4px;
+    box-shadow: 2px 2px 0 var(--accent-green);
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    cursor: pointer;
+  }
+  .plan-link:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--accent-green);
+  }
+
+  .promote-btn {
+    font-family: 'Comic Mono', monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--accent-blue);
+    background: transparent;
+    color: var(--accent-blue);
+    border-radius: 4px;
+    box-shadow: 3px 3px 0 var(--accent-blue);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+    min-height: 44px;
+  }
+  .promote-btn:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 5px 5px 0 var(--accent-blue);
+  }
+  .promote-btn:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--accent-blue);
+  }
+  .promote-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 </style>
