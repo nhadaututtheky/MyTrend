@@ -28,6 +28,10 @@ export interface TelegramMessage {
   photo?: TelegramPhotoSize[];
   document?: TelegramDocument;
   reply_to_message?: TelegramMessage;
+  /** Bot API 9.3: forum topic thread ID (private chat topics) */
+  message_thread_id?: number;
+  /** Bot API 9.3: true if message belongs to a forum topic */
+  is_topic_message?: boolean;
 }
 
 export interface TelegramPhotoSize {
@@ -100,4 +104,25 @@ export interface TelegramSessionMapping {
   createdAt: number;
   lastActivityAt: number;
   pinnedMessageId?: number;
+  /** Forum topic thread ID for this project's topic (0 = General/no topic) */
+  topicId?: number;
+}
+
+// ─── Forum Topics (Bot API 9.3/9.4) ─────────────────────────────────────────
+
+export interface TelegramForumTopic {
+  message_thread_id: number;
+  name: string;
+  icon_color?: number;
+  icon_custom_emoji_id?: string;
+}
+
+// ─── Notification Config ─────────────────────────────────────────────────────
+
+export interface TelegramNotificationConfig {
+  /** Telegram group chat ID for aggregated notifications */
+  groupChatId?: number;
+  notifyOnComplete: boolean;
+  notifyOnError: boolean;
+  notifyOnPermission: boolean;
 }

@@ -146,6 +146,17 @@ export async function killSession(sessionId: string): Promise<void> {
   if (!res.ok) throw new Error(`Kill failed: ${res.status}`);
 }
 
+export async function cleanupSessions(): Promise<{ ok: boolean; cleaned: number }> {
+  const res = await fetch(`${COMPANION_URL}/api/sessions/cleanup`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Cleanup failed: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${COMPANION_URL}/api/sessions/${sessionId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`Delete failed: ${res.status}`);
+}
+
 export async function listProjects(): Promise<CompanionProjectProfile[]> {
   const res = await fetch(`${COMPANION_URL}/api/projects`);
   if (!res.ok) throw new Error(`Failed to list projects: ${res.status}`);

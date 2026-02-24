@@ -11,12 +11,15 @@ export interface TelegramBridgeConfig {
   botToken: string;
   allowedChatIds: number[];
   enabled: boolean;
+  /** Group chat ID for aggregated notifications from all sessions */
+  notificationGroupId?: number;
 }
 
 const EMPTY_CONFIG: TelegramBridgeConfig = {
   botToken: "",
   allowedChatIds: [],
   enabled: false,
+  notificationGroupId: undefined,
 };
 
 export function loadTelegramConfig(): TelegramBridgeConfig {

@@ -6,6 +6,8 @@
     listSessions,
     createSession,
     killSession,
+    cleanupSessions,
+    deleteSession,
     listProjects,
     type CompanionConnection,
     type CompanionSessionState,
@@ -62,10 +64,53 @@
   // Auto-scroll
   let feedEl: HTMLDivElement | undefined = $state();
 
+  // Session list filter
+  let showEnded = $state(false);
+  let isCleaningUp = $state(false);
+
   // Derived
   const isBusy = $derived(sessionState?.status === 'busy' || sessionState?.status === 'starting');
   const isConnected = $derived(sessionState !== null && sessionState.status !== 'ended' && sessionState.status !== 'error');
   const costFormatted = $derived(sessionState ? `$${sessionState.total_cost_usd.toFixed(4)}` : '$0');
+
+  // Group sessions by project
+  interface SessionGroup {
+    slug: string;
+    name: string;
+    sessions: CompanionSessionListItem[];
+  }
+
+  const groupedSessions = $derived.by(() => {
+    const filtered = showEnded ? sessions : sessions.filter((s) => s.status !== 'ended');
+    const groups = new Map<string, CompanionSessionListItem[]>();
+
+    for (const s of filtered) {
+      const key = s.projectSlug ?? '_unknown';
+      const arr = groups.get(key) ?? [];
+      arr.push(s);
+      groups.set(key, arr);
+    }
+
+    const result: SessionGroup[] = [];
+    for (const [slug, items] of groups) {
+      const profile = projects.find((p) => p.slug === slug);
+      result.push({
+        slug,
+        name: profile?.name ?? slug.replace(/^_/, ''),
+        sessions: items,
+      });
+    }
+
+    // Sort groups alphabetically, _unknown last
+    result.sort((a, b) =>
+      a.slug === '_unknown' ? 1 : b.slug === '_unknown' ? -1 : a.name.localeCompare(b.name)
+    );
+
+    return result;
+  });
+
+  const activeCount = $derived(sessions.filter((s) => s.status !== 'ended').length);
+  const endedCount = $derived(sessions.filter((s) => s.status === 'ended').length);
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
   onMount(async () => {
@@ -159,6 +204,40 @@
       await refreshSessions();
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : 'Failed to kill session';
+    }
+  }
+
+  async function handleKillFromList(e: Event, id: string) {
+    e.stopPropagation();
+    try {
+      await killSession(id);
+      await refreshSessions();
+    } catch (err) {
+      errorMsg = err instanceof Error ? err.message : 'Failed to kill session';
+    }
+  }
+
+  async function handleDeleteFromList(e: Event, id: string) {
+    e.stopPropagation();
+    try {
+      await deleteSession(id);
+      await refreshSessions();
+    } catch (err) {
+      errorMsg = err instanceof Error ? err.message : 'Failed to delete session';
+    }
+  }
+
+  async function handleCleanup() {
+    isCleaningUp = true;
+    try {
+      const result = await cleanupSessions();
+      if (result.cleaned > 0) {
+        await refreshSessions();
+      }
+    } catch (err) {
+      errorMsg = err instanceof Error ? err.message : 'Cleanup failed';
+    } finally {
+      isCleaningUp = false;
     }
   }
 
@@ -466,26 +545,77 @@
 
       {#if sessions.length > 0}
         <div class="history-section">
-          <h3 class="section-title">SESSIONS</h3>
-          <div class="session-list">
-            {#each sessions as s (s.id)}
+          <div class="session-header">
+            <h3 class="section-title">SESSIONS ({activeCount} active)</h3>
+            <div class="session-actions">
               <button
-                class="session-item"
-                class:active={s.status !== 'ended'}
-                onclick={() => handleSelectSession(s.id)}
-                aria-label="Connect to session {s.id.slice(0, 8)}"
+                class="btn-cleanup"
+                onclick={handleCleanup}
+                disabled={isCleaningUp}
+                aria-label="Clean up dead sessions"
+                title="Force-end stuck sessions"
               >
-                <div class="session-info">
-                  <span class="session-model">{s.model}</span>
-                  <span class="session-status status-{s.status}">{s.status}</span>
-                </div>
-                <div class="session-meta">
-                  <span>{s.cwd.split(/[\\/]/).pop()}</span>
-                  <span class="session-cost">${s.total_cost_usd.toFixed(4)}</span>
-                </div>
+                {isCleaningUp ? '...' : 'Cleanup'}
               </button>
-            {/each}
+              <button
+                class="btn-toggle-ended"
+                class:active={showEnded}
+                onclick={() => showEnded = !showEnded}
+                aria-label="Toggle ended sessions"
+                title="{showEnded ? 'Hide' : 'Show'} ended ({endedCount})"
+              >
+                {showEnded ? 'Hide ended' : `+${endedCount} ended`}
+              </button>
+            </div>
           </div>
+
+          {#each groupedSessions as group (group.slug)}
+            <div class="session-group">
+              <div class="group-label">{group.name}</div>
+              <div class="session-list">
+                {#each group.sessions as s (s.id)}
+                  <button
+                    class="session-item"
+                    class:active={s.status !== 'ended'}
+                    onclick={() => handleSelectSession(s.id)}
+                    aria-label="Connect to session {s.id.slice(0, 8)}"
+                  >
+                    <div class="session-info">
+                      <span class="session-model">{s.model}</span>
+                      <span class="session-status status-{s.status}">{s.status}</span>
+                      <span class="session-actions-inline">
+                        {#if s.status !== 'ended'}
+                          <span
+                            class="btn-kill-inline"
+                            role="button"
+                            tabindex="0"
+                            onclick={(e) => handleKillFromList(e, s.id)}
+                            onkeydown={(e) => e.key === 'Enter' && handleKillFromList(e, s.id)}
+                            aria-label="Kill session"
+                            title="Kill this session"
+                          >Kill</span>
+                        {:else}
+                          <span
+                            class="btn-delete-inline"
+                            role="button"
+                            tabindex="0"
+                            onclick={(e) => handleDeleteFromList(e, s.id)}
+                            onkeydown={(e) => e.key === 'Enter' && handleDeleteFromList(e, s.id)}
+                            aria-label="Delete session"
+                            title="Remove from history"
+                          >Del</span>
+                        {/if}
+                      </span>
+                    </div>
+                    <div class="session-meta">
+                      <span>{s.cwd.split(/[\\/]/).pop()}</span>
+                      <span class="session-cost">${s.total_cost_usd.toFixed(4)}</span>
+                    </div>
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/each}
         </div>
       {/if}
     </div>
@@ -768,6 +898,67 @@
     padding: var(--spacing-md);
   }
 
+  .session-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .session-header .section-title {
+    margin: 0;
+  }
+
+  .session-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .btn-cleanup,
+  .btn-toggle-ended {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-2xs);
+    font-weight: 700;
+    padding: 1px 6px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 150ms ease;
+  }
+
+  .btn-cleanup:hover:not(:disabled) {
+    border-color: var(--accent-yellow);
+    color: var(--accent-yellow);
+  }
+
+  .btn-cleanup:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-toggle-ended:hover,
+  .btn-toggle-ended.active {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  .session-group {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .group-label {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-2xs);
+    font-weight: 700;
+    color: var(--accent-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+    padding-left: 2px;
+  }
+
   .session-list {
     display: flex;
     flex-direction: column;
@@ -820,6 +1011,7 @@
   .status-idle { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); }
   .status-busy { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); }
   .status-starting { background: rgba(255, 230, 109, 0.15); color: var(--accent-yellow); }
+  .status-compacting { background: rgba(255, 230, 109, 0.15); color: var(--accent-yellow); }
   .status-ended { background: var(--bg-card); color: var(--text-muted); }
   .status-error { background: rgba(255, 71, 87, 0.15); color: var(--accent-red); }
 
@@ -833,6 +1025,41 @@
   .session-cost {
     font-family: var(--font-mono);
     font-weight: 700;
+  }
+
+  .session-actions-inline {
+    margin-left: auto;
+  }
+
+  .btn-kill-inline,
+  .btn-delete-inline {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-2xs);
+    font-weight: 700;
+    padding: 0 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 150ms ease;
+  }
+
+  .btn-kill-inline {
+    color: var(--accent-red);
+    border: 1px solid transparent;
+  }
+
+  .btn-kill-inline:hover {
+    background: var(--accent-red);
+    color: #fff;
+    border-color: var(--accent-red);
+  }
+
+  .btn-delete-inline {
+    color: var(--text-muted);
+    border: 1px solid transparent;
+  }
+
+  .btn-delete-inline:hover {
+    border-color: var(--text-muted);
   }
 
   /* ── Active terminal ───────────────────────────────────────────────────── */

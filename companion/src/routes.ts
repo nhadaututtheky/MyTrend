@@ -205,8 +205,59 @@ export function createApp(ctx: AppContext): Hono {
 
   app.post("/api/sessions/:id/kill", async (c) => {
     const id = c.req.param("id");
+
+    // Try killing the actual process first
     const killed = await ctx.launcher.kill(id);
-    return c.json({ ok: killed });
+
+    // Even if process was already dead, force-end the session state
+    if (!killed) {
+      const forced = ctx.bridge.forceEndSession(id);
+      return c.json({ ok: forced, forced: true });
+    }
+
+    // Process was alive and killed — bridge.disconnectCLI will handle cleanup
+    return c.json({ ok: true });
+  });
+
+  // Bulk cleanup: force-end sessions with dead processes
+  app.post("/api/sessions/cleanup", (c) => {
+    const running = new Set(ctx.launcher.getRunning());
+    const allSessions = ctx.bridge.getAllSessions();
+    const persisted = ctx.store.loadAll();
+    let cleaned = 0;
+
+    // Force-end active sessions whose process is dead
+    for (const s of allSessions) {
+      if (s.state.status !== "ended" && !running.has(s.id)) {
+        ctx.bridge.forceEndSession(s.id);
+        cleaned++;
+      }
+    }
+
+    // Fix persisted sessions that are stuck
+    for (const p of persisted) {
+      if (p.state.status !== "ended" && !running.has(p.id)) {
+        p.state.status = "ended";
+        p.endedAt = p.endedAt ?? Date.now();
+        ctx.store.saveSync(p);
+        cleaned++;
+      }
+    }
+
+    return c.json({ ok: true, cleaned });
+  });
+
+  // Delete a session's persisted data (only ended sessions)
+  app.delete("/api/sessions/:id", (c) => {
+    const id = c.req.param("id");
+
+    // Don't allow deleting running sessions
+    if (ctx.launcher.isAlive(id)) {
+      return c.json({ error: "Cannot delete a running session. Kill it first." }, 400);
+    }
+
+    ctx.store.remove(id);
+    return c.json({ ok: true });
   });
 
   app.post("/api/sessions/:id/resume", async (c) => {
@@ -394,6 +445,7 @@ export function createApp(ctx: AppContext): Hono {
       hasConfig: !!config.botToken,
       botTokenSet: !!config.botToken,
       allowedChatIds: config.allowedChatIds,
+      notificationGroupId: config.notificationGroupId ?? null,
     });
   });
 
@@ -408,6 +460,7 @@ export function createApp(ctx: AppContext): Hono {
       allowedChatIds: config.allowedChatIds,
       enabled: config.enabled,
       envConfigured: isEnvConfigured(),
+      notificationGroupId: config.notificationGroupId ?? null,
     });
   });
 
@@ -416,13 +469,16 @@ export function createApp(ctx: AppContext): Hono {
       return c.json({ error: "Config is managed by environment variables" }, 400);
     }
 
-    const body = await c.req.json<{ botToken?: string; allowedChatIds?: number[]; enabled?: boolean }>();
+    const body = await c.req.json<{ botToken?: string; allowedChatIds?: number[]; enabled?: boolean; notificationGroupId?: number | null }>();
 
     const current = loadTelegramConfig();
     const updated: TelegramBridgeConfig = {
       botToken: body.botToken ?? current.botToken,
       allowedChatIds: body.allowedChatIds ?? current.allowedChatIds,
       enabled: body.enabled ?? current.enabled,
+      notificationGroupId: body.notificationGroupId !== undefined
+        ? (body.notificationGroupId ?? undefined)
+        : current.notificationGroupId,
     };
 
     // Validate chat IDs
@@ -448,6 +504,12 @@ export function createApp(ctx: AppContext): Hono {
     const result = await ctx.startTelegramBridge(config.botToken, config.allowedChatIds);
     if (!result.ok) {
       return c.json({ ok: false, error: result.error }, 500);
+    }
+
+    // Set notification group if configured
+    const tg = ctx.getTelegramBridge();
+    if (tg && config.notificationGroupId) {
+      tg.setNotificationGroupId(config.notificationGroupId);
     }
 
     // Mark as enabled in config

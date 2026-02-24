@@ -257,17 +257,19 @@ export function formatHelp(): string {
     "<b>Commands</b>",
     "",
     "/start - Projects &amp; quick start",
-    "/project &lt;slug&gt; - Connect to a project",
-    "/switch - Quick-switch project",
+    "/project &lt;slug&gt; - Open project (creates topic)",
+    "/switch - Open another project",
     "/model - Change model",
-    "/status - Session info",
+    "/status - Session info (all sessions in General)",
     "/autoapprove - Auto-approve settings",
     "/translate - Toggle Vi→En auto-translate",
     "/cancel - Interrupt Claude",
-    "/stop - End session",
+    "/stop - End session (this topic)",
+    "/stopall - End all sessions",
     "/new - Restart session",
     "/help - This message",
     "",
+    "Each project runs in its own topic.",
     "Just type to chat. Buttons for everything else.",
   ].join("\n");
 }
@@ -602,6 +604,47 @@ export function formatAskUserQuestion(questions: AskQuestion[]): string {
 
   lines.push("<i>Reply with your choice (number or text).</i>");
   return lines.join("\n").trim();
+}
+
+// ─── Multi-session & Notification formatting ──────────────────────────────────
+
+/** Format all active sessions for General topic /status overview. */
+export function formatAllSessions(
+  mappings: Map<number, TelegramSessionMapping>,
+  getSessionState: (sessionId: string) => SessionState | undefined
+): string {
+  if (mappings.size === 0) return "No active sessions.";
+
+  const lines: string[] = [`<b>Active Sessions (${mappings.size})</b>`, ""];
+  for (const [topicId, m] of mappings) {
+    const session = getSessionState(m.sessionId);
+    const status = session?.status ?? "unknown";
+    const statusEmoji =
+      status === "busy" ? "🔵" :
+      status === "idle" ? "🟢" :
+      status === "compacting" ? "🟡" :
+      status === "ended" ? "⚫" : "⚪";
+
+    const cost = session?.total_cost_usd.toFixed(3) ?? "0.000";
+    const turns = session?.num_turns ?? 0;
+    const topicLabel = topicId > 0 ? "topic" : "general";
+
+    lines.push(`${statusEmoji} <b>${m.projectSlug}</b> (${topicLabel})`);
+    lines.push(`  ${m.model} · $${cost} · ${turns} turns`);
+  }
+
+  return lines.join("\n");
+}
+
+/** Compact notification format for group alerts. */
+export function formatNotification(
+  projectName: string,
+  event: string,
+  details?: string
+): string {
+  let text = `<b>[${escapeHTML(projectName)}]</b> ${escapeHTML(event)}`;
+  if (details) text += `\n${escapeHTML(details)}`;
+  return text;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

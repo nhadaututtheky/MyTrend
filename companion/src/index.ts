@@ -54,6 +54,13 @@ async function startTelegramBridge(
     { botToken, allowedChatIds: new Set(allowedChatIds) },
     { bridge, launcher, store, profiles }
   );
+
+  // Load notification group config
+  const fullConfig = loadTelegramConfig();
+  if (fullConfig.notificationGroupId) {
+    telegramBridge.setNotificationGroupId(fullConfig.notificationGroupId);
+  }
+
   const result = await telegramBridge.start();
   if (!result.ok) {
     telegramBridge = null;

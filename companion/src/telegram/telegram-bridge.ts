@@ -62,40 +62,51 @@ export class TelegramBridge {
   private config: TelegramConfig;
   private deps: BridgeDeps;
 
-  private chatSessions = new Map<number, TelegramSessionMapping>();
-  private pendingCreations = new Set<number>();
-  private typingIntervals = new Map<number, ReturnType<typeof setInterval>>();
-  private idleTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  // Outer key: chatId, inner key: topicId (0 = General/no topic)
+  private chatSessions = new Map<number, Map<number, TelegramSessionMapping>>();
+  private pendingCreations = new Set<string>(); // composite key "chatId:topicId"
+  // Session-specific transient state (keyed by composite "chatId:topicId")
+  private typingIntervals = new Map<string, ReturnType<typeof setInterval>>();
+  private idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private pollingAbort: AbortController | null = null;
   private running = false;
   private offset = 0;
   private botName: string | null = null;
   private botUsername: string | null = null;
 
-  // Per-chat transient state (not persisted)
-  private lastToolFeedAt = new Map<number, number>();
-  private lastUserMsgId = new Map<number, number>();
-  private costAlertsShown = new Map<number, Set<number>>();
+  // Per-session transient state (composite key, not persisted)
+  private lastToolFeedAt = new Map<string, number>();
+  private lastUserMsgId = new Map<string, number>();
+  private costAlertsShown = new Map<string, Set<number>>();
+  private streamingMsg = new Map<string, { msgId: number; lastText: string; lastEditAt: number }>();
+  private readonly STREAM_EDIT_INTERVAL_MS = 1_500; // min interval between edits
+
+  // Lock origin message ID when response starts (prevents race condition with new user messages)
+  private responseOriginMsg = new Map<string, number>();
+
+  // Permission batching: collect permissions in a 2s window, then send as single message
+  private permissionBatch = new Map<string, { perms: import("../session-types.js").PermissionRequest[]; timer: ReturnType<typeof setTimeout> }>();
+  private readonly PERM_BATCH_WINDOW_MS = 2_000;
+
+  // Per-chat settings (keyed by chatId only — shared across topics)
   private lastProjectSlug = new Map<number, string>();
   private autoApproveConfigs = new Map<number, AutoApproveConfig>();
   private translateEnabled = new Map<number, boolean>(); // auto-translate Vi→En, default ON
   private hubFirstMsg = new Set<number>();
 
-  // Streaming state: progressive editMessageText instead of multi-message
-  private streamingMsg = new Map<number, { msgId: number; lastText: string; lastEditAt: number }>();
-  private readonly STREAM_EDIT_INTERVAL_MS = 1_500; // min interval between edits
-
-  // Lock origin message ID when response starts (prevents race condition with new user messages)
-  private responseOriginMsg = new Map<number, number>();
-
-  // Permission batching: collect permissions in a 2s window, then send as single message
-  private permissionBatch = new Map<number, { perms: import("../session-types.js").PermissionRequest[]; timer: ReturnType<typeof setTimeout> }>();
-  private readonly PERM_BATCH_WINDOW_MS = 2_000;
+  // Notification group for aggregated events
+  private notificationGroupId: number | null = null;
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
     this.deps = deps;
     this.api = new TelegramAPI(config);
+  }
+
+  // ── Composite key helper ──────────────────────────────────────────────
+
+  private key(chatId: number, topicId: number = 0): string {
+    return `${chatId}:${topicId}`;
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────
@@ -135,14 +146,16 @@ export class TelegramBridge {
     this.pollingAbort?.abort();
 
     // Clear all typing indicators
-    for (const [chatId] of this.typingIntervals) {
-      this.stopTyping(chatId);
+    for (const interval of this.typingIntervals.values()) {
+      clearInterval(interval);
     }
+    this.typingIntervals.clear();
 
     // Clear idle timers
     for (const timer of this.idleTimers.values()) {
       clearTimeout(timer);
     }
+    this.idleTimers.clear();
 
     this.saveMappings();
     console.log("[telegram] Bridge stopped");
@@ -204,9 +217,11 @@ export class TelegramBridge {
       const text = msg.text ?? "";
       const isCommand = text.startsWith("/");
       const isMention = this.botUsername && text.includes(`@${this.botUsername}`);
-      const hasActiveSession = this.chatSessions.has(chatId);
+      const hasActiveSession = this.chatSessions.has(chatId) && (this.chatSessions.get(chatId)?.size ?? 0) > 0;
       if (!isCommand && !isMention && !hasActiveSession) return;
     }
+
+    const topicId = msg.message_thread_id ?? 0;
 
     // Check for commands
     if (msg.text?.startsWith("/")) {
@@ -230,12 +245,12 @@ export class TelegramBridge {
 
     // Photo message → download and send as multimodal
     if (msg.photo && msg.photo.length > 0) {
-      await this.handlePhotoMessage(msg);
+      await this.handlePhotoMessage(msg, topicId);
       return;
     }
 
     // Text message → send to Claude
-    await this.handleTextMessage(msg);
+    await this.handleTextMessage(msg, topicId);
   }
 
   /** Auto-connect to Hub if no active session. Returns the mapping or undefined. */
@@ -244,13 +259,13 @@ export class TelegramBridge {
     if (!hubProfile) return undefined;
 
     await this.sendToChat(chatId, "🏠 Auto-connecting to <b>HQ</b>...");
-    const result = await this.createSession(chatId, hubProfile);
+    const result = await this.createSession(chatId, hubProfile, 0); // topicId=0 for hub
     if (!result.ok) {
       await this.sendToChat(chatId, `Failed to auto-connect HQ: ${result.error}`);
       return undefined;
     }
 
-    const mapping = this.chatSessions.get(chatId);
+    const mapping = this.chatSessions.get(chatId)?.get(0);
     if (mapping) {
       // Send connected notification with session actions
       const msgId = await this.api.sendMessage(
@@ -264,14 +279,19 @@ export class TelegramBridge {
     return mapping;
   }
 
-  private async handleTextMessage(msg: TelegramMessage): Promise<void> {
+  private async handleTextMessage(msg: TelegramMessage, topicId: number): Promise<void> {
     const chatId = msg.chat.id;
     const text = msg.text?.trim();
     if (!text) return;
 
-    let mapping = this.chatSessions.get(chatId);
+    let mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) {
-      // Auto-connect to Hub — no project selection required
+      if (topicId > 0) {
+        // Project topic with no active session
+        await this.sendToChat(chatId, "No active session in this topic.", topicId);
+        return;
+      }
+      // General topic (topicId=0): try auto-connect Hub or show project selection
       mapping = await this.autoConnectHub(chatId);
       if (!mapping) {
         // Hub not available, fall back to project selection
@@ -303,16 +323,16 @@ export class TelegramBridge {
     if (!cleanText) return;
 
     // Track message ID for reply-to and reaction updates
-    this.lastUserMsgId.set(chatId, msg.message_id);
+    this.lastUserMsgId.set(this.key(chatId, topicId), msg.message_id);
 
     // Acknowledge receipt with reaction
     this.api.react(chatId, msg.message_id, "👀").catch(() => {});
 
     // Reset idle timer
-    this.resetIdleTimer(chatId);
+    this.resetIdleTimer(chatId, topicId);
 
     // Start typing indicator
-    this.startTyping(chatId);
+    this.startTyping(chatId, topicId);
 
     // Auto-translate Vietnamese → English before sending to Claude
     // Only translate longer messages (>=30 chars) — short commands like "làm đi bro" Claude understands natively
@@ -322,6 +342,7 @@ export class TelegramBridge {
         // Subtle inline indicator — not a reply (avoids quote block clutter)
         this.api.sendMessage(chatId, `🌐 <i>${translated}</i>`, {
           disablePreview: true,
+          messageThreadId: topicId > 0 ? topicId : undefined,
         }).catch(() => {});
         cleanText = translated;
       }
@@ -340,10 +361,14 @@ export class TelegramBridge {
     this.saveMappings();
   }
 
-  private async handlePhotoMessage(msg: TelegramMessage): Promise<void> {
+  private async handlePhotoMessage(msg: TelegramMessage, topicId: number): Promise<void> {
     const chatId = msg.chat.id;
-    let mapping = this.chatSessions.get(chatId);
+    let mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) {
+      if (topicId > 0) {
+        await this.sendToChat(chatId, "No active session in this topic.", topicId);
+        return;
+      }
       mapping = await this.autoConnectHub(chatId);
       if (!mapping) {
         await this.sendToChat(chatId, "No active session. Use /start to connect.");
@@ -356,10 +381,10 @@ export class TelegramBridge {
     const caption = msg.caption ?? "";
 
     // Acknowledge receipt
-    this.lastUserMsgId.set(chatId, msg.message_id);
+    this.lastUserMsgId.set(this.key(chatId, topicId), msg.message_id);
     this.api.react(chatId, msg.message_id, "👀").catch(() => {});
-    this.resetIdleTimer(chatId);
-    this.startTyping(chatId);
+    this.resetIdleTimer(chatId, topicId);
+    this.startTyping(chatId, topicId);
 
     try {
       // Download image from Telegram
@@ -391,8 +416,8 @@ export class TelegramBridge {
     } catch (err) {
       const error = err instanceof Error ? err.message : "Unknown error";
       console.error("[telegram] Photo download error:", error);
-      this.stopTyping(chatId);
-      await this.sendToChat(chatId, `Failed to process image: ${error}`);
+      this.stopTyping(chatId, topicId);
+      await this.sendToChat(chatId, `Failed to process image: ${error}`, topicId);
     }
   }
 
@@ -400,24 +425,27 @@ export class TelegramBridge {
 
   async createSession(
     chatId: number,
-    profile: ProjectProfile
+    profile: ProjectProfile,
+    topicId: number = 0
   ): Promise<{ ok: boolean; error?: string }> {
-    // Prevent concurrent creation for same chat
-    if (this.pendingCreations.has(chatId)) {
+    const creationKey = this.key(chatId, topicId);
+    // Prevent concurrent creation for same chat+topic
+    if (this.pendingCreations.has(creationKey)) {
       return { ok: false, error: "Session creation already in progress" };
     }
-    this.pendingCreations.add(chatId);
+    this.pendingCreations.add(creationKey);
 
     try {
-      return await this.doCreateSession(chatId, profile);
+      return await this.doCreateSession(chatId, profile, topicId);
     } finally {
-      this.pendingCreations.delete(chatId);
+      this.pendingCreations.delete(creationKey);
     }
   }
 
   private async doCreateSession(
     chatId: number,
-    profile: ProjectProfile
+    profile: ProjectProfile,
+    topicId: number
   ): Promise<{ ok: boolean; error?: string }> {
     const sessionId = crypto.randomUUID();
     const model = profile.defaultModel ?? "sonnet";
@@ -452,16 +480,22 @@ export class TelegramBridge {
     // Create mapping
     const mapping: TelegramSessionMapping = {
       chatId,
+      topicId,
       sessionId,
       projectSlug: profile.slug,
       model,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
     };
-    this.chatSessions.set(chatId, mapping);
+
+    // Store in nested map: chatId → topicId → mapping
+    if (!this.chatSessions.has(chatId)) {
+      this.chatSessions.set(chatId, new Map());
+    }
+    this.chatSessions.get(chatId)!.set(topicId, mapping);
 
     // Subscribe to CLI messages
-    this.subscribeToSession(chatId, sessionId);
+    this.subscribeToSession(chatId, topicId, sessionId);
 
     // Apply auto-approve config if previously set for this chat
     const existingConfig = this.autoApproveConfigs.get(chatId);
@@ -473,14 +507,18 @@ export class TelegramBridge {
     // to consolidate into a single message flow.
 
     // Start idle timer
-    this.resetIdleTimer(chatId);
+    this.resetIdleTimer(chatId, topicId);
 
     this.saveMappings();
+
+    // Notify group of session start
+    await this.notifyGroup(profile.slug, "Session started", `Model: ${model}`);
+
     return { ok: true };
   }
 
-  async destroySession(chatId: number): Promise<void> {
-    const mapping = this.chatSessions.get(chatId);
+  async destroySession(chatId: number, topicId: number = 0): Promise<void> {
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) return;
 
     // Sync conversation to PocketBase before cleanup
@@ -495,35 +533,51 @@ export class TelegramBridge {
     }
 
     // Unsubscribe
-    this.deps.bridge.unsubscribe(mapping.sessionId, `telegram:${chatId}`);
+    const subscriberId = `telegram:${chatId}:${topicId}`;
+    this.deps.bridge.unsubscribe(mapping.sessionId, subscriberId);
 
     // Kill CLI
     await this.deps.launcher.kill(mapping.sessionId);
 
-    // Clean up
-    this.chatSessions.delete(chatId);
-    this.stopTyping(chatId);
-    this.clearIdleTimer(chatId);
-    this.cleanupChatState(chatId);
+    // Remove from nested map
+    this.chatSessions.get(chatId)?.delete(topicId);
+    if ((this.chatSessions.get(chatId)?.size ?? 0) === 0) {
+      this.chatSessions.delete(chatId);
+    }
+
+    // Close forum topic if it was a named topic (not General)
+    if (topicId > 0) {
+      this.api.closeForumTopic(chatId, topicId).catch(() => {});
+    }
+
+    this.stopTyping(chatId, topicId);
+    this.clearIdleTimer(chatId, topicId);
+    this.cleanupChatState(chatId, topicId);
+
+    // Notify group of session end
+    await this.notifyGroup(mapping.projectSlug, "Session stopped");
+
     this.saveMappings();
   }
 
-  private subscribeToSession(chatId: number, sessionId: string): void {
-    const subscriberId = `telegram:${chatId}`;
+  private subscribeToSession(chatId: number, topicId: number, sessionId: string): void {
+    const subscriberId = `telegram:${chatId}:${topicId}`;
 
     this.deps.bridge.subscribe(sessionId, subscriberId, (msg: BrowserIncomingMessage) => {
-      this.handleCLIResponse(chatId, msg).catch((err) => {
-        console.error(`[telegram] CLI response handler error (chat=${chatId}):`, err);
+      this.handleCLIResponse(chatId, topicId, msg).catch((err) => {
+        console.error(`[telegram] CLI response handler error (chat=${chatId} topic=${topicId}):`, err);
       });
     });
   }
 
   // ── CLI response handling ─────────────────────────────────────────────
 
-  private async handleCLIResponse(chatId: number, msg: BrowserIncomingMessage): Promise<void> {
+  private async handleCLIResponse(chatId: number, topicId: number, msg: BrowserIncomingMessage): Promise<void> {
+    const k = this.key(chatId, topicId);
+
     // Reset idle timer on ANY CLI activity — Claude is working, don't timeout
     if (msg.type === "assistant" || msg.type === "tool_progress" || msg.type === "result" || msg.type === "status_change") {
-      this.resetIdleTimer(chatId);
+      this.resetIdleTimer(chatId, topicId);
     }
 
     switch (msg.type) {
@@ -538,38 +592,46 @@ export class TelegramBridge {
         const text = extractText(content);
         if (!text && !askQuestions) {
           const toolFeed = formatToolFeed(content);
-          if (toolFeed) this.sendThrottledToolFeed(chatId, toolFeed);
+          if (toolFeed) this.sendThrottledToolFeed(chatId, topicId, toolFeed);
           break;
         }
 
         // Streaming text response via sendMessage + editMessageText
         if (text) {
           const html = toTelegramHTML(text);
-          const streaming = this.streamingMsg.get(chatId);
+          const streaming = this.streamingMsg.get(k);
           const now = Date.now();
 
           if (!streaming) {
             // First text chunk: lock origin message ID to prevent race condition
             // with new user messages arriving while Claude is still responding
-            const replyTo = this.lastUserMsgId.get(chatId);
-            if (replyTo && !this.responseOriginMsg.has(chatId)) {
-              this.responseOriginMsg.set(chatId, replyTo);
+            const replyTo = this.lastUserMsgId.get(k);
+            if (replyTo && !this.responseOriginMsg.has(k)) {
+              this.responseOriginMsg.set(k, replyTo);
             }
             try {
-              const msgId = await this.api.sendMessage(chatId, html + " ▌", { replyTo });
-              this.streamingMsg.set(chatId, { msgId, lastText: html, lastEditAt: now });
-              this.stopTyping(chatId);
+              const msgId = await this.api.sendMessage(chatId, html + " ▌", {
+                replyTo,
+                messageThreadId: topicId > 0 ? topicId : undefined,
+              });
+              this.streamingMsg.set(k, { msgId, lastText: html, lastEditAt: now });
+              this.stopTyping(chatId, topicId);
             } catch {
               // Fallback: send without cursor
-              await this.api.sendLongMessage(chatId, html, { replyTo });
+              await this.api.sendLongMessage(chatId, html, {
+                replyTo,
+                messageThreadId: topicId > 0 ? topicId : undefined,
+              });
             }
           } else if (html !== streaming.lastText) {
             // Text exceeded Telegram limit: finalize current, start new message
             if (html.length > 4000) {
               this.api.editMessageText(chatId, streaming.msgId, streaming.lastText).catch(() => {});
-              this.streamingMsg.delete(chatId);
+              this.streamingMsg.delete(k);
               // Send remaining text as new message(s)
-              await this.api.sendLongMessage(chatId, html);
+              await this.api.sendLongMessage(chatId, html, {
+                messageThreadId: topicId > 0 ? topicId : undefined,
+              });
             } else if (now - streaming.lastEditAt >= this.STREAM_EDIT_INTERVAL_MS) {
               // Normal streaming edit (throttled)
               this.api.editMessageText(chatId, streaming.msgId, html + " ▌").catch(() => {});
@@ -582,66 +644,74 @@ export class TelegramBridge {
         // AskUserQuestion — send as separate prominent message
         if (askQuestions) {
           const askHtml = formatAskUserQuestion(askQuestions);
-          await this.api.sendMessage(chatId, askHtml);
+          await this.api.sendMessage(chatId, askHtml, {
+            messageThreadId: topicId > 0 ? topicId : undefined,
+          });
         }
 
         if (askQuestions) {
-          this.lastUserMsgId.delete(chatId);
-          this.stopTyping(chatId);
+          this.lastUserMsgId.delete(k);
+          this.stopTyping(chatId, topicId);
         }
         break;
       }
 
       case "result": {
-        this.stopTyping(chatId);
+        this.stopTyping(chatId, topicId);
 
         // Finalize streaming: remove cursor, send final text if it changed
-        const streamState = this.streamingMsg.get(chatId);
+        const streamState = this.streamingMsg.get(k);
         if (streamState) {
           this.api.editMessageText(chatId, streamState.msgId, streamState.lastText).catch(() => {});
-          this.streamingMsg.delete(chatId);
+          this.streamingMsg.delete(k);
         }
 
         const resultMsg = msg.data as CLIResultMessage;
-        await this.sendToChat(chatId, formatResult(resultMsg));
+        await this.sendToChat(chatId, formatResult(resultMsg), topicId);
 
         // Update reaction on the ORIGINAL user message (locked at response start)
-        const originMsgId = this.responseOriginMsg.get(chatId) ?? this.lastUserMsgId.get(chatId);
+        const originMsgId = this.responseOriginMsg.get(k) ?? this.lastUserMsgId.get(k);
         if (originMsgId) {
           const emoji = resultMsg.is_error ? "❌" : "✅";
           this.api.react(chatId, originMsgId, emoji).catch(() => {});
         }
         // Clean up both maps
-        this.responseOriginMsg.delete(chatId);
-        this.lastUserMsgId.delete(chatId);
+        this.responseOriginMsg.delete(k);
+        this.lastUserMsgId.delete(k);
 
         // Cost budget alert
-        this.checkCostAlert(chatId, resultMsg.total_cost_usd);
+        this.checkCostAlert(chatId, topicId, resultMsg.total_cost_usd);
 
         // Update pinned status
-        this.updatePinnedStatus(chatId);
+        this.updatePinnedStatus(chatId, topicId);
+
+        // Notify group of task completion
+        const mapping = this.chatSessions.get(chatId)?.get(topicId);
+        if (mapping) {
+          await this.notifyGroup(mapping.projectSlug, "Task complete", formatResult(resultMsg));
+        }
         break;
       }
 
       case "tool_progress": {
         // Refresh typing indicator - Claude is working
-        this.startTyping(chatId);
+        this.startTyping(chatId, topicId);
         break;
       }
 
       case "status_change": {
         if (msg.status === "idle") {
-          this.stopTyping(chatId);
+          this.stopTyping(chatId, topicId);
         } else if (msg.status === "compacting") {
-          await this.sendToChat(chatId, "Context compacting... this may take a moment.");
+          await this.sendToChat(chatId, "Context compacting... this may take a moment.", topicId);
         }
-        this.updatePinnedStatus(chatId);
+        this.updatePinnedStatus(chatId, topicId);
         break;
       }
 
       case "cli_disconnected": {
-        this.stopTyping(chatId);
-        const disconnectedMapping = this.chatSessions.get(chatId);
+        this.stopTyping(chatId, topicId);
+        const disconnectedMapping = this.chatSessions.get(chatId)?.get(topicId);
         if (disconnectedMapping) {
           // Sync conversation before cleanup
           this.syncConversationToPB(disconnectedMapping);
@@ -650,12 +720,22 @@ export class TelegramBridge {
           if (disconnectedMapping.pinnedMessageId) {
             this.api.unpinChatMessage(chatId, disconnectedMapping.pinnedMessageId).catch(() => {});
           }
-          this.deps.bridge.unsubscribe(disconnectedMapping.sessionId, `telegram:${chatId}`);
+          const subscriberId = `telegram:${chatId}:${topicId}`;
+          this.deps.bridge.unsubscribe(disconnectedMapping.sessionId, subscriberId);
+
+          // Notify group of session end
+          await this.notifyGroup(disconnectedMapping.projectSlug, "Session ended");
         }
-        await this.sendToChat(chatId, "Session ended.");
-        this.chatSessions.delete(chatId);
-        this.clearIdleTimer(chatId);
-        this.cleanupChatState(chatId);
+        await this.sendToChat(chatId, "Session ended.", topicId);
+
+        // Remove from nested map
+        this.chatSessions.get(chatId)?.delete(topicId);
+        if ((this.chatSessions.get(chatId)?.size ?? 0) === 0) {
+          this.chatSessions.delete(chatId);
+        }
+
+        this.clearIdleTimer(chatId, topicId);
+        this.cleanupChatState(chatId, topicId);
         this.saveMappings();
         break;
       }
@@ -665,7 +745,7 @@ export class TelegramBridge {
 
         // Suppress permission UI for bypassPermissions mode — should never arrive,
         // but if it does (edge case), don't bother user
-        const mapping = this.chatSessions.get(chatId);
+        const mapping = this.chatSessions.get(chatId)?.get(topicId);
         if (mapping) {
           const sessionState = this.getSessionState(mapping.sessionId);
           if (sessionState?.permissionMode === "bypassPermissions") {
@@ -674,7 +754,7 @@ export class TelegramBridge {
         }
 
         // Batch permissions in a 2s window to reduce message spam
-        this.queuePermission(chatId, perm);
+        this.queuePermission(chatId, topicId, perm);
         break;
       }
 
@@ -687,46 +767,54 @@ export class TelegramBridge {
 
   // ── Typing indicator ──────────────────────────────────────────────────
 
-  private startTyping(chatId: number): void {
+  private startTyping(chatId: number, topicId: number = 0): void {
+    const k = this.key(chatId, topicId);
     // Already typing? Don't restart
-    if (this.typingIntervals.has(chatId)) return;
+    if (this.typingIntervals.has(k)) return;
 
     // Send immediately
-    this.api.sendChatAction(chatId, "typing").catch(() => {});
+    this.api.sendChatAction(chatId, "typing", topicId > 0 ? topicId : undefined).catch(() => {});
 
     // Refresh every 4 seconds (Telegram typing expires after ~5s)
     const interval = setInterval(() => {
-      this.api.sendChatAction(chatId, "typing").catch(() => {});
+      this.api.sendChatAction(chatId, "typing", topicId > 0 ? topicId : undefined).catch(() => {});
     }, TYPING_INTERVAL_MS);
-    this.typingIntervals.set(chatId, interval);
+    this.typingIntervals.set(k, interval);
   }
 
-  private stopTyping(chatId: number): void {
-    const interval = this.typingIntervals.get(chatId);
+  private stopTyping(chatId: number, topicId: number = 0): void {
+    const k = this.key(chatId, topicId);
+    const interval = this.typingIntervals.get(k);
     if (interval) {
       clearInterval(interval);
-      this.typingIntervals.delete(chatId);
+      this.typingIntervals.delete(k);
     }
   }
 
   // ── Idle timeout ──────────────────────────────────────────────────────
 
-  private resetIdleTimer(chatId: number): void {
-    this.clearIdleTimer(chatId);
+  private resetIdleTimer(chatId: number, topicId: number = 0): void {
+    this.clearIdleTimer(chatId, topicId);
+    const k = this.key(chatId, topicId);
     const timer = setTimeout(() => {
-      console.log(`[telegram] Chat ${chatId} idle timeout, destroying session`);
-      this.destroySession(chatId).then(() => {
-        this.sendToChat(chatId, "Session timed out after 60 minutes of inactivity.").catch(() => {});
+      console.log(`[telegram] Chat ${chatId} topic ${topicId} idle timeout, destroying session`);
+      const mapping = this.chatSessions.get(chatId)?.get(topicId);
+      this.destroySession(chatId, topicId).then(async () => {
+        await this.sendToChat(chatId, "Session timed out after 60 minutes of inactivity.", topicId).catch(() => {});
+        if (mapping) {
+          await this.notifyGroup(mapping.projectSlug, "Idle timeout — session destroyed");
+        }
       });
     }, IDLE_TIMEOUT_MS);
-    this.idleTimers.set(chatId, timer);
+    this.idleTimers.set(k, timer);
   }
 
-  private clearIdleTimer(chatId: number): void {
-    const timer = this.idleTimers.get(chatId);
+  private clearIdleTimer(chatId: number, topicId: number = 0): void {
+    const k = this.key(chatId, topicId);
+    const timer = this.idleTimers.get(k);
     if (timer) {
       clearTimeout(timer);
-      this.idleTimers.delete(chatId);
+      this.idleTimers.delete(k);
     }
   }
 
@@ -747,34 +835,35 @@ export class TelegramBridge {
       return;
     }
 
+    const topicId = query.message?.message_thread_id ?? 0;
     const [prefix, ...rest] = data.split(":");
     const value = rest.join(":");
 
     try {
       switch (prefix) {
         case "proj":
-          await this.onProjectSelected(chatId, messageId!, query.id, value);
+          await this.onProjectSelected(chatId, messageId!, query.id, value, topicId);
           break;
         case "model":
-          await this.onModelSelected(chatId, messageId!, query.id, value);
+          await this.onModelSelected(chatId, messageId!, query.id, value, topicId);
           break;
         case "mode":
           await this.onModeSelected(chatId, messageId!, query.id, value);
           break;
         case "perm":
-          await this.onPermissionResponse(chatId, messageId!, query.id, value);
+          await this.onPermissionResponse(chatId, messageId!, query.id, value, topicId);
           break;
         case "stop":
-          await this.onStopResponse(chatId, messageId!, query.id, value);
+          await this.onStopResponse(chatId, messageId!, query.id, value, topicId);
           break;
         case "new":
-          await this.onNewResponse(chatId, messageId!, query.id, value);
+          await this.onNewResponse(chatId, messageId!, query.id, value, topicId);
           break;
         case "action":
-          await this.onActionSelected(chatId, messageId!, query.id, value);
+          await this.onActionSelected(chatId, messageId!, query.id, value, topicId);
           break;
         case "autoapprove":
-          await this.onAutoApproveSelected(chatId, messageId!, query.id, value);
+          await this.onAutoApproveSelected(chatId, messageId!, query.id, value, topicId);
           break;
         default:
           await this.api.answerCallbackQuery(query.id, "Unknown action");
@@ -787,7 +876,7 @@ export class TelegramBridge {
   }
 
   private async onProjectSelected(
-    chatId: number, messageId: number, queryId: string, slug: string
+    chatId: number, messageId: number, queryId: string, slug: string, topicId: number = 0
   ): Promise<void> {
     const profile = this.deps.profiles.get(slug);
     if (!profile) {
@@ -795,25 +884,36 @@ export class TelegramBridge {
       return;
     }
 
-    // If already on same project, just acknowledge
-    const existing = this.chatSessions.get(chatId);
-    if (existing?.projectSlug === slug) {
+    // Check if a session already exists for this topic
+    const existingForTopic = this.chatSessions.get(chatId)?.get(topicId);
+    if (existingForTopic?.projectSlug === slug) {
       await this.api.answerCallbackQuery(queryId, `Already on ${profile.name}`);
       return;
-    }
-
-    // Auto-switch: destroy existing session if different project
-    if (existing) {
-      await this.destroySession(chatId);
     }
 
     // Remove keyboard from original message
     await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
     await this.api.answerCallbackQuery(queryId, `Connecting to ${profile.name}...`);
 
+    // Create new topic for this project (topics allow multiple concurrent sessions)
+    let targetTopicId = topicId;
+    if (topicId === 0) {
+      // In General topic: create a new forum topic for this project
+      try {
+        const forumTopic = await this.api.createForumTopic(chatId, profile.name);
+        targetTopicId = forumTopic.message_thread_id;
+      } catch {
+        // Forum topics may not be available (e.g., not a supergroup with topics)
+        // Fall back to using General topic (topicId=0)
+        targetTopicId = 0;
+      }
+    }
+
     // Single progress message — will be edited through stages
-    const progressMsgId = await this.api.sendMessage(chatId, `Connecting to ${profile.name}...`);
-    const result = await this.createSession(chatId, profile);
+    const progressMsgId = await this.api.sendMessage(chatId, `Connecting to ${profile.name}...`, {
+      messageThreadId: targetTopicId > 0 ? targetTopicId : undefined,
+    });
+    const result = await this.createSession(chatId, profile, targetTopicId);
 
     if (!result.ok) {
       await this.api.editMessageText(chatId, progressMsgId, `Failed to connect: ${result.error}`);
@@ -821,7 +921,7 @@ export class TelegramBridge {
     }
 
     // Edit progress message into final "Connected" with details
-    const mapping = this.chatSessions.get(chatId);
+    const mapping = this.chatSessions.get(chatId)?.get(targetTopicId);
     try {
       await this.api.editMessageText(chatId, progressMsgId, formatConnected(profile, profile.defaultModel), {
         replyMarkup: buildSessionActionsKeyboard(mapping?.model ?? profile.defaultModel),
@@ -833,21 +933,21 @@ export class TelegramBridge {
       }
     } catch {
       // Fallback: send separate message
-      await this.sendToChat(chatId, formatConnected(profile, profile.defaultModel));
+      await this.sendToChat(chatId, formatConnected(profile, profile.defaultModel), targetTopicId);
     }
   }
 
   private async onModelSelected(
-    chatId: number, _messageId: number, queryId: string, model: string
+    chatId: number, _messageId: number, queryId: string, model: string, topicId: number = 0
   ): Promise<void> {
-    const mapping = this.chatSessions.get(chatId);
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) {
       await this.api.answerCallbackQuery(queryId, "No active session");
       return;
     }
 
     // setModel() already calls updatePinnedStatus() to restore the pinned message
-    this.setModel(chatId, model);
+    this.setModel(chatId, model, topicId);
     await this.api.answerCallbackQuery(queryId, `Model → ${model}`);
   }
 
@@ -860,7 +960,7 @@ export class TelegramBridge {
   }
 
   private async onPermissionResponse(
-    chatId: number, messageId: number, queryId: string, value: string
+    chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
   ): Promise<void> {
     // value format: "allow:<requestId>" or "deny:<requestId>"
     // Batch format: "allow:<id1>,<id2>,<id3>" (comma-separated)
@@ -872,7 +972,7 @@ export class TelegramBridge {
       return;
     }
 
-    const mapping = this.chatSessions.get(chatId);
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) {
       await this.api.answerCallbackQuery(queryId, "No active session");
       return;
@@ -898,16 +998,16 @@ export class TelegramBridge {
   }
 
   private async onStopResponse(
-    chatId: number, messageId: number, queryId: string, value: string
+    chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
   ): Promise<void> {
     await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
 
     if (value === "confirm") {
-      const mapping = this.chatSessions.get(chatId);
+      const mapping = this.chatSessions.get(chatId)?.get(topicId);
       if (mapping) {
-        await this.destroySession(chatId);
+        await this.destroySession(chatId, topicId);
         await this.api.answerCallbackQuery(queryId, "Session stopped");
-        await this.sendToChat(chatId, `Session stopped. (<code>${mapping.projectSlug}</code>)`);
+        await this.sendToChat(chatId, `Session stopped. (<code>${mapping.projectSlug}</code>)`, topicId);
       } else {
         await this.api.answerCallbackQuery(queryId, "No active session");
       }
@@ -917,12 +1017,12 @@ export class TelegramBridge {
   }
 
   private async onNewResponse(
-    chatId: number, messageId: number, queryId: string, value: string
+    chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
   ): Promise<void> {
     await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
 
     if (value === "confirm") {
-      const mapping = this.chatSessions.get(chatId);
+      const mapping = this.chatSessions.get(chatId)?.get(topicId);
       if (!mapping) {
         await this.api.answerCallbackQuery(queryId, "No active session");
         return;
@@ -936,18 +1036,19 @@ export class TelegramBridge {
       }
 
       await this.api.answerCallbackQuery(queryId, "Restarting...");
-      await this.destroySession(chatId);
-      await this.sendToChat(chatId, "Restarting session...");
+      await this.destroySession(chatId, topicId);
+      await this.sendToChat(chatId, "Restarting session...", topicId);
 
-      const result = await this.createSession(chatId, profile);
+      const result = await this.createSession(chatId, profile, topicId);
       if (!result.ok) {
-        await this.sendToChat(chatId, `Failed: ${result.error}`);
+        await this.sendToChat(chatId, `Failed: ${result.error}`, topicId);
         return;
       }
       await this.sendToChatWithKeyboard(
         chatId,
         formatConnected(profile, profile.defaultModel),
-        buildSessionActionsKeyboard(mapping.model)
+        buildSessionActionsKeyboard(mapping.model),
+        topicId
       );
     } else {
       await this.api.answerCallbackQuery(queryId, "Cancelled");
@@ -955,11 +1056,11 @@ export class TelegramBridge {
   }
 
   private async onActionSelected(
-    chatId: number, messageId: number, queryId: string, action: string
+    chatId: number, messageId: number, queryId: string, action: string, topicId: number = 0
   ): Promise<void> {
     switch (action) {
       case "model": {
-        const mapping = this.chatSessions.get(chatId);
+        const mapping = this.chatSessions.get(chatId)?.get(topicId);
         await this.api.answerCallbackQuery(queryId);
         // Edit the same message inline instead of creating a new one
         await this.api.editMessageText(chatId, messageId, "Select model:", {
@@ -969,7 +1070,7 @@ export class TelegramBridge {
       }
       case "status": {
         await this.api.answerCallbackQuery(queryId);
-        const mapping = this.chatSessions.get(chatId);
+        const mapping = this.chatSessions.get(chatId)?.get(topicId);
         if (mapping) {
           const session = this.getSessionState(mapping.sessionId);
           const status = session?.status ?? "unknown";
@@ -977,12 +1078,12 @@ export class TelegramBridge {
           if (session) {
             lines.push(`Cost: <code>$${session.total_cost_usd.toFixed(3)}</code> | Turns: <code>${session.num_turns}</code>`);
           }
-          await this.sendToChat(chatId, lines.join("\n"));
+          await this.sendToChat(chatId, lines.join("\n"), topicId);
         }
         break;
       }
       case "cancel": {
-        this.interruptSession(chatId);
+        this.interruptSession(chatId, topicId);
         await this.api.answerCallbackQuery(queryId, "Interrupt sent");
         break;
       }
@@ -991,7 +1092,8 @@ export class TelegramBridge {
         await this.sendToChatWithKeyboard(
           chatId,
           "Stop the current session?",
-          buildStopConfirmKeyboard()
+          buildStopConfirmKeyboard(),
+          topicId
         );
         break;
       }
@@ -1001,7 +1103,8 @@ export class TelegramBridge {
         await this.sendToChatWithKeyboard(
           chatId,
           formatAutoApproveStatus(aaConfig),
-          buildAutoApproveKeyboard(aaConfig)
+          buildAutoApproveKeyboard(aaConfig),
+          topicId
         );
         break;
       }
@@ -1012,7 +1115,8 @@ export class TelegramBridge {
           await this.sendToChatWithKeyboard(
             chatId,
             "Select a project:",
-            buildProjectKeyboard(profiles)
+            buildProjectKeyboard(profiles),
+            topicId
           );
         }
         break;
@@ -1023,7 +1127,7 @@ export class TelegramBridge {
   }
 
   private async onAutoApproveSelected(
-    chatId: number, messageId: number, queryId: string, value: string
+    chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
   ): Promise<void> {
     // value format: "timeout:<seconds>" or "bash:<on|off>"
     const [subtype, subvalue] = value.split(":");
@@ -1039,8 +1143,8 @@ export class TelegramBridge {
 
     this.autoApproveConfigs.set(chatId, config);
 
-    // Push to ws-bridge
-    const mapping = this.chatSessions.get(chatId);
+    // Push to ws-bridge for the current topic's session
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (mapping) {
       this.deps.bridge.setAutoApprove(mapping.sessionId, config);
     }
@@ -1069,6 +1173,7 @@ export class TelegramBridge {
         { command: "translate", description: "Toggle Vi→En auto-translate" },
         { command: "cancel", description: "Interrupt Claude" },
         { command: "stop", description: "End session" },
+        { command: "stopall", description: "End all sessions" },
         { command: "new", description: "Restart session" },
         { command: "help", description: "All commands" },
       ]);
@@ -1080,15 +1185,20 @@ export class TelegramBridge {
 
   // ── Public API (for commands) ─────────────────────────────────────────
 
-  async sendToChat(chatId: number, text: string): Promise<void> {
+  async sendToChat(chatId: number, text: string, topicId?: number): Promise<void> {
     try {
-      await this.api.sendMessage(chatId, text);
+      await this.api.sendMessage(chatId, text, {
+        messageThreadId: topicId && topicId > 0 ? topicId : undefined,
+      });
     } catch (err) {
       console.error(`[telegram] sendToChat(${chatId}) HTML error:`, err);
       // Retry as plain text (strip HTML tags, no parse_mode)
       try {
         const plain = text.replace(/<[^>]+>/g, "");
-        await this.api.sendMessage(chatId, plain, { parseMode: null });
+        await this.api.sendMessage(chatId, plain, {
+          parseMode: null,
+          messageThreadId: topicId && topicId > 0 ? topicId : undefined,
+        });
       } catch {
         // give up
       }
@@ -1098,14 +1208,18 @@ export class TelegramBridge {
   async sendToChatWithKeyboard(
     chatId: number,
     text: string,
-    keyboard: TelegramInlineKeyboardMarkup
+    keyboard: TelegramInlineKeyboardMarkup,
+    topicId?: number
   ): Promise<void> {
     try {
-      await this.api.sendMessage(chatId, text, { replyMarkup: keyboard });
+      await this.api.sendMessage(chatId, text, {
+        replyMarkup: keyboard,
+        messageThreadId: topicId && topicId > 0 ? topicId : undefined,
+      });
     } catch (err) {
       console.error(`[telegram] sendToChatWithKeyboard(${chatId}) error:`, err);
       // Retry without keyboard as fallback
-      await this.sendToChat(chatId, text);
+      await this.sendToChat(chatId, text, topicId);
     }
   }
 
@@ -1121,7 +1235,11 @@ export class TelegramBridge {
     return this.deps.profiles.getAll();
   }
 
-  getMapping(chatId: number): TelegramSessionMapping | undefined {
+  getMapping(chatId: number, topicId: number = 0): TelegramSessionMapping | undefined {
+    return this.chatSessions.get(chatId)?.get(topicId);
+  }
+
+  getMappings(chatId: number): Map<number, TelegramSessionMapping> | undefined {
     return this.chatSessions.get(chatId);
   }
 
@@ -1129,20 +1247,20 @@ export class TelegramBridge {
     return this.deps.bridge.getSessionState(sessionId);
   }
 
-  interruptSession(chatId: number): void {
-    const mapping = this.chatSessions.get(chatId);
+  interruptSession(chatId: number, topicId: number = 0): void {
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) return;
     this.deps.bridge.injectInterrupt(mapping.sessionId);
   }
 
-  setModel(chatId: number, model: string): void {
-    const mapping = this.chatSessions.get(chatId);
+  setModel(chatId: number, model: string, topicId: number = 0): void {
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) return;
 
     mapping.model = model;
     this.deps.bridge.injectSetModel(mapping.sessionId, model);
     this.saveMappings();
-    this.updatePinnedStatus(chatId);
+    this.updatePinnedStatus(chatId, topicId);
   }
 
   getAutoApproveConfig(chatId: number): AutoApproveConfig {
@@ -1151,9 +1269,12 @@ export class TelegramBridge {
 
   setAutoApproveConfig(chatId: number, config: AutoApproveConfig): void {
     this.autoApproveConfigs.set(chatId, config);
-    const mapping = this.chatSessions.get(chatId);
-    if (mapping) {
-      this.deps.bridge.setAutoApprove(mapping.sessionId, config);
+    // Apply to all active sessions for this chat
+    const topics = this.chatSessions.get(chatId);
+    if (topics) {
+      for (const mapping of topics.values()) {
+        this.deps.bridge.setAutoApprove(mapping.sessionId, config);
+      }
     }
   }
 
@@ -1166,41 +1287,68 @@ export class TelegramBridge {
   }
 
   getActiveChatCount(): number {
-    return this.chatSessions.size;
+    let count = 0;
+    for (const topics of this.chatSessions.values()) count += topics.size;
+    return count;
   }
 
   isRunning(): boolean {
     return this.running;
   }
 
-  // ── Helper methods (tool feed, cost alerts, pinned status) ──────────
+  // ── Notification group ────────────────────────────────────────────────
 
-  private sendThrottledToolFeed(chatId: number, text: string): void {
-    const now = Date.now();
-    const last = this.lastToolFeedAt.get(chatId) ?? 0;
-    if (now - last < 5_000) return; // Max 1 tool feed per 5 seconds
-
-    this.lastToolFeedAt.set(chatId, now);
-    this.sendToChat(chatId, text).catch(() => {});
+  setNotificationGroupId(groupId: number | null): void {
+    this.notificationGroupId = groupId;
   }
 
-  private checkCostAlert(chatId: number, cost: number): void {
+  getNotificationGroupId(): number | null {
+    return this.notificationGroupId;
+  }
+
+  private async notifyGroup(projectSlug: string, event: string, details?: string): Promise<void> {
+    if (!this.notificationGroupId) return;
+    const profile = this.deps.profiles.get(projectSlug);
+    const name = profile?.name ?? projectSlug;
+    let text = `<b>[${name}]</b> ${event}`;
+    if (details) text += `\n${details}`;
+    try {
+      await this.api.sendMessage(this.notificationGroupId, text);
+    } catch (err) {
+      console.error(`[telegram] Notification group send failed:`, err);
+    }
+  }
+
+  // ── Helper methods (tool feed, cost alerts, pinned status) ──────────
+
+  private sendThrottledToolFeed(chatId: number, topicId: number, text: string): void {
+    const k = this.key(chatId, topicId);
+    const now = Date.now();
+    const last = this.lastToolFeedAt.get(k) ?? 0;
+    if (now - last < 5_000) return; // Max 1 tool feed per 5 seconds
+
+    this.lastToolFeedAt.set(k, now);
+    this.sendToChat(chatId, text, topicId).catch(() => {});
+  }
+
+  private checkCostAlert(chatId: number, topicId: number, cost: number): void {
+    const k = this.key(chatId, topicId);
     const thresholds = [0.50, 1.00, 2.00, 5.00];
-    const shown = this.costAlertsShown.get(chatId) ?? new Set<number>();
+    const shown = this.costAlertsShown.get(k) ?? new Set<number>();
 
     for (const t of thresholds) {
       if (cost >= t && !shown.has(t)) {
         shown.add(t);
-        this.costAlertsShown.set(chatId, shown);
+        this.costAlertsShown.set(k, shown);
         const emoji = t >= 5 ? "🔴" : t >= 2 ? "🟠" : "🟡";
-        this.sendToChat(chatId, `${emoji} Cost alert: <code>$${cost.toFixed(3)}</code> (crossed $${t.toFixed(2)})`).catch(() => {});
+        this.sendToChat(chatId, `${emoji} Cost alert: <code>$${cost.toFixed(3)}</code> (crossed $${t.toFixed(2)})`, topicId).catch(() => {});
         break; // Only one alert per result
       }
     }
   }
 
-  private updatePinnedStatus(chatId: number): void {
-    const mapping = this.chatSessions.get(chatId);
+  private updatePinnedStatus(chatId: number, topicId: number = 0): void {
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping?.pinnedMessageId) return;
 
     const session = this.getSessionState(mapping.sessionId);
@@ -1213,28 +1361,33 @@ export class TelegramBridge {
     });
   }
 
-  private cleanupChatState(chatId: number): void {
-    this.lastToolFeedAt.delete(chatId);
-    this.lastUserMsgId.delete(chatId);
-    this.responseOriginMsg.delete(chatId);
-    this.costAlertsShown.delete(chatId);
-    this.autoApproveConfigs.delete(chatId);
-    this.translateEnabled.delete(chatId);
-    this.streamingMsg.delete(chatId);
-    this.hubFirstMsg.delete(chatId);
+  private cleanupChatState(chatId: number, topicId: number = 0): void {
+    const k = this.key(chatId, topicId);
+    this.lastToolFeedAt.delete(k);
+    this.lastUserMsgId.delete(k);
+    this.responseOriginMsg.delete(k);
+    this.costAlertsShown.delete(k);
+    this.streamingMsg.delete(k);
     // Clear permission batch timer
-    const batch = this.permissionBatch.get(chatId);
+    const batch = this.permissionBatch.get(k);
     if (batch) {
       clearTimeout(batch.timer);
-      this.permissionBatch.delete(chatId);
+      this.permissionBatch.delete(k);
+    }
+    // Only clean chat-level state if no more sessions remain for this chat
+    if ((this.chatSessions.get(chatId)?.size ?? 0) === 0) {
+      this.autoApproveConfigs.delete(chatId);
+      this.translateEnabled.delete(chatId);
+      this.hubFirstMsg.delete(chatId);
     }
   }
 
   // ── Permission batching ─────────────────────────────────────────────────
 
   /** Queue a permission request — flush after 2s window to batch multiple requests. */
-  private queuePermission(chatId: number, perm: import("../session-types.js").PermissionRequest): void {
-    const existing = this.permissionBatch.get(chatId);
+  private queuePermission(chatId: number, topicId: number, perm: import("../session-types.js").PermissionRequest): void {
+    const k = this.key(chatId, topicId);
+    const existing = this.permissionBatch.get(k);
 
     if (existing) {
       // Add to existing batch
@@ -1242,16 +1395,17 @@ export class TelegramBridge {
     } else {
       // Start new batch with timer
       const timer = setTimeout(() => {
-        this.flushPermissionBatch(chatId);
+        this.flushPermissionBatch(chatId, topicId);
       }, this.PERM_BATCH_WINDOW_MS);
-      this.permissionBatch.set(chatId, { perms: [perm], timer });
+      this.permissionBatch.set(k, { perms: [perm], timer });
     }
   }
 
   /** Send batched permissions as a single message. */
-  private async flushPermissionBatch(chatId: number): Promise<void> {
-    const batch = this.permissionBatch.get(chatId);
-    this.permissionBatch.delete(chatId);
+  private async flushPermissionBatch(chatId: number, topicId: number = 0): Promise<void> {
+    const k = this.key(chatId, topicId);
+    const batch = this.permissionBatch.get(k);
+    this.permissionBatch.delete(k);
     if (!batch || batch.perms.length === 0) return;
 
     const aaConfig = this.getAutoApproveConfig(chatId);
@@ -1259,7 +1413,7 @@ export class TelegramBridge {
     const requestIds = batch.perms.map((p) => p.request_id);
     const keyboard = buildPermissionBatchKeyboard(requestIds);
 
-    await this.sendToChatWithKeyboard(chatId, text, keyboard);
+    await this.sendToChatWithKeyboard(chatId, text, keyboard, topicId);
   }
 
   // ── Hub Mode ───────────────────────────────────────────────────────────
@@ -1372,7 +1526,12 @@ export class TelegramBridge {
   private saveMappings(): void {
     try {
       mkdirSync(DATA_DIR, { recursive: true });
-      const data = [...this.chatSessions.values()];
+      const data: TelegramSessionMapping[] = [];
+      for (const topics of this.chatSessions.values()) {
+        for (const mapping of topics.values()) {
+          data.push(mapping);
+        }
+      }
       writeFileSync(MAPPINGS_FILE, JSON.stringify(data, null, 2), "utf-8");
     } catch (err) {
       console.error("[telegram] Failed to save mappings:", err);
@@ -1386,10 +1545,14 @@ export class TelegramBridge {
       // Only restore mappings where the session is still alive
       for (const m of data) {
         if (this.deps.launcher.isAlive(m.sessionId)) {
-          this.chatSessions.set(m.chatId, m);
-          this.subscribeToSession(m.chatId, m.sessionId);
-          this.resetIdleTimer(m.chatId);
-          console.log(`[telegram] Restored mapping: chat=${m.chatId} → session=${m.sessionId.slice(0, 8)}`);
+          const topicId = m.topicId ?? 0;
+          if (!this.chatSessions.has(m.chatId)) {
+            this.chatSessions.set(m.chatId, new Map());
+          }
+          this.chatSessions.get(m.chatId)!.set(topicId, m);
+          this.subscribeToSession(m.chatId, topicId, m.sessionId);
+          this.resetIdleTimer(m.chatId, topicId);
+          console.log(`[telegram] Restored mapping: chat=${m.chatId} topic=${topicId} → session=${m.sessionId.slice(0, 8)}`);
         }
       }
     } catch {

@@ -133,6 +133,36 @@ export class WsBridge {
     return this.sessions.get(sessionId);
   }
 
+  /** Force-end a session that's stuck (process dead but status not ended). */
+  forceEndSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      // Try updating persisted state directly
+      const persisted = this.store.load(sessionId);
+      if (persisted && persisted.state.status !== "ended") {
+        persisted.state.status = "ended";
+        persisted.endedAt = Date.now();
+        this.store.saveSync(persisted);
+        return true;
+      }
+      return false;
+    }
+
+    session.cliSend = null;
+
+    // Cancel auto-approve timers
+    for (const [, timer] of session.autoApproveTimers) {
+      clearTimeout(timer);
+    }
+    session.autoApproveTimers.clear();
+    session.pendingPermissions.clear();
+
+    this.updateStatus(session, "ended");
+    this.broadcastToBrowsers(session, { type: "cli_disconnected" });
+    this.persistSession(session);
+    return true;
+  }
+
   getAllSessions(): ActiveSession[] {
     return [...this.sessions.values()];
   }

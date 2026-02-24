@@ -7,6 +7,7 @@ import type {
   TelegramBotCommand,
   TelegramReactionType,
   TelegramInlineKeyboardMarkup,
+  TelegramForumTopic,
 } from "./telegram-types.js";
 
 const API_BASE = "https://api.telegram.org";
@@ -17,6 +18,8 @@ interface SendMessageOptions {
   replyTo?: number;
   replyMarkup?: TelegramInlineKeyboardMarkup;
   disablePreview?: boolean;
+  /** Forum topic thread ID (Bot API 9.3 private chat topics) */
+  messageThreadId?: number;
 }
 
 interface ApiResponse<T> {
@@ -109,6 +112,7 @@ export class TelegramAPI {
 
     if (options.replyTo) body.reply_to_message_id = options.replyTo;
     if (options.replyMarkup) body.reply_markup = options.replyMarkup;
+    if (options.messageThreadId) body.message_thread_id = options.messageThreadId;
 
     const result = await this.call<{ message_id: number }>("sendMessage", body);
     return result.message_id;
@@ -170,11 +174,10 @@ export class TelegramAPI {
     });
   }
 
-  async sendChatAction(chatId: number, action: "typing" | "upload_photo" = "typing"): Promise<void> {
-    await this.call("sendChatAction", {
-      chat_id: chatId,
-      action,
-    });
+  async sendChatAction(chatId: number, action: "typing" | "upload_photo" = "typing", messageThreadId?: number): Promise<void> {
+    const body: Record<string, unknown> = { chat_id: chatId, action };
+    if (messageThreadId) body.message_thread_id = messageThreadId;
+    await this.call("sendChatAction", body);
   }
 
   // ── Reactions ─────────────────────────────────────────────────────────
@@ -220,7 +223,8 @@ export class TelegramAPI {
   async sendPhoto(
     chatId: number,
     photoUrl: string,
-    caption?: string
+    caption?: string,
+    messageThreadId?: number
   ): Promise<number> {
     const body: Record<string, unknown> = {
       chat_id: chatId,
@@ -230,8 +234,30 @@ export class TelegramAPI {
       body.caption = caption;
       body.parse_mode = "HTML";
     }
+    if (messageThreadId) body.message_thread_id = messageThreadId;
     const result = await this.call<{ message_id: number }>("sendPhoto", body);
     return result.message_id;
+  }
+
+  // ── Forum Topics (Bot API 9.3/9.4) ──────────────────────────────────────
+
+  /** Create a forum topic in a private chat or supergroup. */
+  async createForumTopic(chatId: number, name: string, iconColor?: number): Promise<TelegramForumTopic> {
+    const body: Record<string, unknown> = { chat_id: chatId, name };
+    if (iconColor !== undefined) body.icon_color = iconColor;
+    return this.call<TelegramForumTopic>("createForumTopic", body);
+  }
+
+  async closeForumTopic(chatId: number, messageThreadId: number): Promise<boolean> {
+    return this.call<boolean>("closeForumTopic", { chat_id: chatId, message_thread_id: messageThreadId });
+  }
+
+  async reopenForumTopic(chatId: number, messageThreadId: number): Promise<boolean> {
+    return this.call<boolean>("reopenForumTopic", { chat_id: chatId, message_thread_id: messageThreadId });
+  }
+
+  async deleteForumTopic(chatId: number, messageThreadId: number): Promise<boolean> {
+    return this.call<boolean>("deleteForumTopic", { chat_id: chatId, message_thread_id: messageThreadId });
   }
 
   // ── Chat management ─────────────────────────────────────────────────
