@@ -67,7 +67,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS:-}
     volumes:
-      - companion_data:/app/data
+      - ./companion/data:/app/data
       - ${CLAUDE_CONFIG_DIR:-~/.claude}:/root/.claude:ro
     depends_on:
       pocketbase:
@@ -91,4 +91,3 @@ services:
 volumes:
   pb_data:
   nm_data:
-  companion_data:
