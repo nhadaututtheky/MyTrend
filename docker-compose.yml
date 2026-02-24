@@ -31,6 +31,7 @@ services:
       - NEURAL_MEMORY_HOST=0.0.0.0
       - NEURAL_MEMORY_PORT=8000
       - NEURAL_MEMORY_DEBUG=false
+      - NEURAL_MEMORY_HUB_ENABLED=true
     volumes:
       - nm_data:/data
     healthcheck:
