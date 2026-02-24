@@ -227,6 +227,73 @@ function encodeToNeuralMemory(collection, record) {
         if (topicName) tags.push('topic:' + topicName);
       }
 
+      // Extract typed insights from conversation messages
+      function extractInsights(msgs, maxInsights) {
+        var results = [];
+        var extractPatterns = [
+          { words: ['decided to', 'chose', 'went with', 'will use', 'switched to'], type: 'decision', priority: 8 },
+          { words: ['learned', 'lesson', 'mistake', 'never again', 'realized', 'turns out'], type: 'insight', priority: 8 },
+          { words: ['error', 'failed', 'bug', 'crashed', 'broke'], type: 'error', priority: 7 },
+          { words: ['workflow', 'process', 'always do', 'convention'], type: 'workflow', priority: 6 },
+        ];
+
+        for (var mi = 0; mi < msgs.length && results.length < maxInsights; mi++) {
+          var m = msgs[mi];
+          if (!m || !m.content || m.role !== 'assistant') continue;
+          var txt = m.content.toLowerCase();
+
+          for (var pi = 0; pi < extractPatterns.length; pi++) {
+            var matched = false;
+            for (var wi = 0; wi < extractPatterns[pi].words.length; wi++) {
+              if (txt.indexOf(extractPatterns[pi].words[wi]) !== -1) {
+                matched = true;
+                break;
+              }
+            }
+            if (matched) {
+              var snippet = m.content;
+              if (snippet.length > 300) snippet = snippet.substring(0, 297) + '...';
+              results.push({
+                content: snippet,
+                type: extractPatterns[pi].type,
+                priority: extractPatterns[pi].priority,
+              });
+              break; // One type per message
+            }
+          }
+        }
+        return results;
+      }
+
+      // Encode extracted insights as separate memories
+      var extracted = extractInsights(messages, 5);
+      for (var ei = 0; ei < extracted.length; ei++) {
+        var insightTags = tags.slice(); // copy base tags
+        insightTags.push('extracted');
+        insightTags.push(extracted[ei].type);
+        var insightPayload = {
+          content: extracted[ei].content,
+          metadata: {
+            collection: 'conversations',
+            record_id: record.getId(),
+            type: extracted[ei].type,
+            priority: extracted[ei].priority,
+            extracted_from: 'conversation',
+            title: title,
+          },
+          tags: insightTags,
+        };
+        try {
+          $http.send({
+            url: endpoint,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'laptop-brain' },
+            body: JSON.stringify(insightPayload),
+            timeout: 5,
+          });
+        } catch (e) { /* silent fail */ }
+      }
+
     // -----------------------------------------------------------------------
     // ideas
     // -----------------------------------------------------------------------
