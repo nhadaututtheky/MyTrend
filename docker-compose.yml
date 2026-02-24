@@ -55,26 +55,8 @@ services:
       pocketbase:
         condition: service_healthy
 
-  companion:
-    build: ./companion
-    container_name: mytrend-companion
-    restart: unless-stopped
-    user: "1000:1000"
-    ports:
-      - "3457:3457"
-    environment:
-      - PORT=3457
-      - PB_URL=http://pocketbase:8090
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - TELEGRAM_ALLOWED_CHAT_IDS=${TELEGRAM_ALLOWED_CHAT_IDS:-}
-      - HOME=/home/bun
-    volumes:
-      - ./companion/data:/app/data
-      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/home/bun/.claude
-      - ${CLAUDE_CONFIG_FILE:-~/.claude.json}:/home/bun/.claude.json
-    depends_on:
-      pocketbase:
-        condition: service_healthy
+  # companion runs natively (bun run dev) for full MCP/skills/filesystem access
+  # See start.bat for launch command
 
   nginx:
     image: nginx:alpine
@@ -89,7 +71,6 @@ services:
       - frontend
       - pocketbase
       - neural-memory
-      - companion
 
 volumes:
   pb_data:

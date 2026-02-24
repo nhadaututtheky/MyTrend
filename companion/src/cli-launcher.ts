@@ -85,81 +85,31 @@ export class CLILauncher {
         if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_")) continue;
         if (v !== undefined) cleanEnv[k] = v;
       }
-      cleanEnv.HOME = process.env.USERPROFILE ?? process.env.HOME ?? "/home/claude";
+      cleanEnv.HOME = process.env.USERPROFILE ?? process.env.HOME ?? "";
 
-      // Resolve spawn args per platform
       // On Windows, bypass .cmd wrapper to avoid pipe buffering issues.
       // claude.cmd just calls: node <npm_prefix>/node_modules/@anthropic-ai/claude-code/cli.js
       let spawnArgs: string[];
       if (process.platform === "win32") {
-        const { existsSync } = await import("node:fs");
-        const { execSync } = await import("node:child_process");
-
         const npmPrefix = process.env.APPDATA
           ? `${process.env.APPDATA}\\npm`
           : "";
         const cliScript = `${npmPrefix}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`;
-
-        // Resolve full node.exe path — Bun.spawn needs .exe on Windows
-        let nodeBin = "node.exe";
-        try {
-          const resolved = execSync("where node", { encoding: "utf-8" }).trim().split("\n")[0].trim();
-          if (resolved) nodeBin = resolved;
-        } catch { /* fallback to node.exe in PATH */ }
-
+        // Try direct node invocation first, fallback to claude.cmd
+        const { existsSync } = await import("node:fs");
         if (existsSync(cliScript)) {
-          spawnArgs = [nodeBin, cliScript, ...args];
+          spawnArgs = ["node", cliScript, ...args];
         } else {
           spawnArgs = ["claude.cmd", ...args];
         }
       } else {
-        // Linux/Docker: Bun.spawn can't exec symlinks, so resolve the real path
-        // and invoke via node directly. "claude" is a symlink → cli.js with shebang.
-        const { existsSync, realpathSync } = await import("node:fs");
-        const { execSync } = await import("node:child_process");
-
-        let nodeBin = "node";
-        try {
-          nodeBin = execSync("which node", { encoding: "utf-8" }).trim();
-        } catch { /* fallback */ }
-
-        // Find cli.js via symlink resolution or known paths
-        let cliScript = "";
-        try {
-          const claudePath = execSync("which claude", { encoding: "utf-8" }).trim();
-          cliScript = realpathSync(claudePath);
-        } catch { /* fallback */ }
-
-        if (!cliScript) {
-          const knownPaths = [
-            "/usr/lib/node_modules/@anthropic-ai/claude-code/cli.js",
-            "/usr/local/lib/node_modules/@anthropic-ai/claude-code/cli.js",
-          ];
-          cliScript = knownPaths.find((p) => existsSync(p)) ?? "";
-        }
-
-        if (cliScript) {
-          spawnArgs = [nodeBin, cliScript, ...args];
-        } else {
-          // Last resort: wrap in sh -c to let shell handle symlink
-          spawnArgs = ["/bin/sh", "-c", `claude ${args.map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(" ")}`];
-        }
-      }
-
-      // Resolve cwd — Windows paths don't exist in Docker containers
-      let cwd = options.projectDir;
-      if (process.platform !== "win32") {
-        const { existsSync } = await import("node:fs");
-        if (!existsSync(cwd)) {
-          console.warn(`[cli-launcher] cwd "${cwd}" not found, falling back to HOME`);
-          cwd = cleanEnv.HOME || "/home/claude";
-        }
+        spawnArgs = ["claude", ...args];
       }
 
       console.log(`[cli-launcher] Spawn command: ${spawnArgs[0]} ${spawnArgs.length > 3 ? spawnArgs.slice(1, 4).join(" ") + "..." : spawnArgs.slice(1).join(" ")}`);
 
       const proc = Bun.spawn(spawnArgs, {
-        cwd,
+        cwd: options.projectDir,
         stdin: "pipe",
         stdout: "pipe",
         stderr: "pipe",

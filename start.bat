@@ -48,26 +48,32 @@ goto end
 
 :docker
 echo.
-echo  Starting all services with Docker...
+echo  Starting Docker services + native companion...
 cd /d "%~dp0"
 docker-compose up -d
+cd /d "%~dp0companion"
+call bun install >nul 2>&1
+start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run dev"
 echo.
 echo  Frontend:   http://localhost
 echo  PocketBase: http://localhost:8090/_/
-echo  Companion:  http://localhost:3457/api/health
+echo  Companion:  http://localhost:3457/api/health (native)
 echo.
 pause
 goto end
 
 :docker_build
 echo.
-echo  Rebuilding and starting...
+echo  Rebuilding Docker + starting native companion...
 cd /d "%~dp0"
 docker-compose up -d --build
+cd /d "%~dp0companion"
+call bun install >nul 2>&1
+start "MyTrend Companion" cmd /k "title MyTrend Companion (port 3457) && bun run dev"
 echo.
 echo  Frontend:   http://localhost
 echo  PocketBase: http://localhost:8090/_/
-echo  Companion:  http://localhost:3457/api/health
+echo  Companion:  http://localhost:3457/api/health (native)
 echo.
 pause
 goto end
