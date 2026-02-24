@@ -152,7 +152,7 @@ export function formatToolAction(name: string, input: Record<string, unknown>): 
     case "Grep":
       return `${emoji} Searching for <code>${truncate(input.pattern as string, 40)}</code>`;
     case "Task":
-      return `${emoji} Spawning sub-agent: ${truncate(input.description as string ?? input.prompt as string, 50)}`;
+      return `${emoji} Spawning sub-agent: ${escapeHTML(truncate(input.description as string ?? input.prompt as string, 50))}`;
     case "WebFetch":
     case "WebSearch":
       return `${emoji} ${name === "WebSearch" ? "Searching" : "Fetching"} web...`;
@@ -193,7 +193,7 @@ export function formatResult(msg: CLIResultMessage): string {
     } else if (msg.subtype === "error_max_budget_usd") {
       text += "\nBudget limit reached.";
     } else if (msg.errors?.length) {
-      text += `\n${truncate(msg.errors[0], 200)}`;
+      text += `\n${escapeHTML(truncate(msg.errors[0], 200))}`;
     }
   }
 

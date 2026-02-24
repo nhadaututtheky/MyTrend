@@ -414,7 +414,8 @@ export class WsBridge {
         this.handleToolProgress(session, msg as CLIToolProgressMessage);
         break;
       case "keep_alive":
-        // silent
+      case "user":
+        // silent — CLI echoes user messages back, ignore them
         break;
       default:
         // Unknown message type - log but don't crash

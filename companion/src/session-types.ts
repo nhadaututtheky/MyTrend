@@ -108,7 +108,8 @@ export type CLIMessage =
   | CLIStreamEventMessage
   | CLIToolProgressMessage
   | CLIControlRequestMessage
-  | CLIKeepAliveMessage;
+  | CLIKeepAliveMessage
+  | { type: "user"; message: { role: "user"; content: string } };
 
 // ─── Content Block Types ─────────────────────────────────────────────────────
 
