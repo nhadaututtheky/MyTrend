@@ -120,3 +120,6 @@
 - [x] Companion reverted to native — Docker companion breaks MCP/skills (commit b28d446)
 - [x] Docker bind mount fix for profiles + telegram config (commit 16c1d94)
 - [x] LESSONS.md workflow established (commit f7fe464)
+- [x] Permission UI Redesign: batch 2s, severity, bypassPermissions suppress (commit 57c5ec9)
+- [x] PWA: manifest + service worker + icons + Apple meta tags (commit ec3e89d)
+- [x] Daily/Weekly Digest: PocketBase cron → Telegram HTML digest (commit 1a8743c)
