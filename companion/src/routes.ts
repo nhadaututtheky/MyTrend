@@ -467,5 +467,86 @@ export function createApp(ctx: AppContext): Hono {
     return c.json({ ok: true });
   });
 
+  // ── NM Doc Training ──────────────────────────────────────────────────
+
+  app.post("/api/nm/train-docs", async (c) => {
+    const { readFile, writeFile, mkdir } = await import("node:fs/promises");
+    const { resolve, basename } = await import("node:path");
+    const { createHash } = await import("node:crypto");
+
+    const NM_URL = process.env.NM_URL || "http://localhost:8001";
+    const PROJECT_DIR = process.env.PROJECT_DIR || "D:\\Project\\MyTrend";
+
+    const docs: { file: string; tag: string; memType: string }[] = [
+      { file: "LESSONS.md", tag: "lessons", memType: "insight" },
+      { file: "CLAUDE.md", tag: "conventions", memType: "reference" },
+      { file: "ROADMAP.md", tag: "roadmap", memType: "fact" },
+    ];
+
+    // Load stored checksums
+    const checksumFile = resolve("data", "doc-checksums.json");
+    let storedChecksums: Record<string, string> = {};
+    try {
+      const raw = await readFile(checksumFile, "utf-8");
+      storedChecksums = JSON.parse(raw) as Record<string, string>;
+    } catch {
+      // First run or file missing
+    }
+
+    const results: { file: string; status: string }[] = [];
+
+    for (const doc of docs) {
+      const filePath = resolve(PROJECT_DIR, doc.file);
+      try {
+        const content = await readFile(filePath, "utf-8");
+        const checksum = createHash("md5").update(content).digest("hex");
+
+        if (storedChecksums[doc.file] === checksum) {
+          results.push({ file: doc.file, status: "unchanged" });
+          continue;
+        }
+
+        // Encode to NM
+        const res = await fetch(`${NM_URL}/memory/encode`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Brain-ID": "laptop-brain",
+          },
+          body: JSON.stringify({
+            content: `[${doc.tag.toUpperCase()}] ${basename(doc.file)}\n\n${content}`,
+            tags: [doc.tag, "doc-training", "project:MyTrend", `source:${doc.file}`],
+            metadata: {
+              type: doc.memType,
+              source: doc.file,
+              collection: "doc-training",
+              checksum,
+            },
+          }),
+        });
+
+        if (res.ok) {
+          storedChecksums[doc.file] = checksum;
+          results.push({ file: doc.file, status: "encoded" });
+        } else {
+          results.push({ file: doc.file, status: `error: ${res.status}` });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        results.push({ file: doc.file, status: `error: ${msg}` });
+      }
+    }
+
+    // Persist checksums
+    try {
+      await mkdir(resolve("data"), { recursive: true });
+      await writeFile(checksumFile, JSON.stringify(storedChecksums, null, 2));
+    } catch {
+      // Non-critical
+    }
+
+    return c.json({ ok: true, results });
+  });
+
   return app;
 }
