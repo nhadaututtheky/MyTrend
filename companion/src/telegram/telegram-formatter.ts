@@ -460,40 +460,105 @@ export function formatAutoApproveStatus(config: AutoApproveConfig): string {
   ].join("\n");
 }
 
-/** Format a permission request for Telegram display. */
-export function formatPermissionRequest(perm: PermissionRequest): string {
+/** Compact single-line summary for a permission request (used in batch view). */
+export function formatPermissionLine(perm: PermissionRequest): string {
   const emoji = TOOL_EMOJI[perm.tool_name] ?? "🔧";
-  const lines = [
-    `<b>${emoji} Permission Request</b>`,
-    `Tool: <code>${perm.tool_name}</code>`,
-  ];
-
-  if (perm.description) {
-    lines.push(`${perm.description}`);
-  }
-
-  // Show key input details based on tool type
   const input = perm.input;
+
   switch (perm.tool_name) {
     case "Bash":
-      if (input.command) lines.push(`Command: <code>${truncate(input.command as string, 100)}</code>`);
-      break;
+      return `${emoji} Bash: <code>${truncate(input.command as string, 60)}</code>`;
     case "Write":
     case "Read":
     case "Edit":
-      if (input.file_path) lines.push(`File: <code>${shortenPath(input.file_path as string)}</code>`);
-      break;
+      return `${emoji} ${perm.tool_name}: <code>${shortenPath(input.file_path as string)}</code>`;
+    case "Glob":
+      return `${emoji} Glob: <code>${input.pattern}</code>`;
+    case "Grep":
+      return `${emoji} Grep: <code>${truncate(input.pattern as string, 40)}</code>`;
+    case "Task":
+      return `${emoji} Task: ${truncate(input.description as string ?? input.prompt as string, 50)}`;
     default:
-      // Show first string value for unknown tools
-      for (const [key, val] of Object.entries(input)) {
-        if (typeof val === "string" && val.length < 100) {
-          lines.push(`${key}: <code>${escapeHTML(truncate(val, 80))}</code>`);
-          break;
-        }
+      return `${emoji} ${perm.tool_name}`;
+  }
+}
+
+/** Format a single permission request for Telegram display. */
+export function formatPermissionRequest(perm: PermissionRequest): string {
+  return formatPermissionLine(perm);
+}
+
+/** Format a batch of permission requests as a single message. */
+export function formatPermissionBatch(
+  perms: PermissionRequest[],
+  autoApproveConfig: AutoApproveConfig,
+): string {
+  const lines: string[] = [];
+
+  // Header with count
+  if (perms.length === 1) {
+    const isBash = perms[0].tool_name === "Bash";
+    const willAutoApprove = autoApproveConfig.enabled && autoApproveConfig.timeoutSeconds > 0
+      && (!isBash || autoApproveConfig.allowBash);
+
+    if (willAutoApprove) {
+      lines.push(`⏱ <b>Auto-approve in ${autoApproveConfig.timeoutSeconds}s</b>`);
+    } else if (isBash && autoApproveConfig.enabled && !autoApproveConfig.allowBash) {
+      lines.push("🔒 <b>Manual approval required</b>");
+    } else {
+      lines.push("🔧 <b>Permission</b>");
+    }
+    lines.push(formatPermissionLine(perms[0]));
+  } else {
+    // Multiple permissions — split into auto vs manual
+    const autoPerms: PermissionRequest[] = [];
+    const manualPerms: PermissionRequest[] = [];
+
+    for (const p of perms) {
+      const isBash = p.tool_name === "Bash";
+      const willAuto = autoApproveConfig.enabled && autoApproveConfig.timeoutSeconds > 0
+        && (!isBash || autoApproveConfig.allowBash);
+      if (willAuto) {
+        autoPerms.push(p);
+      } else {
+        manualPerms.push(p);
       }
+    }
+
+    if (autoPerms.length > 0) {
+      lines.push(`⏱ <b>Auto-approve ${autoPerms.length} tool${autoPerms.length > 1 ? "s" : ""} in ${autoApproveConfig.timeoutSeconds}s</b>`);
+      for (const p of autoPerms) {
+        lines.push(formatPermissionLine(p));
+      }
+    }
+
+    if (manualPerms.length > 0) {
+      if (autoPerms.length > 0) lines.push("");
+      lines.push(`🔒 <b>Manual approval (${manualPerms.length})</b>`);
+      for (const p of manualPerms) {
+        lines.push(formatPermissionLine(p));
+      }
+    }
   }
 
   return lines.join("\n");
+}
+
+/** Build keyboard for a batch of permission requests. */
+export function buildPermissionBatchKeyboard(requestIds: string[]): TelegramInlineKeyboardMarkup {
+  if (requestIds.length === 1) {
+    return buildPermissionKeyboard(requestIds[0]);
+  }
+  // Batch: Allow all / Deny all
+  const batchId = requestIds.join(",");
+  return {
+    inline_keyboard: [
+      [
+        { text: `Allow all (${requestIds.length})`, callback_data: `perm:allow:${batchId}`, style: "success" },
+        { text: "Deny all", callback_data: `perm:deny:${batchId}`, style: "danger" },
+      ],
+    ],
+  };
 }
 
 // ─── AskUserQuestion extraction ──────────────────────────────────────────────

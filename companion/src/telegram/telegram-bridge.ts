@@ -35,10 +35,10 @@ import {
   buildProjectKeyboard,
   buildModelKeyboard,
   buildStopConfirmKeyboard,
-  buildPermissionKeyboard,
+  buildPermissionBatchKeyboard,
   buildSessionActionsKeyboard,
   buildAutoApproveKeyboard,
-  formatPermissionRequest,
+  formatPermissionBatch,
   formatAutoApproveStatus,
   extractAskUserQuestion,
   formatAskUserQuestion,
@@ -87,6 +87,10 @@ export class TelegramBridge {
 
   // Lock origin message ID when response starts (prevents race condition with new user messages)
   private responseOriginMsg = new Map<number, number>();
+
+  // Permission batching: collect permissions in a 2s window, then send as single message
+  private permissionBatch = new Map<number, { perms: import("../session-types.js").PermissionRequest[]; timer: ReturnType<typeof setTimeout> }>();
+  private readonly PERM_BATCH_WINDOW_MS = 2_000;
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
@@ -658,21 +662,19 @@ export class TelegramBridge {
 
       case "permission_request": {
         const perm = msg.request;
-        let permText = formatPermissionRequest(perm);
 
-        // Show auto-approve countdown info
-        const aaConfig = this.getAutoApproveConfig(chatId);
-        if (aaConfig.enabled && aaConfig.timeoutSeconds > 0) {
-          const willAutoApprove = perm.tool_name !== "Bash" || aaConfig.allowBash;
-          if (willAutoApprove) {
-            permText += `\n\n⏱ Auto-approving in <b>${aaConfig.timeoutSeconds}s</b>...`;
-          } else {
-            permText += "\n\n🔒 Bash requires manual approval.";
+        // Suppress permission UI for bypassPermissions mode — should never arrive,
+        // but if it does (edge case), don't bother user
+        const mapping = this.chatSessions.get(chatId);
+        if (mapping) {
+          const sessionState = this.getSessionState(mapping.sessionId);
+          if (sessionState?.permissionMode === "bypassPermissions") {
+            break;
           }
         }
 
-        const keyboard = buildPermissionKeyboard(perm.request_id);
-        await this.sendToChatWithKeyboard(chatId, permText, keyboard);
+        // Batch permissions in a 2s window to reduce message spam
+        this.queuePermission(chatId, perm);
         break;
       }
 
@@ -861,8 +863,9 @@ export class TelegramBridge {
     chatId: number, messageId: number, queryId: string, value: string
   ): Promise<void> {
     // value format: "allow:<requestId>" or "deny:<requestId>"
+    // Batch format: "allow:<id1>,<id2>,<id3>" (comma-separated)
     const [behavior, ...idParts] = value.split(":");
-    const requestId = idParts.join(":");
+    const requestIdStr = idParts.join(":");
 
     if (behavior !== "allow" && behavior !== "deny") {
       await this.api.answerCallbackQuery(queryId, "Invalid response");
@@ -875,14 +878,20 @@ export class TelegramBridge {
       return;
     }
 
-    // Send permission response to CLI
-    this.deps.bridge.injectPermissionResponse(mapping.sessionId, {
-      request_id: requestId,
-      behavior,
-    });
+    // Support batch: comma-separated request IDs
+    const requestIds = requestIdStr.split(",").filter(Boolean);
+
+    for (const requestId of requestIds) {
+      this.deps.bridge.injectPermissionResponse(mapping.sessionId, {
+        request_id: requestId,
+        behavior,
+      });
+    }
 
     const emoji = behavior === "allow" ? "✅" : "❌";
-    await this.api.answerCallbackQuery(queryId, `${emoji} ${behavior === "allow" ? "Allowed" : "Denied"}`);
+    const label = behavior === "allow" ? "Allowed" : "Denied";
+    const countLabel = requestIds.length > 1 ? ` ${requestIds.length} tools` : "";
+    await this.api.answerCallbackQuery(queryId, `${emoji} ${label}${countLabel}`);
 
     // Remove the keyboard
     await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
@@ -1213,6 +1222,44 @@ export class TelegramBridge {
     this.translateEnabled.delete(chatId);
     this.streamingMsg.delete(chatId);
     this.hubFirstMsg.delete(chatId);
+    // Clear permission batch timer
+    const batch = this.permissionBatch.get(chatId);
+    if (batch) {
+      clearTimeout(batch.timer);
+      this.permissionBatch.delete(chatId);
+    }
+  }
+
+  // ── Permission batching ─────────────────────────────────────────────────
+
+  /** Queue a permission request — flush after 2s window to batch multiple requests. */
+  private queuePermission(chatId: number, perm: import("../session-types.js").PermissionRequest): void {
+    const existing = this.permissionBatch.get(chatId);
+
+    if (existing) {
+      // Add to existing batch
+      existing.perms.push(perm);
+    } else {
+      // Start new batch with timer
+      const timer = setTimeout(() => {
+        this.flushPermissionBatch(chatId);
+      }, this.PERM_BATCH_WINDOW_MS);
+      this.permissionBatch.set(chatId, { perms: [perm], timer });
+    }
+  }
+
+  /** Send batched permissions as a single message. */
+  private async flushPermissionBatch(chatId: number): Promise<void> {
+    const batch = this.permissionBatch.get(chatId);
+    this.permissionBatch.delete(chatId);
+    if (!batch || batch.perms.length === 0) return;
+
+    const aaConfig = this.getAutoApproveConfig(chatId);
+    const text = formatPermissionBatch(batch.perms, aaConfig);
+    const requestIds = batch.perms.map((p) => p.request_id);
+    const keyboard = buildPermissionBatchKeyboard(requestIds);
+
+    await this.sendToChatWithKeyboard(chatId, text, keyboard);
   }
 
   // ── Hub Mode ───────────────────────────────────────────────────────────
