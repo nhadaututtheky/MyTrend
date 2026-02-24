@@ -13,6 +13,8 @@ services:
     environment:
       - NM_URL=http://neural-memory:8000
       - MYTREND_SYNC_USER_ID=873bodab6pacp1u
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8090/api/health"]
       interval: 10s

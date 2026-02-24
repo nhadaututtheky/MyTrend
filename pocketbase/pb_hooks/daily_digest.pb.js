@@ -341,3 +341,32 @@ cronAdd('daily_digest', '0 * * * *', function () {
 });
 
 console.log('[DailyDigest] Cron registered: daily_digest (hourly check)');
+
+// NM Doc Training — triggers companion to encode project docs into Neural Memory
+// Runs at :30 every hour, only executes at DIGEST_HOUR
+cronAdd('nm_doc_training', '30 * * * *', function () {
+  var now = new Date();
+  var digestHour = 9;
+  try {
+    var dh = $os.getenv('DIGEST_HOUR');
+    if (dh) digestHour = parseInt(dh, 10);
+  } catch (e) {}
+  if (now.getHours() !== digestHour) return;
+
+  console.log('[NMDocTraining] Triggering companion doc training');
+
+  try {
+    var res = $http.send({
+      url: 'http://host.docker.internal:3457/api/nm/train-docs',
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+      timeout: 30,
+    });
+    console.log('[NMDocTraining] Companion responded: ' + res.statusCode);
+  } catch (e) {
+    console.log('[NMDocTraining] Companion unreachable: ' + e);
+  }
+});
+
+console.log('[NMDocTraining] Cron registered: nm_doc_training');
