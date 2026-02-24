@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#FFFEF9"/>
+  <rect x="8" y="8" width="496" height="496" rx="88" fill="none" stroke="#1a1a1a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 0"/>
+  <!-- Trend line (sketch style) -->
+  <path d="M100 360 Q150 340 180 320 Q220 290 260 240 Q300 190 340 200 Q380 210 400 160" fill="none" stroke="#00D26A" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Arrow tip -->
+  <path d="M388 170 L410 155 L395 180" fill="none" stroke="#00D26A" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dots on trend -->
+  <circle cx="180" cy="320" r="10" fill="#4ECDC4"/>
+  <circle cx="260" cy="240" r="10" fill="#FFE66D"/>
+  <circle cx="340" cy="200" r="10" fill="#FF4757"/>
+  <circle cx="400" cy="160" r="12" fill="#00D26A"/>
+  <!-- "M" letter (comic style) -->
+  <text x="256" y="450" font-family="'Comic Sans MS', 'Comic Mono', cursive" font-size="80" font-weight="700" fill="#1a1a1a" text-anchor="middle">MyTrend</text>
+</svg>

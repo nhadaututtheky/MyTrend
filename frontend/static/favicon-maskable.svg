@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable: fill entire area, content in safe zone (center 80%) -->
+  <rect width="512" height="512" fill="#00D26A"/>
+  <!-- Trend line (sketch style) - centered in safe zone -->
+  <path d="M130 330 Q170 310 200 290 Q240 260 270 220 Q310 170 340 180 Q370 190 390 150" fill="none" stroke="#FFFEF9" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Arrow tip -->
+  <path d="M378 160 L400 145 L385 170" fill="none" stroke="#FFFEF9" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Dots -->
+  <circle cx="200" cy="290" r="9" fill="#4ECDC4"/>
+  <circle cx="270" cy="220" r="9" fill="#FFE66D"/>
+  <circle cx="340" cy="180" r="9" fill="#FFFEF9"/>
+  <circle cx="390" cy="150" r="10" fill="#FFFEF9"/>
+  <!-- "M" -->
+  <text x="256" y="410" font-family="'Comic Sans MS', cursive" font-size="70" font-weight="700" fill="#FFFEF9" text-anchor="middle">MyTrend</text>
+</svg>
