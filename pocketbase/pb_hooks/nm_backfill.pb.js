@@ -44,6 +44,109 @@ routerAdd('POST', '/api/mytrend/nm-backfill', (c) => {
     return c.json(400, { error: 'Invalid collection. Valid: ' + validCollections.join(', ') });
   }
 
+  // --- Inline classification helpers (Goja scope isolation, no shared imports) ---
+  function classifyMemoryType(content, coll, record) {
+    if (coll === 'plans') { return { type: 'decision', priority: 8 }; }
+    if (coll === 'activities') { return { type: 'workflow', priority: 6 }; }
+    if (coll === 'projects') { return { type: 'fact', priority: 4 }; }
+    if (coll === 'topics') { return { type: 'fact', priority: 4 }; }
+    if (coll === 'ideas') {
+      var ideaStatus = record.getString('status') || '';
+      if (ideaStatus === 'planned' || ideaStatus === 'done') {
+        return { type: 'decision', priority: 8 };
+      }
+      return { type: 'fact', priority: 4 };
+    }
+    var text = content.toLowerCase();
+    if (
+      text.indexOf('decided to') !== -1 ||
+      text.indexOf('chose') !== -1 ||
+      text.indexOf('went with') !== -1 ||
+      text.indexOf('will use') !== -1 ||
+      text.indexOf('switched to') !== -1 ||
+      text.indexOf('migrated to') !== -1
+    ) { return { type: 'decision', priority: 8 }; }
+    if (
+      text.indexOf('learned') !== -1 ||
+      text.indexOf('lesson') !== -1 ||
+      text.indexOf('mistake') !== -1 ||
+      text.indexOf('never again') !== -1 ||
+      text.indexOf('insight') !== -1 ||
+      text.indexOf('realized') !== -1 ||
+      text.indexOf('turns out') !== -1
+    ) { return { type: 'insight', priority: 8 }; }
+    if (
+      text.indexOf('error') !== -1 ||
+      text.indexOf('failed') !== -1 ||
+      text.indexOf('bug') !== -1 ||
+      text.indexOf('crashed') !== -1 ||
+      text.indexOf('broke') !== -1 ||
+      text.indexOf('exception') !== -1 ||
+      text.indexOf('stacktrace') !== -1
+    ) { return { type: 'error', priority: 7 }; }
+    if (
+      text.indexOf('workflow') !== -1 ||
+      text.indexOf('process') !== -1 ||
+      text.indexOf('pattern') !== -1 ||
+      text.indexOf('always do') !== -1 ||
+      text.indexOf('convention') !== -1 ||
+      text.indexOf('standard') !== -1
+    ) { return { type: 'workflow', priority: 6 }; }
+    if (
+      text.indexOf('todo') !== -1 ||
+      text.indexOf('need to') !== -1 ||
+      text.indexOf('should') !== -1 ||
+      text.indexOf('must') !== -1 ||
+      text.indexOf('plan to') !== -1 ||
+      text.indexOf('next step') !== -1
+    ) { return { type: 'todo', priority: 5 }; }
+    if (
+      text.indexOf('prefer') !== -1 ||
+      text.indexOf('like') !== -1 ||
+      text.indexOf('dislike') !== -1 ||
+      text.indexOf('better') !== -1 ||
+      text.indexOf('worse') !== -1 ||
+      text.indexOf('favorite') !== -1
+    ) { return { type: 'preference', priority: 5 }; }
+    return { type: 'fact', priority: 4 };
+  }
+
+  function inferDomainTags(content) {
+    var text = content.toLowerCase();
+    var domains = [];
+    var frontendWords = ['svelte', 'component', 'css', 'layout', 'page', 'route', 'html', 'ui'];
+    var backendWords = ['pocketbase', 'hook', 'api', 'endpoint', 'collection', 'migration', 'cron'];
+    var infraWords = ['docker', 'nginx', 'deploy', 'compose', 'build', 'ci', 'pipeline'];
+    var aiWords = ['neural', 'memory', 'model', 'claude', 'prompt', 'llm', 'embedding'];
+    var telegramWords = ['telegram', 'bot', 'webhook', 'chat_id'];
+    var foundFrontend = false;
+    for (var fi = 0; fi < frontendWords.length; fi++) {
+      if (text.indexOf(frontendWords[fi]) !== -1) { foundFrontend = true; break; }
+    }
+    if (foundFrontend) domains.push('domain:frontend');
+    var foundBackend = false;
+    for (var bi = 0; bi < backendWords.length; bi++) {
+      if (text.indexOf(backendWords[bi]) !== -1) { foundBackend = true; break; }
+    }
+    if (foundBackend) domains.push('domain:backend');
+    var foundInfra = false;
+    for (var ii = 0; ii < infraWords.length; ii++) {
+      if (text.indexOf(infraWords[ii]) !== -1) { foundInfra = true; break; }
+    }
+    if (foundInfra) domains.push('domain:infra');
+    var foundAi = false;
+    for (var ai = 0; ai < aiWords.length; ai++) {
+      if (text.indexOf(aiWords[ai]) !== -1) { foundAi = true; break; }
+    }
+    if (foundAi) domains.push('domain:ai');
+    var foundTelegram = false;
+    for (var ti = 0; ti < telegramWords.length; ti++) {
+      if (text.indexOf(telegramWords[ti]) !== -1) { foundTelegram = true; break; }
+    }
+    if (foundTelegram) domains.push('domain:telegram');
+    return domains;
+  }
+
   // --- Inline encode function (Goja scope isolation) ---
   function _resolveProjectName(dao, projId) {
     if (!projId) return null;
@@ -63,7 +166,6 @@ routerAdd('POST', '/api/mytrend/nm-backfill', (c) => {
       collection: coll,
       record_id: record.getId(),
       user: record.getString('user'),
-      type: 'fact',
     };
     var dao = $app.dao();
 
@@ -186,7 +288,6 @@ routerAdd('POST', '/api/mytrend/nm-backfill', (c) => {
       for (var tsi = 0; tsi < tst.length; tsi++) tags.push('tech:' + tst[tsi]);
       metadata.title = pnv;
       metadata.project_name = pnv;
-      metadata.type = 'context';
 
     } else if (coll === 'topics') {
       var tn = record.getString('name') || '';
@@ -206,6 +307,16 @@ routerAdd('POST', '/api/mytrend/nm-backfill', (c) => {
 
     if (!content || content.length < 10) return false;
     if (content.length > 50000) content = content.substring(0, 50000);
+
+    var classified = classifyMemoryType(content, coll, record);
+    metadata.type = classified.type;
+    metadata.priority = classified.priority;
+    var domainTags = inferDomainTags(content);
+    for (var dti = 0; dti < domainTags.length; dti++) { tags.push(domainTags[dti]); }
+    function padTwo(n) { return n < 10 ? '0' + n : '' + n; }
+    var now = new Date();
+    tags.push('session:' + now.getFullYear() + '-' + padTwo(now.getMonth() + 1) + '-' + padTwo(now.getDate()));
+    tags.push('collection:' + coll);
 
     var payload = {
       content: content,
