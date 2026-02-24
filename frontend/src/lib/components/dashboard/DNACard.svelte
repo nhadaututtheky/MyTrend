@@ -4,11 +4,13 @@
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
 
   interface Props {
-    dna: ProjectDNA;
+    dna: ProjectDNA | null | undefined;
     projectName?: string;
   }
 
-  const { dna, projectName = 'Project' }: Props = $props();
+  const { dna: rawDna, projectName = 'Project' }: Props = $props();
+
+  const dna: ProjectDNA = $derived(rawDna ?? { vision: '', stack: [], phase: '', challenges: [], decisions: [] });
 </script>
 
 <ComicCard variant="interactive">

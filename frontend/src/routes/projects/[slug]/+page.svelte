@@ -120,9 +120,19 @@
     return groups;
   });
 
+  /** Ensure project fields have safe defaults (PB may return null for JSON/array fields). */
+  function safeProject(p: Project): Project {
+    return {
+      ...p,
+      tech_stack: p.tech_stack ?? [],
+      dna: p.dna ?? { vision: '', stack: [], phase: '', challenges: [], decisions: [] },
+    };
+  }
+
   onMount(async () => {
     try {
-      project = await fetchProjectBySlug(slug);
+      const raw = await fetchProjectBySlug(slug);
+      project = raw ? safeProject(raw) : null;
       if (project) {
         const [convRes, ideasRes, plansRes, actRes, aggRes, tasksRes] = await Promise.allSettled([
           fetchConversations(1, project.id),
