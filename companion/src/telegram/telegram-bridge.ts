@@ -85,6 +85,9 @@ export class TelegramBridge {
   private streamingMsg = new Map<number, { msgId: number; lastText: string; lastEditAt: number }>();
   private readonly STREAM_EDIT_INTERVAL_MS = 1_500; // min interval between edits
 
+  // Lock origin message ID when response starts (prevents race condition with new user messages)
+  private responseOriginMsg = new Map<number, number>();
+
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
     this.deps = deps;
@@ -537,15 +540,19 @@ export class TelegramBridge {
           const now = Date.now();
 
           if (!streaming) {
-            // First text chunk: send new message with streaming cursor
+            // First text chunk: lock origin message ID to prevent race condition
+            // with new user messages arriving while Claude is still responding
             const replyTo = this.lastUserMsgId.get(chatId);
+            if (replyTo && !this.responseOriginMsg.has(chatId)) {
+              this.responseOriginMsg.set(chatId, replyTo);
+            }
             try {
               const msgId = await this.api.sendMessage(chatId, html + " ▌", { replyTo });
               this.streamingMsg.set(chatId, { msgId, lastText: html, lastEditAt: now });
               this.stopTyping(chatId);
             } catch {
               // Fallback: send without cursor
-              await this.api.sendLongMessage(chatId, html, { replyTo: this.lastUserMsgId.get(chatId) });
+              await this.api.sendLongMessage(chatId, html, { replyTo });
             }
           } else if (html !== streaming.lastText) {
             // Text exceeded Telegram limit: finalize current, start new message
@@ -584,19 +591,20 @@ export class TelegramBridge {
         if (streamState) {
           this.api.editMessageText(chatId, streamState.msgId, streamState.lastText).catch(() => {});
           this.streamingMsg.delete(chatId);
-          this.lastUserMsgId.delete(chatId);
         }
 
         const resultMsg = msg.data as CLIResultMessage;
         await this.sendToChat(chatId, formatResult(resultMsg));
 
-        // Update reaction on user's message (✅ or ❌)
-        const userMsgId = this.lastUserMsgId.get(chatId);
-        if (userMsgId) {
+        // Update reaction on the ORIGINAL user message (locked at response start)
+        const originMsgId = this.responseOriginMsg.get(chatId) ?? this.lastUserMsgId.get(chatId);
+        if (originMsgId) {
           const emoji = resultMsg.is_error ? "❌" : "✅";
-          this.api.react(chatId, userMsgId, emoji).catch(() => {});
-          this.lastUserMsgId.delete(chatId);
+          this.api.react(chatId, originMsgId, emoji).catch(() => {});
         }
+        // Clean up both maps
+        this.responseOriginMsg.delete(chatId);
+        this.lastUserMsgId.delete(chatId);
 
         // Cost budget alert
         this.checkCostAlert(chatId, resultMsg.total_cost_usd);
@@ -1194,6 +1202,7 @@ export class TelegramBridge {
   private cleanupChatState(chatId: number): void {
     this.lastToolFeedAt.delete(chatId);
     this.lastUserMsgId.delete(chatId);
+    this.responseOriginMsg.delete(chatId);
     this.costAlertsShown.delete(chatId);
     this.autoApproveConfigs.delete(chatId);
     this.translateEnabled.delete(chatId);
