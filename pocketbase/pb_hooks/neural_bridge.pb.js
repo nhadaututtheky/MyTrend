@@ -300,7 +300,7 @@ function encodeToNeuralMemory(collection, record) {
     var res = $http.send({
       url: endpoint,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'mytrend' },
+      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'laptop-brain' },
       body: JSON.stringify(payload),
       timeout: 5,
     });

@@ -27,13 +27,15 @@ services:
       - "8001:8000"
     environment:
       - NEURALMEMORY_DIR=/data
-      - NEURALMEMORY_BRAIN=mytrend
+      - NEURALMEMORY_BRAIN=laptop-brain
       - NEURAL_MEMORY_HOST=0.0.0.0
       - NEURAL_MEMORY_PORT=8000
       - NEURAL_MEMORY_DEBUG=false
       - NEURAL_MEMORY_HUB_ENABLED=true
+      - NEURAL_MEMORY_HUB_TRUSTED_HOSTS=172.17.0.1,172.18.0.1,172.19.0.1,172.20.0.1
     volumes:
       - nm_data:/data
+      - ./patches/nm_hub.py:/opt/venv/lib/python3.11/site-packages/neural_memory/server/routes/hub.py:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
