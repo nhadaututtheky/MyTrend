@@ -577,6 +577,15 @@ export class TelegramBridge {
     const subscriberId = `telegram:${chatId}:${topicId}`;
 
     this.deps.bridge.subscribe(sessionId, subscriberId, (msg: BrowserIncomingMessage) => {
+      // Guard: ignore stale callbacks from orphaned sessions (e.g. Hub CLI exits
+      // after a Project session replaced it at the same topicId in private chat)
+      const currentMapping = this.chatSessions.get(chatId)?.get(topicId);
+      if (currentMapping && currentMapping.sessionId !== sessionId) {
+        // Unsubscribe this stale listener to prevent future ghost events
+        this.deps.bridge.unsubscribe(sessionId, subscriberId);
+        return;
+      }
+
       this.handleCLIResponse(chatId, topicId, msg).catch((err) => {
         console.error(`[telegram] CLI response handler error (chat=${chatId} topic=${topicId}):`, err);
       });
@@ -916,8 +925,14 @@ export class TelegramBridge {
         const forumTopic = await this.api.createForumTopic(chatId, profile.name);
         targetTopicId = forumTopic.message_thread_id;
       } catch {
-        // Forum topics may not be available (e.g., not a supergroup with topics)
+        // Forum topics may not be available (e.g., private chat)
         // Fall back to using General topic (topicId=0)
+        // IMPORTANT: destroy existing session first to prevent orphaned CLI processes
+        // whose disconnect events would corrupt the new session's mapping
+        const existingAtZero = this.chatSessions.get(chatId)?.get(0);
+        if (existingAtZero && existingAtZero.projectSlug !== slug) {
+          await this.destroySession(chatId, 0);
+        }
         targetTopicId = 0;
       }
     }
