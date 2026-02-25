@@ -5,6 +5,7 @@
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import { updateProject, deleteProject } from '$lib/api/projects';
   import { toast } from '$lib/stores/toast';
+  import { getHealthStatus } from '$lib/utils/project-health';
 
   interface Props {
     project: Project;
@@ -18,6 +19,8 @@
     archived: 'blue',
     completed: 'purple' as 'blue',
   };
+
+  const health = $derived(getHealthStatus(project.last_activity ?? null));
 
   let menuOpen = $state(false);
   let isActing = $state(false);
@@ -73,7 +76,15 @@
       <div class="project-header">
         <span class="icon" style:background={project.color}>{project.icon}</span>
         <div class="info">
-          <h3 class="name">{project.name}</h3>
+          <h3 class="name">
+            {project.name}
+            <span
+              class="health-dot"
+              style:background={health.dotColor}
+              title={health.label}
+              aria-label="Status: {health.label}"
+            ></span>
+          </h3>
           <ComicBadge color={STATUS_COLORS[project.status] ?? 'blue'} size="sm">
             {project.status}
           </ComicBadge>
@@ -181,6 +192,17 @@
 
   .last-activity {
     margin-left: auto;
+  }
+
+  /* Health dot */
+  .health-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-left: 6px;
+    vertical-align: middle;
+    flex-shrink: 0;
   }
 
   /* Menu */

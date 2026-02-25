@@ -550,6 +550,11 @@ export class WsBridge {
     this.broadcastToBrowsers(session, browserMsg);
     this.updateStatus(session, "idle");
 
+    // Auto-save session summary to Neural Memory (fire-and-forget, only meaningful sessions)
+    if (msg.num_turns >= 2 && !msg.is_error) {
+      this.saveSessionSummary(session, msg).catch(() => {});
+    }
+
     // Auto-approve plan after ExitPlanMode completes
     if (session.pendingPlanApproval) {
       session.pendingPlanApproval = false;
@@ -917,6 +922,57 @@ export class WsBridge {
   }
 
   // ── Persistence ──────────────────────────────────────────────────────────
+
+  private async saveSessionSummary(
+    session: ActiveSession,
+    result: CLIResultMessage
+  ): Promise<void> {
+    const nmUrl = process.env.NM_URL || "http://localhost:8001";
+    // Derive project name from cwd (last path segment)
+    const cwd = session.state.cwd ?? "";
+    const projectName = cwd.split(/[/\\]/).filter(Boolean).pop() ?? "unknown";
+
+    // Extract last few text exchanges for context (keep lightweight)
+    const textPairs: string[] = [];
+    for (const msg of session.messageHistory.slice(-20)) {
+      if (msg.type === "assistant") {
+        const content = msg.message?.content;
+        if (Array.isArray(content)) {
+          const text = content
+            .filter((b: { type: string; text?: string }) => b.type === "text" && b.text?.trim())
+            .map((b: { type: string; text?: string }) => b.text ?? "")
+            .join(" ")
+            .slice(0, 300);
+          if (text) textPairs.push(`A: ${text}`);
+        }
+      } else if (msg.type === "result") {
+        // skip
+      }
+    }
+
+    const summary = [
+      `[SESSION] Project: ${projectName}`,
+      `Turns: ${result.num_turns} | Cost: $${result.total_cost_usd.toFixed(3)} | Duration: ${Math.round((result.duration_ms ?? 0) / 1000)}s`,
+      textPairs.length > 0 ? `\nKey exchanges:\n${textPairs.slice(-5).join("\n")}` : "",
+    ].filter(Boolean).join("\n");
+
+    await fetch(`${nmUrl}/memory/encode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Brain-ID": "laptop-brain" },
+      body: JSON.stringify({
+        content: summary,
+        tags: ["session", `project:${projectName}`, "auto-summary"],
+        metadata: {
+          type: "session",
+          project: projectName,
+          turns: result.num_turns,
+          cost_usd: result.total_cost_usd,
+          priority: Math.min(10, Math.max(3, result.num_turns)),
+        },
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+  }
 
   private persistSession(session: ActiveSession): void {
     const persisted: PersistedSession = {
