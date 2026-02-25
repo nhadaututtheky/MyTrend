@@ -32,9 +32,12 @@ migrate(
       updateRule: '@request.auth.id != ""',
       deleteRule: '@request.auth.id != ""',
     });
-    return db.saveCollection(col);
+    Dao(db).saveCollection(col);
   },
   (db) => {
-    return db.dropTable('hub_cron_history');
+    try {
+      var col = Dao(db).findCollectionByNameOrId('hub_cron_history');
+      Dao(db).deleteCollection(col);
+    } catch (_) {}
   },
 );
