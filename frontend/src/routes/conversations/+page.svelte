@@ -116,13 +116,13 @@
             {#if conv.summary}<p class="conv-summary">{conv.summary}</p>{/if}
             <div class="conv-meta">
               <span>{conv.message_count} messages</span>
-              <span>{conv.total_tokens.toLocaleString()} tokens</span>
+              <span>{(conv.total_tokens ?? 0).toLocaleString()} tokens</span>
               {#if conv.device_name}<span>{conv.device_name}</span>{/if}
               <span class="time">{formatRelative(conv.started_at)}</span>
             </div>
-            {#if conv.tags.length > 0}
+            {#if (conv.tags ?? []).length > 0}
               <div class="tags">
-                {#each conv.tags.slice(0, 5) as tag (tag)}<ComicBadge color="purple" size="sm"
+                {#each (conv.tags ?? []).slice(0, 5) as tag (tag)}<ComicBadge color="purple" size="sm"
                     >{tag}</ComicBadge
                   >{/each}
               </div>

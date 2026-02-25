@@ -29,7 +29,7 @@ export async function fetchResearchItem(id: string): Promise<Research | null> {
 
 export async function fetchResearchStats(): Promise<ResearchStats> {
   const res = await fetch('/api/mytrend/research/stats', {
-    headers: { Authorization: `Bearer ${pb.authStore.token}` },
+    headers: { Authorization: pb.authStore.token },
   });
   if (!res.ok) throw new Error(`Stats fetch failed: ${res.status}`);
   return res.json() as Promise<ResearchStats>;

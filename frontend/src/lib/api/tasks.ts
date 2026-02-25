@@ -106,9 +106,19 @@ export async function fetchTasks(options?: {
 
   const filter = filters.join(' && ');
 
-  const result = await pb
-    .collection('claude_tasks')
-    .getList<ClaudeTask>(options?.page ?? 1, options?.perPage ?? 500, { sort: '-updated', filter });
+  let result: PBListResult<ClaudeTask>;
+  try {
+    result = await pb
+      .collection('claude_tasks')
+      .getList<ClaudeTask>(options?.page ?? 1, options?.perPage ?? 500, { sort: '-updated', filter });
+  } catch (err) {
+    const e = err as { status?: number };
+    if (e?.status === 404) {
+      // Collection not yet migrated — return empty gracefully instead of throwing
+      return { items: [], page: 1, perPage: options?.perPage ?? 500, totalItems: 0, totalPages: 0 };
+    }
+    throw err;
+  }
 
   if (options?.search) {
     const q = options.search.toLowerCase();
