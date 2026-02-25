@@ -39,6 +39,7 @@ import {
 import {
   toTelegramHTML,
   extractText,
+  escapeHTML,
   formatResult,
   formatConnected,
   formatStatus,
@@ -118,6 +119,9 @@ export class TelegramBridge {
 
   // Track .md files written by Claude per session-key — auto-send on result
   private pendingMdFiles = new Map<string, Array<{ path: string; content: string }>>();
+
+  // Track Bash tool_use_ids so we can show their tool_result output
+  private bashToolIds = new Map<string, Set<string>>();
 
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
@@ -678,11 +682,43 @@ export class TelegramBridge {
         // Check for AskUserQuestion — always show prominently
         const askQuestions = extractAskUserQuestion(content);
 
+        // Track Bash tool_use ids so we can show their output later
+        const bashIds = this.bashToolIds.get(k) ?? new Set<string>();
+        for (const block of content) {
+          if (block.type === "tool_use" && block.name === "Bash") {
+            bashIds.add(block.id);
+            this.bashToolIds.set(k, bashIds);
+          }
+        }
+
         // Tool activity feed (throttled, only when no text)
         const text = extractText(content);
         if (!text && !askQuestions) {
           const toolFeed = formatToolFeed(content);
           if (toolFeed) this.sendThrottledToolFeed(chatId, topicId, toolFeed);
+
+          // Show Bash tool_result output so results aren't silently swallowed
+          for (const block of content) {
+            if (block.type === "tool_result" && bashIds.has(block.tool_use_id)) {
+              const output = typeof block.content === "string"
+                ? block.content
+                : (block.content as Array<{ type: string; text?: string }>)
+                    .filter((b) => b.type === "text")
+                    .map((b) => b.text ?? "")
+                    .join("\n");
+              const trimmed = output.trim();
+              if (trimmed) {
+                const isError = block.is_error === true;
+                const header = isError ? "⚠️ <b>Error output:</b>" : "📤 <b>Output:</b>";
+                const preview = trimmed.length > 1500 ? trimmed.slice(0, 1500) + "\n…(truncated)" : trimmed;
+                await this.sendToChat(
+                  chatId,
+                  `${header}\n<pre>${escapeHTML(preview)}</pre>`,
+                  topicId,
+                );
+              }
+            }
+          }
           break;
         }
 
@@ -1538,6 +1574,8 @@ export class TelegramBridge {
     this.responseOriginMsg.delete(k);
     this.costAlertsShown.delete(k);
     this.streamingMsg.delete(k);
+    this.bashToolIds.delete(k);
+    this.pendingMdFiles.delete(k);
     // Clear permission batch timer
     const batch = this.permissionBatch.get(k);
     if (batch) {

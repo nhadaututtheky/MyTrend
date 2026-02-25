@@ -70,7 +70,7 @@ export function toTelegramHTML(markdown: string): string {
   return text.trim();
 }
 
-function escapeHTML(text: string): string {
+export function escapeHTML(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
