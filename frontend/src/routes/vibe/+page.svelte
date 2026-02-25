@@ -18,6 +18,7 @@
   let selectedSessionId = $state<string | null>(null);
   let searchQuery = $state('');
   let activeTab = $state('kanban');
+  let initialPrompt = $state('');
   let isLoading = $state(true);
   let isSyncing = $state(false);
   let isSendingSummary = $state(false);
@@ -60,6 +61,25 @@
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
   onMount(async () => {
+    // Handle URL params: ?session=<id>&tab=<t>&prompt=<text>
+    if (typeof window !== 'undefined') {
+      const params = new URL(window.location.href).searchParams;
+      const sessionParam = params.get('session');
+      const tabParam = params.get('tab');
+      const promptParam = params.get('prompt');
+      if (sessionParam) {
+        selectedSessionId = sessionParam;
+        activeTab = 'terminal';
+      }
+      if (tabParam && ['kanban', 'context', 'router', 'terminal'].includes(tabParam)) {
+        activeTab = tabParam;
+      }
+      if (promptParam) {
+        initialPrompt = decodeURIComponent(promptParam);
+        if (!tabParam && !sessionParam) activeTab = 'terminal';
+      }
+    }
+
     await loadTasks();
     await loadSyncStatus();
     subscribeRealtime();
@@ -277,7 +297,7 @@
       </div>
     {:else if activeTab === 'terminal'}
       <div class="terminal-layout">
-        <VibeTerminal />
+        <VibeTerminal {initialPrompt} />
       </div>
     {/if}
   </div>

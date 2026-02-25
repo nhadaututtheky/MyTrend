@@ -1,16 +1,27 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+
   interface Props {
     disabled?: boolean;
     placeholder?: string;
     onsend: (content: string) => void;
     oninterrupt?: () => void;
     isBusy?: boolean;
+    initialValue?: string;
   }
 
-  let { disabled = false, placeholder, onsend, oninterrupt, isBusy = false }: Props = $props();
+  let { disabled = false, placeholder, onsend, oninterrupt, isBusy = false, initialValue = '' }: Props = $props();
 
   let inputValue = $state('');
   let textareaEl: HTMLTextAreaElement | undefined = $state();
+
+  onMount(() => {
+    if (initialValue) {
+      inputValue = initialValue;
+      // Focus so user can send immediately
+      textareaEl?.focus();
+    }
+  });
   let translatedText = $state('');
   let isTranslating = $state(false);
   let translateEnabled = $state(true);

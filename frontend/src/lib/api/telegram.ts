@@ -168,3 +168,26 @@ export async function sendVibeNotification(
   });
   return res.json();
 }
+
+/** Send a content summary to Telegram (idea, conversation, project). */
+export async function sendContentToTelegram(
+  type: string,
+  title: string,
+  snippet: string,
+  webPath: string,
+): Promise<{ success: boolean; error?: string }> {
+  const typeEmoji: Record<string, string> = {
+    idea: '💡',
+    conversation: '💬',
+    project: '📁',
+    plan: '📋',
+  };
+  const emoji = typeEmoji[type] ?? '🔗';
+  const webUrl = import.meta.env.VITE_WEB_URL || 'http://localhost:5173';
+  const lines = [
+    `${emoji} <b>${title}</b>`,
+    snippet ? `<i>${snippet.slice(0, 200)}</i>` : '',
+    `<a href="${webUrl}${webPath}">View in MyTrend</a>`,
+  ].filter(Boolean);
+  return sendVibeNotification(lines.join('\n'), 'HTML');
+}

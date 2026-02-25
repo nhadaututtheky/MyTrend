@@ -6,12 +6,32 @@
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
   import RelatedContent from '$lib/components/comic/RelatedContent.svelte';
   import { buildRelatedQuery } from '$lib/api/related';
+  import { sendContentToTelegram } from '$lib/api/telegram';
   import { formatDateTime, formatDuration } from '$lib/utils/date';
   import type { Conversation } from '$lib/types';
 
   let convId = $derived($page.params['id'] ?? '');
   let conversation = $state<Conversation | null>(null);
   let isLoading = $state(true);
+  let isSendingToTg = $state(false);
+
+  async function handleSendToTelegram() {
+    if (!conversation || isSendingToTg) return;
+    isSendingToTg = true;
+    try {
+      await sendContentToTelegram('conversation', conversation.title, conversation.summary ?? '', `/conversations/${convId}`);
+    } catch {
+      // Non-critical
+    } finally {
+      isSendingToTg = false;
+    }
+  }
+
+  function buildDiscussPrompt(conv: Conversation): string {
+    const parts = [`[Conversation: ${conv.title}]`];
+    if (conv.summary) parts.push(conv.summary.slice(0, 300));
+    return encodeURIComponent(parts.join('\n'));
+  }
 
   onMount(async () => {
     try {
@@ -40,6 +60,19 @@
         {#if conversation.duration_min}<span>{formatDuration(conversation.duration_min)}</span>{/if}
         {#if conversation.device_name}<span>{conversation.device_name}</span>{/if}
         <span>{conversation.total_tokens.toLocaleString()} tokens</span>
+      </div>
+      <div class="header-actions">
+        <a
+          href="/vibe?prompt={buildDiscussPrompt(conversation)}&tab=terminal"
+          class="action-btn discuss-btn"
+          aria-label="Discuss this conversation with Claude"
+        >💬 Discuss</a>
+        <button
+          class="action-btn tg-btn"
+          onclick={handleSendToTelegram}
+          disabled={isSendingToTg}
+          aria-label="Send to Telegram"
+        >{isSendingToTg ? '...' : '✈️ Telegram'}</button>
       </div>
     </div>
 
@@ -89,6 +122,53 @@
   }
   .conv-header h1 {
     margin: 0 0 var(--spacing-xs);
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-sm);
+  }
+  .action-btn {
+    font-family: 'Comic Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 2px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 150ms ease;
+    box-shadow: 2px 2px 0 var(--border-color);
+    white-space: nowrap;
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .action-btn:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--border-color);
+    color: var(--text-primary);
+  }
+  .action-btn:active:not(:disabled) {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--border-color);
+  }
+  .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .discuss-btn {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    box-shadow: 2px 2px 0 var(--accent-blue);
+  }
+  .discuss-btn:hover {
+    background: rgba(78, 205, 196, 0.08);
+    box-shadow: 3px 3px 0 var(--accent-blue) !important;
   }
   .meta {
     display: flex;

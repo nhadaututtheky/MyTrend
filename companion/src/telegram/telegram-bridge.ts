@@ -832,7 +832,18 @@ export class TelegramBridge {
         }
 
         const resultMsg = msg.data as CLIResultMessage;
-        await this.sendToChat(chatId, formatResult(resultMsg), topicId);
+        const resultText = formatResult(resultMsg);
+        const webUrl = process.env.MYTREND_WEB_URL || "http://localhost:5173";
+        const resultMapping = this.chatSessions.get(chatId)?.get(topicId);
+        if (!resultMsg.is_error && resultMapping) {
+          await this.sendToChatWithKeyboard(chatId, resultText, {
+            inline_keyboard: [[
+              { text: "🌐 Open in Web", url: `${webUrl}/vibe?session=${resultMapping.sessionId}&tab=terminal` },
+            ]],
+          }, topicId);
+        } else {
+          await this.sendToChat(chatId, resultText, topicId);
+        }
 
         // Update reaction on the ORIGINAL user message (locked at response start)
         const originMsgId = this.responseOriginMsg.get(k) ?? this.lastUserMsgId.get(k);

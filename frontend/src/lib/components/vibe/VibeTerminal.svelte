@@ -22,6 +22,12 @@
   import VibeComposer from './VibeComposer.svelte';
   import VibeOnboarding from './VibeOnboarding.svelte';
 
+  // ─── Props ────────────────────────────────────────────────────────────────
+  interface Props {
+    initialPrompt?: string;
+  }
+  const { initialPrompt = '' }: Props = $props();
+
   // ─── State ────────────────────────────────────────────────────────────────
   let isHealthy = $state(false);
   let sessions = $state<CompanionSessionListItem[]>([]);
@@ -776,6 +782,7 @@
         onsend={handleSend}
         oninterrupt={handleInterrupt}
         {isBusy}
+        initialValue={initialPrompt}
       />
     </div>
   {/if}

@@ -10,8 +10,29 @@
   import TelegramFileUpload from '$lib/components/telegram/TelegramFileUpload.svelte';
   import RelatedContent from '$lib/components/comic/RelatedContent.svelte';
   import { buildRelatedQuery } from '$lib/api/related';
+  import { sendContentToTelegram } from '$lib/api/telegram';
   import { formatDate } from '$lib/utils/date';
   import type { Idea } from '$lib/types';
+
+  let isSendingToTg = $state(false);
+
+  async function handleSendToTelegram() {
+    if (!idea || isSendingToTg) return;
+    isSendingToTg = true;
+    try {
+      await sendContentToTelegram('idea', idea.title, idea.content ?? '', `/ideas/${ideaId}`);
+    } catch {
+      // Non-critical
+    } finally {
+      isSendingToTg = false;
+    }
+  }
+
+  function buildDiscussPrompt(item: Idea): string {
+    const parts = [`[Idea: ${item.title}]`];
+    if (item.content) parts.push(item.content.slice(0, 300));
+    return encodeURIComponent(parts.join('\n'));
+  }
 
   let ideaId = $derived($page.params['id'] ?? '');
   let idea = $state<Idea | null>(null);
@@ -64,7 +85,20 @@
         <ComicBadge color="green">{idea.status}</ComicBadge>
         <ComicBadge color="orange">{idea.priority}</ComicBadge>
       </div>
-      <span class="date">Created {formatDate(idea.created)}</span>
+      <div class="header-actions">
+        <span class="date">Created {formatDate(idea.created)}</span>
+        <a
+          href="/vibe?prompt={buildDiscussPrompt(idea)}&tab=terminal"
+          class="action-btn discuss-btn"
+          aria-label="Discuss this idea with Claude"
+        >💬 Discuss</a>
+        <button
+          class="action-btn tg-btn"
+          onclick={handleSendToTelegram}
+          disabled={isSendingToTg}
+          aria-label="Send to Telegram"
+        >{isSendingToTg ? '...' : '✈️ Telegram'}</button>
+      </div>
     </div>
 
     <!-- Plan Link Section -->
@@ -131,6 +165,53 @@
     flex-direction: column;
     gap: var(--spacing-lg);
     max-width: 800px;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    margin-top: var(--spacing-xs);
+  }
+  .action-btn {
+    font-family: 'Comic Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 2px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 150ms ease;
+    box-shadow: 2px 2px 0 var(--border-color);
+    white-space: nowrap;
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+  }
+  .action-btn:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0 var(--border-color);
+    color: var(--text-primary);
+  }
+  .action-btn:active:not(:disabled) {
+    transform: translate(1px, 1px);
+    box-shadow: 1px 1px 0 var(--border-color);
+  }
+  .action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .discuss-btn {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    box-shadow: 2px 2px 0 var(--accent-blue);
+  }
+  .discuss-btn:hover {
+    background: rgba(78, 205, 196, 0.08);
+    box-shadow: 3px 3px 0 var(--accent-blue) !important;
   }
   .idea-header {
     animation: sketchFadeIn 0.3s ease;
