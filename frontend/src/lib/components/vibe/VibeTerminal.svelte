@@ -30,6 +30,7 @@
   let sessionState = $state<CompanionSessionState | null>(null);
   let connection = $state<CompanionConnection | null>(null);
   let isCreating = $state(false);
+  let isLoadingSessions = $state(false);
   let errorMsg = $state('');
   let reconnectAttempt = $state(0);
   let healthPollTimer: ReturnType<typeof setInterval> | undefined;
@@ -66,7 +67,11 @@
   let feedEl: HTMLDivElement | undefined = $state();
 
   // Session list filter
-  let showEnded = $state(false);
+  let showEnded = $state(
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('vibe-show-ended') === 'true'
+      : false
+  );
   let isCleaningUp = $state(false);
 
   // Onboarding
@@ -155,10 +160,13 @@
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   async function refreshSessions() {
+    isLoadingSessions = true;
     try {
       sessions = await listSessions();
     } catch {
       // companion not running
+    } finally {
+      isLoadingSessions = false;
     }
   }
 
@@ -443,7 +451,7 @@
         timestamp: Date.now(),
       },
     ];
-    scrollToBottom();
+    scrollToBottom(true);
   }
 
   function getAutoApproveTimeout(toolName: string): number {
@@ -471,9 +479,11 @@
     connection?.interrupt();
   }
 
-  function scrollToBottom() {
+  function scrollToBottom(force = false) {
     requestAnimationFrame(() => {
-      if (feedEl) {
+      if (!feedEl) return;
+      const isNearBottom = feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight < 120;
+      if (force || isNearBottom) {
         feedEl.scrollTop = feedEl.scrollHeight;
       }
     });
@@ -566,7 +576,16 @@
         {/if}
       </div>
 
-      {#if sessions.length > 0}
+      {#if isLoadingSessions && sessions.length === 0}
+        <div class="history-section">
+          <h3 class="section-title">SESSIONS</h3>
+          <div class="skeleton-list">
+            <div class="skeleton-item"></div>
+            <div class="skeleton-item"></div>
+            <div class="skeleton-item"></div>
+          </div>
+        </div>
+      {:else if sessions.length > 0}
         <div class="history-section">
           <div class="session-header">
             <h3 class="section-title">SESSIONS ({activeCount} active)</h3>
@@ -583,7 +602,7 @@
               <button
                 class="btn-toggle-ended"
                 class:active={showEnded}
-                onclick={() => showEnded = !showEnded}
+                onclick={() => { showEnded = !showEnded; localStorage.setItem('vibe-show-ended', String(showEnded)); }}
                 aria-label="Toggle ended sessions"
                 title="{showEnded ? 'Hide' : 'Show'} ended ({endedCount})"
               >
@@ -597,10 +616,13 @@
               <div class="group-label">{group.name}</div>
               <div class="session-list">
                 {#each group.sessions as s (s.id)}
-                  <button
+                  <div
                     class="session-item"
                     class:active={s.status !== 'ended'}
+                    role="button"
+                    tabindex="0"
                     onclick={() => handleSelectSession(s.id)}
+                    onkeydown={(e) => e.key === 'Enter' && handleSelectSession(s.id)}
                     aria-label="Connect to session {s.id.slice(0, 8)}"
                   >
                     <div class="session-info">
@@ -608,25 +630,19 @@
                       <span class="session-status status-{s.status}">{s.status}</span>
                       <span class="session-actions-inline">
                         {#if s.status !== 'ended'}
-                          <span
+                          <button
                             class="btn-kill-inline"
-                            role="button"
-                            tabindex="0"
                             onclick={(e) => handleKillFromList(e, s.id)}
-                            onkeydown={(e) => e.key === 'Enter' && handleKillFromList(e, s.id)}
                             aria-label="Kill session"
                             title="Kill this session"
-                          >Kill</span>
+                          >Kill</button>
                         {:else}
-                          <span
+                          <button
                             class="btn-delete-inline"
-                            role="button"
-                            tabindex="0"
                             onclick={(e) => handleDeleteFromList(e, s.id)}
-                            onkeydown={(e) => e.key === 'Enter' && handleDeleteFromList(e, s.id)}
                             aria-label="Delete session"
                             title="Remove from history"
-                          >Del</span>
+                          >Del</button>
                         {/if}
                       </span>
                     </div>
@@ -634,7 +650,7 @@
                       <span>{s.cwd.split(/[\\/]/).pop()}</span>
                       <span class="session-cost">${s.total_cost_usd.toFixed(4)}</span>
                     </div>
-                  </button>
+                  </div>
                 {/each}
               </div>
             </div>
@@ -718,6 +734,15 @@
           <div class="streaming-block">
             <span class="streaming-label">Claude</span>
             <div class="streaming-text">{streamingText}<span class="cursor">|</span></div>
+          </div>
+        {:else if isBusy}
+          <div class="thinking-block">
+            <span class="thinking-label">Claude</span>
+            <span class="thinking-dots">
+              <span class="dot-bounce"></span>
+              <span class="dot-bounce"></span>
+              <span class="dot-bounce"></span>
+            </span>
           </div>
         {/if}
 
@@ -1063,6 +1088,8 @@
     border-radius: 3px;
     cursor: pointer;
     transition: all 150ms ease;
+    background: transparent;
+    line-height: 1.4;
   }
 
   .btn-kill-inline {
@@ -1263,5 +1290,96 @@
   @keyframes blink {
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
+  }
+
+  /* Thinking indicator */
+  .thinking-block {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .thinking-label {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .thinking-dots {
+    display: flex;
+    gap: 4px;
+  }
+
+  .dot-bounce {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    animation: bounce 1.4s ease-in-out infinite;
+  }
+
+  .dot-bounce:nth-child(2) { animation-delay: 0.16s; }
+  .dot-bounce:nth-child(3) { animation-delay: 0.32s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 640px) {
+    .status-bar {
+      flex-wrap: wrap;
+      gap: var(--spacing-xs);
+    }
+
+    .session-item {
+      min-height: 44px;
+    }
+
+    .btn-disconnect,
+    .btn-back,
+    .btn-cleanup,
+    .btn-toggle-ended,
+    .btn-launch,
+    .btn-retry {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-kill-inline,
+    .btn-delete-inline {
+      min-height: 44px;
+      min-width: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+  }
+
+  /* Skeleton loader */
+  .skeleton-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .skeleton-item {
+    height: 52px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-card) 50%, var(--bg-elevated) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 </style>

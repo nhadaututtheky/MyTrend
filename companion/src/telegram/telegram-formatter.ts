@@ -233,6 +233,10 @@ export function formatPinnedStatus(
     if (session.total_lines_added || session.total_lines_removed) {
       parts.push(`+${session.total_lines_added}/-${session.total_lines_removed}`);
     }
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    parts.push(`Updated ${hh}:${mm}`);
     lines.push(parts.join(" · "));
   }
 
@@ -324,17 +328,17 @@ export function buildProjectKeyboard(profiles: ProjectProfile[]): TelegramInline
   return { inline_keyboard: rows };
 }
 
-/** Model selection keyboard — checkmark on current model. */
+/** Model selection keyboard — checkmark on current model, with short descriptions. */
 export function buildModelKeyboard(currentModel?: string): TelegramInlineKeyboardMarkup {
-  const btn = (m: string, label?: string): TelegramInlineKeyboardButton => ({
-    text: m === currentModel ? `${label ?? m} ✓` : (label ?? m),
+  const btn = (m: string, label: string): TelegramInlineKeyboardButton => ({
+    text: m === currentModel ? `${label} ✓` : label,
     callback_data: `model:${m}`,
     style: m === currentModel ? "success" : undefined,
   });
   return {
     inline_keyboard: [
-      [btn("sonnet"), btn("opus"), btn("haiku")],
-      [btn("sonnet-1m", "sonnet 1M"), btn("opus-1m", "opus 1M"), btn("opusplan")],
+      [btn("sonnet", "Sonnet — balanced"), btn("opus", "Opus — powerful"), btn("haiku", "Haiku — fast")],
+      [btn("sonnet-1m", "Sonnet 1M — long ctx"), btn("opus-1m", "Opus 1M — long ctx"), btn("opusplan", "Opus Plan — planner")],
     ],
   };
 }
@@ -536,7 +540,10 @@ export function formatPermissionBatch(
 
     if (manualPerms.length > 0) {
       if (autoPerms.length > 0) lines.push("");
-      lines.push(`🔒 <b>Manual approval (${manualPerms.length})</b>`);
+      const hasBashManual = manualPerms.some((p) => p.tool_name === "Bash");
+      const bashNote = hasBashManual && autoApproveConfig.enabled && !autoApproveConfig.allowBash
+        ? " — Bash excluded from auto-approve" : "";
+      lines.push(`🔒 <b>Manual approval (${manualPerms.length})</b>${bashNote}`);
       for (const p of manualPerms) {
         lines.push(formatPermissionLine(p));
       }
@@ -602,8 +609,33 @@ export function formatAskUserQuestion(questions: AskQuestion[]): string {
     lines.push("");
   }
 
-  lines.push("<i>Reply with your choice (number or text).</i>");
+  lines.push("<i>Reply with your choice or tap a button.</i>");
   return lines.join("\n").trim();
+}
+
+/** Build inline keyboard for AskUserQuestion — one button per option (max 5). */
+export function buildAskQuestionKeyboard(questions: AskQuestion[]): TelegramInlineKeyboardMarkup | null {
+  // Only build keyboard for single question with ≤5 options
+  if (questions.length !== 1) return null;
+  const q = questions[0];
+  if (!q.options || q.options.length === 0 || q.options.length > 5) return null;
+
+  const rows: TelegramInlineKeyboardButton[][] = [];
+  // 2 buttons per row
+  for (let i = 0; i < q.options.length; i += 2) {
+    const row: TelegramInlineKeyboardButton[] = [
+      { text: q.options[i].label, callback_data: `ask:${i}:${truncate(q.options[i].label, 30)}` },
+    ];
+    if (q.options[i + 1]) {
+      row.push({
+        text: q.options[i + 1].label,
+        callback_data: `ask:${i + 1}:${truncate(q.options[i + 1].label, 30)}`,
+      });
+    }
+    rows.push(row);
+  }
+
+  return { inline_keyboard: rows };
 }
 
 // ─── Multi-session & Notification formatting ──────────────────────────────────

@@ -54,6 +54,7 @@ import {
   formatAutoApproveStatus,
   extractAskUserQuestion,
   formatAskUserQuestion,
+  buildAskQuestionKeyboard,
 } from "./telegram-formatter.js";
 
 const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60min
@@ -99,6 +100,12 @@ export class TelegramBridge {
   // Permission batching: collect permissions in a 2s window, then send as single message
   private permissionBatch = new Map<string, { perms: import("../session-types.js").PermissionRequest[]; timer: ReturnType<typeof setTimeout> }>();
   private readonly PERM_BATCH_WINDOW_MS = 2_000;
+
+  // Permission countdown: live-update message text every 5s until auto-approved
+  private permCountdownEdits = new Map<string, ReturnType<typeof setInterval>>();
+
+  // Idle warning timers (warn at 55min before destroying at 60min)
+  private idleWarningTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Per-chat settings (keyed by chatId only — shared across topics)
   private lastProjectSlug = new Map<number, string>();
@@ -163,11 +170,21 @@ export class TelegramBridge {
     }
     this.typingIntervals.clear();
 
-    // Clear idle timers
+    // Clear idle timers + warnings
     for (const timer of this.idleTimers.values()) {
       clearTimeout(timer);
     }
     this.idleTimers.clear();
+    for (const timer of this.idleWarningTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.idleWarningTimers.clear();
+
+    // Clear permission countdown edits
+    for (const interval of this.permCountdownEdits.values()) {
+      clearInterval(interval);
+    }
+    this.permCountdownEdits.clear();
 
     this.saveMappings();
     console.log("[telegram] Bridge stopped");
@@ -683,12 +700,17 @@ export class TelegramBridge {
           }
         }
 
-        // AskUserQuestion — send as separate prominent message
+        // AskUserQuestion — send as separate prominent message with inline buttons
         if (askQuestions) {
           const askHtml = formatAskUserQuestion(askQuestions);
-          await this.api.sendMessage(chatId, askHtml, {
-            messageThreadId: topicId > 0 ? topicId : undefined,
-          });
+          const askKeyboard = buildAskQuestionKeyboard(askQuestions);
+          if (askKeyboard) {
+            await this.sendToChatWithKeyboard(chatId, askHtml, askKeyboard, topicId);
+          } else {
+            await this.api.sendMessage(chatId, askHtml, {
+              messageThreadId: topicId > 0 ? topicId : undefined,
+            });
+          }
         }
 
         if (askQuestions) {
@@ -785,17 +807,9 @@ export class TelegramBridge {
       case "permission_request": {
         const perm = msg.request;
 
-        // Suppress permission UI for bypassPermissions mode — should never arrive,
-        // but if it does (edge case), don't bother user
-        const mapping = this.chatSessions.get(chatId)?.get(topicId);
-        if (mapping) {
-          const sessionState = this.getSessionState(mapping.sessionId);
-          if (sessionState?.permissionMode === "bypassPermissions") {
-            break;
-          }
-        }
-
-        // Batch permissions in a 2s window to reduce message spam
+        // Even in bypassPermissions mode, if a permission_request arrives here
+        // something unexpected happened — show UI so user can unblock manually.
+        // Batch permissions in a 2s window to reduce message spam.
         this.queuePermission(chatId, topicId, perm);
         break;
       }
@@ -838,6 +852,14 @@ export class TelegramBridge {
   private resetIdleTimer(chatId: number, topicId: number = 0): void {
     this.clearIdleTimer(chatId, topicId);
     const k = this.key(chatId, topicId);
+
+    // Warning at 55 minutes
+    const warningTimer = setTimeout(() => {
+      this.sendToChat(chatId, "⏰ Session idle for 55 min. Send any message to keep alive.", topicId).catch(() => {});
+    }, IDLE_TIMEOUT_MS - 5 * 60 * 1000); // 55 min
+    this.idleWarningTimers.set(k, warningTimer);
+
+    // Destroy at 60 minutes
     const timer = setTimeout(() => {
       console.log(`[telegram] Chat ${chatId} topic ${topicId} idle timeout, destroying session`);
       const mapping = this.chatSessions.get(chatId)?.get(topicId);
@@ -857,6 +879,11 @@ export class TelegramBridge {
     if (timer) {
       clearTimeout(timer);
       this.idleTimers.delete(k);
+    }
+    const warningTimer = this.idleWarningTimers.get(k);
+    if (warningTimer) {
+      clearTimeout(warningTimer);
+      this.idleWarningTimers.delete(k);
     }
   }
 
@@ -906,6 +933,9 @@ export class TelegramBridge {
           break;
         case "autoapprove":
           await this.onAutoApproveSelected(chatId, messageId!, query.id, value, topicId);
+          break;
+        case "ask":
+          await this.onAskResponse(chatId, messageId!, query.id, value, topicId);
           break;
         default:
           await this.api.answerCallbackQuery(query.id, "Unknown action");
@@ -1035,6 +1065,9 @@ export class TelegramBridge {
         behavior,
       });
     }
+
+    // Clear any live countdown for this permission batch
+    this.clearPermCountdowns(chatId, topicId);
 
     const emoji = behavior === "allow" ? "✅" : "❌";
     const label = behavior === "allow" ? "Allowed" : "Denied";
@@ -1208,6 +1241,28 @@ export class TelegramBridge {
     }).catch(() => {});
   }
 
+  private async onAskResponse(
+    chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
+  ): Promise<void> {
+    // value format: "<idx>:<label>"
+    const colonIdx = value.indexOf(":");
+    const label = colonIdx >= 0 ? value.slice(colonIdx + 1) : value;
+
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
+    if (!mapping) {
+      await this.api.answerCallbackQuery(queryId, "No active session");
+      return;
+    }
+
+    // Remove keyboard and show selected option
+    await this.api.editMessageReplyMarkup(chatId, messageId).catch(() => {});
+    await this.api.answerCallbackQuery(queryId, `Selected: ${label}`);
+
+    // Inject the selected label as user message to CLI
+    this.deps.bridge.injectUserMessage(mapping.sessionId, label);
+    this.resetIdleTimer(chatId, topicId);
+  }
+
   // ── Bot menu commands ──────────────────────────────────────────────────
 
   private async registerCommands(): Promise<void> {
@@ -1233,9 +1288,9 @@ export class TelegramBridge {
 
   // ── Public API (for commands) ─────────────────────────────────────────
 
-  async sendToChat(chatId: number, text: string, topicId?: number): Promise<void> {
+  async sendToChat(chatId: number, text: string, topicId?: number): Promise<number> {
     try {
-      await this.api.sendMessage(chatId, text, {
+      return await this.api.sendMessage(chatId, text, {
         messageThreadId: topicId && topicId > 0 ? topicId : undefined,
       });
     } catch (err) {
@@ -1243,12 +1298,13 @@ export class TelegramBridge {
       // Retry as plain text (strip HTML tags, no parse_mode)
       try {
         const plain = text.replace(/<[^>]+>/g, "");
-        await this.api.sendMessage(chatId, plain, {
+        return await this.api.sendMessage(chatId, plain, {
           parseMode: null,
           messageThreadId: topicId && topicId > 0 ? topicId : undefined,
         });
       } catch {
         // give up
+        return 0;
       }
     }
   }
@@ -1258,16 +1314,16 @@ export class TelegramBridge {
     text: string,
     keyboard: TelegramInlineKeyboardMarkup,
     topicId?: number
-  ): Promise<void> {
+  ): Promise<number> {
     try {
-      await this.api.sendMessage(chatId, text, {
+      return await this.api.sendMessage(chatId, text, {
         replyMarkup: keyboard,
         messageThreadId: topicId && topicId > 0 ? topicId : undefined,
       });
     } catch (err) {
       console.error(`[telegram] sendToChatWithKeyboard(${chatId}) error:`, err);
       // Retry without keyboard as fallback
-      await this.sendToChat(chatId, text, topicId);
+      return await this.sendToChat(chatId, text, topicId);
     }
   }
 
@@ -1449,7 +1505,7 @@ export class TelegramBridge {
     }
   }
 
-  /** Send batched permissions as a single message. */
+  /** Send batched permissions as a single message, with live countdown if auto-approve is on. */
   private async flushPermissionBatch(chatId: number, topicId: number = 0): Promise<void> {
     const k = this.key(chatId, topicId);
     const batch = this.permissionBatch.get(k);
@@ -1461,7 +1517,40 @@ export class TelegramBridge {
     const requestIds = batch.perms.map((p) => p.request_id);
     const keyboard = buildPermissionBatchKeyboard(requestIds);
 
-    await this.sendToChatWithKeyboard(chatId, text, keyboard, topicId);
+    const msgId = await this.sendToChatWithKeyboard(chatId, text, keyboard, topicId);
+
+    // Live countdown: update message every 5s showing remaining time
+    const hasAutoApprove = aaConfig.enabled && aaConfig.timeoutSeconds > 0;
+    if (hasAutoApprove && msgId > 0) {
+      const countdownKey = `perm:${k}:${requestIds.join(",")}`;
+      let remaining = aaConfig.timeoutSeconds;
+      const interval = setInterval(() => {
+        remaining -= 5;
+        if (remaining <= 0) {
+          clearInterval(interval);
+          this.permCountdownEdits.delete(countdownKey);
+          const approvedText = text
+            .replace(/Auto-approve.*?<\/b>/, "Auto-approved ✅</b>")
+            .replace(/⏱/g, "✅");
+          this.api.editMessageText(chatId, msgId, approvedText).catch(() => {});
+          return;
+        }
+        const updatedText = text.replace(/in \d+s/, `in ${remaining}s`);
+        this.api.editMessageText(chatId, msgId, updatedText, { replyMarkup: keyboard }).catch(() => {});
+      }, 5_000);
+      this.permCountdownEdits.set(countdownKey, interval);
+    }
+  }
+
+  /** Clear permission countdown when manually approved/denied. */
+  private clearPermCountdowns(chatId: number, topicId: number): void {
+    const k = this.key(chatId, topicId);
+    for (const [key, interval] of this.permCountdownEdits) {
+      if (key.startsWith(`perm:${k}:`)) {
+        clearInterval(interval);
+        this.permCountdownEdits.delete(key);
+      }
+    }
   }
 
   // ── Hub Mode ───────────────────────────────────────────────────────────

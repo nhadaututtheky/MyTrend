@@ -612,12 +612,19 @@ export class WsBridge {
 
     // Fallback: auto-approve plan mode requests even if tool_name field is missing/different.
     // CLI may send plan approval as subtype or description instead of tool_name.
+    // Also detect ExitPlanMode by checking for allowedPrompts in input (unique to ExitPlanMode).
     const desc = msg.request.description ?? "";
+    const input = msg.request.input ?? {};
+    const hasAllowedPrompts = "allowedPrompts" in input || Array.isArray(input.allowedPrompts);
+    const isExitPlanByName = toolName.toLowerCase().includes("exitplan")
+      || toolName.toLowerCase().includes("planmode");
     const isPlanRelated =
       subtype === "plan_mode_response" ||
       subtype === "exit_plan_mode" ||
       desc.toLowerCase().includes("exitplanmode") ||
-      desc.toLowerCase().includes("plan mode");
+      desc.toLowerCase().includes("plan mode") ||
+      hasAllowedPrompts ||
+      isExitPlanByName;
     if (isPlanRelated) {
       console.log(
         `[ws-bridge] Auto-approving plan-related request (subtype=${subtype}, desc=${desc.slice(0, 60)}, request ${msg.request_id.slice(0, 8)})`
