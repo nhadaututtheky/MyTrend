@@ -68,6 +68,30 @@
   </ComicCard>
 
   <ComicCard>
+    <h3 class="section-title">GitHub Integration</h3>
+    <p class="hint">
+      Connect GitHub to auto-sync commits, PRs, and issues as activities. Two modes available:
+    </p>
+    <div class="github-modes">
+      <div class="mode-item">
+        <strong>Polling (already active)</strong>
+        <p class="hint">Syncs every 30 min if <code>GITHUB_PAT</code> env var is set. Set <code>github_repo</code> on a project (format: <code>owner/repo</code>).</p>
+      </div>
+      <div class="mode-item">
+        <strong>Webhooks (real-time)</strong>
+        <p class="hint">
+          Add this URL in your GitHub repo → Settings → Webhooks:<br />
+          <code class="webhook-url">http://&lt;your-host&gt;:3457/api/github/webhook</code><br />
+          Set content type to <code>application/json</code>. Optionally set a secret and add <code>GITHUB_WEBHOOK_SECRET</code> to companion env. Events: <em>push, pull_request, issues</em>.
+        </p>
+      </div>
+    </div>
+    <p class="hint">
+      PRs are automatically matched against ideas by keyword — linked ideas appear in the activity metadata.
+    </p>
+  </ComicCard>
+
+  <ComicCard>
     <h3 class="section-title">Environments</h3>
     {#if isLoading}
       <p class="loading">Loading...</p>
@@ -170,5 +194,44 @@
   .empty {
     font-size: 0.875rem;
     color: var(--text-muted);
+  }
+
+  .github-modes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+  }
+
+  .mode-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-left: 3px solid var(--accent-blue);
+    background: var(--bg-elevated);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .mode-item strong {
+    font-size: 0.875rem;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .webhook-url {
+    display: inline-block;
+    margin: 4px 0;
+    padding: 2px 6px;
+    background: var(--bg-base);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    font-size: 0.75rem;
+    word-break: break-all;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    background: var(--bg-elevated);
+    padding: 1px 4px;
+    border-radius: 3px;
   }
 </style>

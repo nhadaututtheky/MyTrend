@@ -711,5 +711,143 @@ export function createApp(ctx: AppContext): Hono {
     return c.json(result);
   });
 
+  // ── GitHub Webhook Receiver ────────────────────────────────────────────
+  // Receives real-time GitHub events, verifies HMAC-SHA256, forwards to PB.
+  // Set Webhook URL to: http://<your-host>:3457/api/github/webhook
+  // Set secret in GITHUB_WEBHOOK_SECRET env var.
+
+  app.post("/api/github/webhook", async (c) => {
+    const secret = process.env.GITHUB_WEBHOOK_SECRET ?? "";
+    const signature = c.req.header("X-Hub-Signature-256") ?? "";
+    const rawBody = await c.req.text();
+
+    // Verify HMAC-SHA256 signature if secret is configured
+    if (secret) {
+      const { createHmac } = await import("node:crypto");
+      const expected = "sha256=" + createHmac("sha256", secret).update(rawBody).digest("hex");
+      if (signature !== expected) {
+        return c.json({ error: "Invalid signature" }, 401);
+      }
+    }
+
+    const event = c.req.header("X-GitHub-Event") ?? "";
+    if (!event || event === "ping") {
+      return c.json({ ok: true, message: "ping acknowledged" });
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON payload" }, 400);
+    }
+
+    const repoFull =
+      ((payload.repository as Record<string, unknown>)?.full_name as string) ?? "";
+
+    type ActivityEntry = {
+      type: string;
+      action: string;
+      metadata: Record<string, unknown>;
+      timestamp: string;
+    };
+    const activities: ActivityEntry[] = [];
+
+    if (event === "push") {
+      const commits =
+        (payload.commits as Array<Record<string, unknown>>) ?? [];
+      for (const commit of commits) {
+        const sha = String(commit.id ?? "");
+        const message = String(commit.message ?? "").split("\n")[0];
+        const author =
+          ((commit.author as Record<string, unknown>)?.name as string) ?? "";
+        const timestamp = String(
+          commit.timestamp ?? new Date().toISOString()
+        );
+        activities.push({
+          type: "commit",
+          action: message.substring(0, 300) || "Git commit",
+          metadata: {
+            source: "github_webhook",
+            commit_hash: sha,
+            author,
+            repo: repoFull,
+            url: String(commit.url ?? ""),
+          },
+          timestamp,
+        });
+      }
+    } else if (event === "pull_request") {
+      const pr = (payload.pull_request ?? {}) as Record<string, unknown>;
+      const prNum = Number(pr.number ?? 0);
+      const prTitle = String(pr.title ?? "");
+      const prState = String(pr.state ?? "open");
+      const prBody = String(pr.body ?? "").substring(0, 500);
+      activities.push({
+        type: "pr",
+        action: `PR #${prNum}: ${prTitle.substring(0, 250)}`,
+        metadata: {
+          source: "github_webhook",
+          pr_number: prNum,
+          pr_key: `pr-${prNum}`,
+          pr_action: String(payload.action ?? ""),
+          state: prState,
+          repo: repoFull,
+          url: String(pr.html_url ?? ""),
+          merged: !!(pr.merged_at),
+          body: prBody,
+        },
+        timestamp: String(pr.updated_at ?? new Date().toISOString()),
+      });
+    } else if (event === "issues") {
+      const issue = (payload.issue ?? {}) as Record<string, unknown>;
+      const issNum = Number(issue.number ?? 0);
+      const issTitle = String(issue.title ?? "");
+      const labels = (
+        (issue.labels as Array<Record<string, unknown>>) ?? []
+      ).map((l) => String(l.name ?? ""));
+      activities.push({
+        type: "issue",
+        action: `Issue #${issNum}: ${issTitle.substring(0, 250)}`,
+        metadata: {
+          source: "github_webhook",
+          issue_number: issNum,
+          issue_key: `issue-${issNum}`,
+          issue_action: String(payload.action ?? ""),
+          state: String(issue.state ?? "open"),
+          repo: repoFull,
+          url: String(issue.html_url ?? ""),
+          labels,
+        },
+        timestamp: String(issue.updated_at ?? new Date().toISOString()),
+      });
+    }
+
+    if (activities.length === 0) {
+      return c.json({
+        ok: true,
+        message: `Event '${event}' produced no activities`,
+      });
+    }
+
+    // Forward to PocketBase ingest hook
+    try {
+      const res = await fetch(`${PB_URL}/api/mytrend/github-ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo: repoFull, activities }),
+      });
+      const data = (await res.json()) as Record<string, unknown>;
+      return c.json({ ok: true, ingested: activities.length, pb: data });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      return c.json({
+        ok: true,
+        ingested: activities.length,
+        warning: `PB ingest failed: ${msg}`,
+      });
+    }
+  });
+
   return app;
 }
