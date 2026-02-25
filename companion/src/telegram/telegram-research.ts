@@ -350,18 +350,21 @@ Verdict guide:
       env: buildCleanEnv(),
     });
 
+    // Consume stdout/stderr concurrently with process execution to avoid pipe drain race
+    const stdoutPromise = new Response(proc.stdout).text();
+    const stderrPromise = new Response(proc.stderr).text();
+
     // Wait for completion with 90s timeout (CLI cold start on Windows is slow)
     const timeoutId = setTimeout(() => proc.kill(), 90_000);
     const exitCode = await proc.exited;
     clearTimeout(timeoutId);
 
+    const [text, stderrText] = await Promise.all([stdoutPromise, stderrPromise]);
+
     if (exitCode !== 0) {
-      const stderrText = await new Response(proc.stderr).text();
       console.error(`[research] CLI exited ${exitCode}: ${stderrText.slice(0, 200)}`);
       return fallbackAnalysis(detected, metadata);
     }
-
-    const text = await new Response(proc.stdout).text();
 
     // Extract JSON object — Claude may wrap in markdown fences or add preamble
     const jsonMatch = text.match(/\{[\s\S]*\}/);

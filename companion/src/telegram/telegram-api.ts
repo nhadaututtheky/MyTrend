@@ -75,15 +75,21 @@ export class TelegramAPI {
     timeout: number,
     signal?: AbortSignal
   ): Promise<TelegramUpdate[]> {
+    // Fetch-level timeout: long-poll duration + 15s buffer to prevent infinite hangs
+    const fetchTimeout = AbortSignal.timeout((timeout + 15) * 1000);
+    const combined = signal
+      ? AbortSignal.any([signal, fetchTimeout])
+      : fetchTimeout;
+
     const res = await fetch(`${this.baseUrl}/getUpdates`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         offset,
         timeout,
-        allowed_updates: ["message", "callback_query"],
+        allowed_updates: ["message", "callback_query", "channel_post"],
       }),
-      signal,
+      signal: combined,
     });
 
     const data = (await res.json()) as ApiResponse<TelegramUpdate[]>;
@@ -344,6 +350,16 @@ function splitMessage(text: string, maxLen: number): string[] {
     // Hard split as last resort
     if (splitAt === -1) {
       splitAt = maxLen;
+    }
+
+    // Safety: don't split inside an HTML tag (e.g. mid-<code> or mid-<b>)
+    // Scan backwards from splitAt to find the last complete tag boundary
+    const candidate = remaining.slice(0, splitAt);
+    const lastTagOpen = candidate.lastIndexOf("<");
+    const lastTagClose = candidate.lastIndexOf(">");
+    if (lastTagOpen > lastTagClose) {
+      // We're inside an unclosed tag — back up to before the tag
+      splitAt = lastTagOpen > maxLen * 0.3 ? lastTagOpen : splitAt;
     }
 
     chunks.push(remaining.slice(0, splitAt));
