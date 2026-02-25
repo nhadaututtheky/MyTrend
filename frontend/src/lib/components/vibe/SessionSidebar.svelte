@@ -234,7 +234,7 @@
     border-left: 4px solid var(--accent-green);
   }
 
-  :global([data-theme='dark']) .session-item.active {
+  :global([data-color-scheme='dark']) .session-item.active {
     box-shadow: 0 0 8px rgba(0, 210, 106, 0.2);
   }
 

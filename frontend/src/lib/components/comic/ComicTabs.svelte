@@ -76,7 +76,7 @@
     border-bottom-color: var(--accent-green);
   }
 
-  :global([data-theme='dark']) .tab.active {
+  :global([data-color-scheme='dark']) .tab.active {
     text-shadow: 0 0 8px rgba(0, 210, 106, 0.3);
   }
 

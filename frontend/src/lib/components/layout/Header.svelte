@@ -177,7 +177,7 @@
     letter-spacing: -0.02em;
   }
 
-  :global([data-theme='dark']) .logo-text {
+  :global([data-color-scheme='dark']) .logo-text {
     text-shadow: 0 0 12px rgba(0, 210, 106, 0.3);
   }
 
@@ -239,7 +239,7 @@
     color: var(--accent-purple);
   }
 
-  :global([data-theme='dark']) .ai-btn:hover {
+  :global([data-color-scheme='dark']) .ai-btn:hover {
     text-shadow: 0 0 8px rgba(162, 155, 254, 0.5);
   }
 

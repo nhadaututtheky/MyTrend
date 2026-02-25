@@ -65,19 +65,19 @@
     background: #fff3cd;
   }
 
-  :global([data-theme='dark']) .toast-success {
+  :global([data-color-scheme='dark']) .toast-success {
     background: #1a3d2a;
     color: #d4edda;
   }
-  :global([data-theme='dark']) .toast-error {
+  :global([data-color-scheme='dark']) .toast-error {
     background: #3d1a1a;
     color: #f8d7da;
   }
-  :global([data-theme='dark']) .toast-info {
+  :global([data-color-scheme='dark']) .toast-info {
     background: #1a2d3d;
     color: #d1ecf1;
   }
-  :global([data-theme='dark']) .toast-warning {
+  :global([data-color-scheme='dark']) .toast-warning {
     background: #3d3a1a;
     color: #fff3cd;
   }

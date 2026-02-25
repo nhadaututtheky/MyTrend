@@ -245,12 +245,33 @@
     const rc = rough.svg(svgElement);
     const plotW = width - MARGIN.left - MARGIN.right;
     const plotH = height - MARGIN.top - MARGIN.bottom;
+    const n = chartData.values.length;
     const maxVal = Math.max(...chartData.values, 1);
 
     const yScale = d3Scale
       .scaleLinear()
-      .domain([0, maxVal * 1.1])
+      .domain([0, maxVal * 1.15])
       .range([plotH, 0]);
+
+    // Y-axis ticks (4 ticks)
+    const tickCount = 4;
+    for (let i = 0; i <= tickCount; i++) {
+      const val = Math.round((maxVal * i) / tickCount);
+      const yPos = MARGIN.top + yScale(val);
+      addSvgText(String(val), MARGIN.left - 6, yPos + 4, {
+        anchor: 'end',
+        size: '10',
+        fill: '#888',
+      });
+      // Light grid line
+      svgElement.appendChild(
+        rc.line(MARGIN.left, yPos, MARGIN.left + plotW, yPos, {
+          roughness: 0.2,
+          stroke: '#ddd',
+          strokeWidth: 0.5,
+        }),
+      );
+    }
 
     // Axes
     svgElement.appendChild(
@@ -270,10 +291,27 @@
 
     // Points
     const points: [number, number][] = chartData.values.map((v, i) => {
-      const x = MARGIN.left + (plotW / (chartData.values.length - 1 || 1)) * i;
+      const x = MARGIN.left + (plotW / (n - 1 || 1)) * i;
       const y = MARGIN.top + yScale(v);
       return [x, y];
     });
+
+    // Area fill under the line (SVG polygon)
+    if (points.length > 1) {
+      const baseY = MARGIN.top + plotH;
+      const polyPoints = [
+        [MARGIN.left, baseY],
+        ...points,
+        [points[points.length - 1]![0], baseY],
+      ]
+        .map(([px, py]) => `${px},${py}`)
+        .join(' ');
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      poly.setAttribute('points', polyPoints);
+      poly.setAttribute('fill', color);
+      poly.setAttribute('fill-opacity', '0.12');
+      svgElement.appendChild(poly);
+    }
 
     // Line path
     if (points.length > 1) {
@@ -281,29 +319,45 @@
         rc.linearPath(points, {
           roughness,
           stroke: color,
-          strokeWidth: 2.5,
+          strokeWidth: 2,
         }),
       );
     }
 
-    // Dots
-    for (const [px, py] of points) {
-      svgElement.appendChild(
-        rc.circle(px, py, 8, {
-          fill: color,
-          fillStyle: 'solid',
-          roughness: 1,
-          stroke: color,
-        }),
-      );
+    // Dots: only at max value and endpoints (avoid 30-dot clutter)
+    const maxIdx = chartData.values.indexOf(Math.max(...chartData.values));
+    const showDotAt = new Set([0, n - 1, maxIdx]);
+    for (let i = 0; i < points.length; i++) {
+      const [px, py] = points[i]!;
+      if (showDotAt.has(i)) {
+        svgElement.appendChild(
+          rc.circle(px, py, 7, {
+            fill: color,
+            fillStyle: 'solid',
+            roughness: 0.8,
+            stroke: color,
+          }),
+        );
+        // Annotate max
+        if (i === maxIdx && maxIdx !== 0 && maxIdx !== n - 1) {
+          addSvgText(String(chartData.values[i] ?? 0), px, py - 8, {
+            size: '9',
+            fill: color,
+            anchor: 'middle',
+          });
+        }
+      }
     }
 
-    // X labels
-    for (let i = 0; i < chartData.labels.length; i++) {
-      const x = MARGIN.left + (plotW / (chartData.labels.length - 1 || 1)) * i;
+    // X labels: show ~6 evenly spaced labels max
+    const labelStep = n <= 7 ? 1 : Math.ceil(n / 6);
+    for (let i = 0; i < n; i++) {
+      if (i % labelStep !== 0 && i !== n - 1) continue;
+      const x = MARGIN.left + (plotW / (n - 1 || 1)) * i;
       const label = chartData.labels[i] ?? '';
-      const lbl = label.length > 8 ? label.slice(0, 7) + '..' : label;
-      addSvgText(lbl, x, MARGIN.top + plotH + 16, { size: '10', fill: '#888' });
+      // Show only day/month portion (strip year)
+      const shortLabel = label.replace(/^\d{4}-/, '').slice(0, 5);
+      addSvgText(shortLabel, x, MARGIN.top + plotH + 16, { size: '10', fill: '#888' });
     }
   }
 

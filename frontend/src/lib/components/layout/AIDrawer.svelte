@@ -217,7 +217,7 @@
     margin: 0;
   }
 
-  :global([data-theme='dark']) .drawer-title {
+  :global([data-color-scheme='dark']) .drawer-title {
     color: var(--accent-purple);
     text-shadow: 0 0 8px rgba(162, 155, 254, 0.3);
   }

@@ -321,7 +321,7 @@
     margin: 0;
   }
 
-  :global([data-theme='dark']) .page-title {
+  :global([data-color-scheme='dark']) .page-title {
     text-shadow: 0 0 12px rgba(0, 210, 106, 0.4);
   }
 

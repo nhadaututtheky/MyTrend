@@ -114,25 +114,25 @@
     border-color: var(--accent-purple);
   }
 
-  :global([data-theme='dark']) .timeline-dot.active {
+  :global([data-color-scheme='dark']) .timeline-dot.active {
     box-shadow: 0 0 8px currentColor;
   }
-  :global([data-theme='dark']) .dot-green.active {
+  :global([data-color-scheme='dark']) .dot-green.active {
     box-shadow: 0 0 10px var(--accent-green);
   }
-  :global([data-theme='dark']) .dot-blue.active {
+  :global([data-color-scheme='dark']) .dot-blue.active {
     box-shadow: 0 0 10px var(--accent-blue);
   }
-  :global([data-theme='dark']) .dot-yellow.active {
+  :global([data-color-scheme='dark']) .dot-yellow.active {
     box-shadow: 0 0 10px var(--accent-yellow);
   }
-  :global([data-theme='dark']) .dot-orange.active {
+  :global([data-color-scheme='dark']) .dot-orange.active {
     box-shadow: 0 0 10px var(--accent-orange);
   }
-  :global([data-theme='dark']) .dot-red.active {
+  :global([data-color-scheme='dark']) .dot-red.active {
     box-shadow: 0 0 10px var(--accent-red);
   }
-  :global([data-theme='dark']) .dot-purple.active {
+  :global([data-color-scheme='dark']) .dot-purple.active {
     box-shadow: 0 0 10px var(--accent-purple);
   }
 

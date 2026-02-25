@@ -184,7 +184,7 @@
   }
 
   /* Keep hard shadow in dark mode too */
-  :global([data-theme='dark']) .nav-link.active {
+  :global([data-color-scheme='dark']) .nav-link.active {
     box-shadow: 3px 3px 0 var(--border-color);
   }
 

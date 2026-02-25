@@ -100,9 +100,11 @@
   }
 
   .action {
+    font-family: var(--font-body);
     font-size: 0.875rem;
     color: var(--text-primary);
     margin: 0;
+    line-height: 1.45;
   }
 
   .device {
