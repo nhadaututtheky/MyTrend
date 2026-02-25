@@ -90,7 +90,7 @@
       </ComicCard>
     {/if}
 
-    {#if idea.tags.length > 0}
+    {#if (idea.tags?.length ?? 0) > 0}
       <div class="tags">
         {#each idea.tags as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}
       </div>
@@ -104,7 +104,7 @@
       <TelegramFileUpload linkedCollection="ideas" linkedRecordId={ideaId} />
     </ComicCard>
 
-    {#if idea.related_ideas.length > 0}
+    {#if (idea.related_ideas?.length ?? 0) > 0}
       <ComicCard>
         <h3 class="section-title">Related Ideas</h3>
         <ul class="related-list">

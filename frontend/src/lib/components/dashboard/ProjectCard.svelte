@@ -3,6 +3,8 @@
   import { formatRelative } from '$lib/utils/date';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import { updateProject, deleteProject } from '$lib/api/projects';
+  import { toast } from '$lib/stores/toast';
 
   interface Props {
     project: Project;
@@ -16,33 +18,108 @@
     archived: 'blue',
     completed: 'purple' as 'blue',
   };
+
+  let menuOpen = $state(false);
+  let isActing = $state(false);
+
+  function toggleMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    menuOpen = !menuOpen;
+  }
+
+  function closeMenu() {
+    menuOpen = false;
+  }
+
+  async function handleArchive(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeMenu();
+    isActing = true;
+    try {
+      const newStatus = project.status === 'archived' ? 'active' : 'archived';
+      await updateProject(project.id, { status: newStatus });
+      toast.success(newStatus === 'archived' ? 'Project archived' : 'Project restored');
+    } catch {
+      toast.error('Failed to update project');
+    } finally {
+      isActing = false;
+    }
+  }
+
+  async function handleDelete(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeMenu();
+    if (!confirm(`Delete "${project.name}"? This cannot be undone.`)) return;
+    isActing = true;
+    try {
+      await deleteProject(project.id);
+      toast.success('Project deleted');
+    } catch {
+      toast.error('Failed to delete project');
+    } finally {
+      isActing = false;
+    }
+  }
 </script>
 
-<a href="/projects/{project.slug}" class="project-link" data-testid="project-card">
-  <ComicCard variant="skewed">
-    <div class="project-header">
-      <span class="icon" style:background={project.color}>{project.icon}</span>
-      <div class="info">
-        <h3 class="name">{project.name}</h3>
-        <ComicBadge color={STATUS_COLORS[project.status] ?? 'blue'} size="sm">
-          {project.status}
-        </ComicBadge>
+<svelte:window onclick={closeMenu} />
+
+<div class="project-wrapper">
+  <a href="/projects/{project.slug}" class="project-link" data-testid="project-card">
+    <ComicCard variant="skewed">
+      <div class="project-header">
+        <span class="icon" style:background={project.color}>{project.icon}</span>
+        <div class="info">
+          <h3 class="name">{project.name}</h3>
+          <ComicBadge color={STATUS_COLORS[project.status] ?? 'blue'} size="sm">
+            {project.status}
+          </ComicBadge>
+        </div>
       </div>
-    </div>
-    {#if project.description}
-      <p class="description">{project.description}</p>
-    {/if}
-    <div class="stats">
-      <span>{project.total_conversations} chats</span>
-      <span>{project.total_ideas} ideas</span>
-      {#if project.last_activity}
-        <span class="last-activity">{formatRelative(project.last_activity)}</span>
+      {#if project.description}
+        <p class="description">{project.description}</p>
       {/if}
-    </div>
-  </ComicCard>
-</a>
+      <div class="stats">
+        <span>{project.total_conversations} chats</span>
+        <span>{project.total_ideas} ideas</span>
+        {#if project.last_activity}
+          <span class="last-activity">{formatRelative(project.last_activity)}</span>
+        {/if}
+      </div>
+    </ComicCard>
+  </a>
+
+  <!-- Quick action menu -->
+  <div class="menu-anchor">
+    <button
+      class="menu-btn"
+      onclick={toggleMenu}
+      disabled={isActing}
+      aria-label="Project actions"
+      aria-expanded={menuOpen}
+    >⋯</button>
+
+    {#if menuOpen}
+      <div class="dropdown" role="menu">
+        <button class="dropdown-item" onclick={handleArchive} role="menuitem">
+          {project.status === 'archived' ? '↩ Restore' : '📦 Archive'}
+        </button>
+        <button class="dropdown-item danger" onclick={handleDelete} role="menuitem">
+          🗑 Delete
+        </button>
+      </div>
+    {/if}
+  </div>
+</div>
 
 <style>
+  .project-wrapper {
+    position: relative;
+  }
+
   .project-link {
     text-decoration: none;
     color: inherit;
@@ -104,5 +181,77 @@
 
   .last-activity {
     margin-left: auto;
+  }
+
+  /* Menu */
+  .menu-anchor {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+  }
+
+  .menu-btn {
+    background: var(--bg-card);
+    border: 1.5px solid var(--border-color);
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 150ms ease;
+    box-shadow: 2px 2px 0 var(--border-color);
+  }
+
+  .project-wrapper:hover .menu-btn {
+    opacity: 1;
+  }
+
+  .menu-btn:focus-visible {
+    opacity: 1;
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
+  }
+
+  .dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 4px 4px 0 var(--border-color);
+    min-width: 140px;
+    overflow: hidden;
+    z-index: 20;
+  }
+
+  .dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-comic);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    transition: background 100ms ease;
+  }
+
+  .dropdown-item:hover {
+    background: var(--bg-secondary);
+  }
+
+  .dropdown-item.danger {
+    color: var(--accent-red);
   }
 </style>
