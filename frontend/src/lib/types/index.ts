@@ -321,6 +321,15 @@ export interface HubCronJob extends BaseRecord {
   last_result: string;
 }
 
+// Hub Cron Job History
+export interface HubCronHistory extends BaseRecord {
+  cron_job: string;
+  ran_at: string;
+  status: 'success' | 'error';
+  duration_ms: number;
+  output: string;
+}
+
 // Trending Topics (from /api/mytrend/trending-topics)
 export type TrendDirection = 'rising' | 'falling' | 'stable';
 

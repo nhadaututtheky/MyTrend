@@ -57,6 +57,76 @@ async function removeProjectFromPB(slug: string): Promise<void> {
   }
 }
 
+// ── Natural Language → Cron Expression Parser ─────────────────────────────
+function parseNaturalCron(text: string): { cron: string; description: string } | { error: string } {
+  const t = text.toLowerCase().trim();
+
+  // every X minutes
+  const everyMins = t.match(/every\s+(\d+)\s+min/);
+  if (everyMins) return { cron: `*/${everyMins[1]} * * * *`, description: `Every ${everyMins[1]} minutes` };
+
+  // every minute
+  if (/every\s+minute/.test(t)) return { cron: "* * * * *", description: "Every minute" };
+
+  // every hour
+  if (/every\s+hour/.test(t)) return { cron: "0 * * * *", description: "Every hour" };
+
+  // every X hours
+  const everyHours = t.match(/every\s+(\d+)\s+hour/);
+  if (everyHours) return { cron: `0 */${everyHours[1]} * * *`, description: `Every ${everyHours[1]} hours` };
+
+  // every morning / each morning → 9am
+  if (/every\s+morning|each\s+morning/.test(t)) return { cron: "0 9 * * *", description: "Every morning at 09:00" };
+
+  // every evening / every night → 9pm
+  if (/every\s+evening|every\s+night/.test(t)) return { cron: "0 21 * * *", description: "Every evening at 21:00" };
+
+  // weekdays / workdays at H
+  if (/weekday|workday/.test(t)) {
+    const m = t.match(/at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    let hour = m ? parseInt(m[1]) : 9;
+    const min = m?.[2] ? parseInt(m[2]) : 0;
+    if (m?.[3] === "pm" && hour !== 12) hour += 12;
+    if (m?.[3] === "am" && hour === 12) hour = 0;
+    return { cron: `${min} ${hour} * * 1-5`, description: `Weekdays at ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}` };
+  }
+
+  // every day at H / daily at H
+  const dailyAt = t.match(/(?:every\s+day|daily)\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+  if (dailyAt) {
+    let hour = parseInt(dailyAt[1]);
+    const min = dailyAt[2] ? parseInt(dailyAt[2]) : 0;
+    if (dailyAt[3] === "pm" && hour !== 12) hour += 12;
+    if (dailyAt[3] === "am" && hour === 12) hour = 0;
+    return { cron: `${min} ${hour} * * *`, description: `Every day at ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}` };
+  }
+
+  // every [day name] at H
+  const dayMap: Record<string, number> = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+  for (const [day, num] of Object.entries(dayMap)) {
+    if (t.includes(day)) {
+      const m = t.match(/at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+      let hour = m ? parseInt(m[1]) : 9;
+      const min = m?.[2] ? parseInt(m[2]) : 0;
+      if (m?.[3] === "pm" && hour !== 12) hour += 12;
+      if (m?.[3] === "am" && hour === 12) hour = 0;
+      return { cron: `${min} ${hour} * * ${num}`, description: `Every ${day.charAt(0).toUpperCase() + day.slice(1)} at ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}` };
+    }
+  }
+
+  // at H:MM (bare time → assume daily)
+  const bareAt = t.match(/^at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  if (bareAt) {
+    let hour = parseInt(bareAt[1]);
+    const min = bareAt[2] ? parseInt(bareAt[2]) : 0;
+    if (bareAt[3] === "pm" && hour !== 12) hour += 12;
+    if (bareAt[3] === "am" && hour === 12) hour = 0;
+    return { cron: `${min} ${hour} * * *`, description: `Every day at ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}` };
+  }
+
+  return { error: `Could not parse "${text}". Try: "every day at 9am", "every Monday at 10am", "every 30 minutes", "weekdays at 8:30am"` };
+}
+
 export function createApp(ctx: AppContext): Hono {
   const app = new Hono();
 
@@ -628,6 +698,17 @@ export function createApp(ctx: AppContext): Hono {
     }
 
     return c.json({ ok: true, results });
+  });
+
+  // ── Natural Language Cron Parser ──────────────────────────────────────
+
+  app.post("/api/nlcron/parse", async (c) => {
+    const body = await c.req.json<{ text: string }>();
+    const text = (body.text ?? "").trim();
+    if (!text) return c.json({ error: "No text provided" }, 400);
+
+    const result = parseNaturalCron(text);
+    return c.json(result);
   });
 
   return app;

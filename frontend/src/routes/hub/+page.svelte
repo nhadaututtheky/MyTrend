@@ -71,7 +71,11 @@
           <li>Auto-save to MyTrend archive</li>
           <li>Token tracking and cost estimation</li>
         </ul>
-        <a href="/hub/new" class="start-btn">Start New Session</a>
+        <div class="hub-actions">
+          <a href="/hub/new" class="start-btn">Start New Session</a>
+          <a href="/hub/cron" class="cron-btn">⏱ Cron Jobs</a>
+          <a href="/hub/settings" class="settings-btn">⚙ Settings</a>
+        </div>
       </div>
     </ComicCard>
   </div>
@@ -135,6 +139,33 @@
       box-shadow 150ms ease;
   }
 
+  .hub-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .cron-btn, .settings-btn {
+    display: inline-block;
+    font-family: var(--font-comic);
+    font-weight: 700;
+    font-size: 0.875rem;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: transparent;
+    color: var(--text-secondary);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sketch);
+    box-shadow: 2px 2px 0 var(--border-color);
+    text-decoration: none;
+    transition: all 150ms ease;
+  }
+  .cron-btn:hover, .settings-btn:hover {
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
+    box-shadow: 3px 3px 0 var(--accent-blue);
+    transform: translate(-1px, -1px);
+    text-decoration: none;
+  }
   .start-btn:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);

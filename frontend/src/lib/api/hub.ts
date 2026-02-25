@@ -1,5 +1,5 @@
 import pb from '$lib/config/pocketbase';
-import type { HubSession, HubEnvironment, HubCronJob, PBListResult } from '$lib/types';
+import type { HubSession, HubEnvironment, HubCronJob, HubCronHistory, PBListResult } from '$lib/types';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -100,6 +100,31 @@ export async function createCronJob(data: Partial<HubCronJob>): Promise<HubCronJ
 
 export async function updateCronJob(id: string, data: Partial<HubCronJob>): Promise<HubCronJob> {
   return pb.collection('hub_cron_jobs').update<HubCronJob>(id, data);
+}
+
+export async function deleteCronJob(id: string): Promise<boolean> {
+  return pb.collection('hub_cron_jobs').delete(id);
+}
+
+export async function runCronJob(id: string): Promise<{
+  success: boolean;
+  output?: string;
+  error?: string;
+  duration_ms?: number;
+}> {
+  const pbUrl = import.meta.env.VITE_PB_URL || 'http://localhost:8090';
+  const res = await fetch(`${pbUrl}/api/mytrend/cron/${id}/run`, {
+    method: 'POST',
+    headers: { Authorization: pb.authStore.token },
+  });
+  return res.json();
+}
+
+export async function fetchCronJobHistory(jobId: string): Promise<PBListResult<HubCronHistory>> {
+  return pb.collection('hub_cron_history').getList<HubCronHistory>(1, 20, {
+    filter: `cron_job = "${jobId}"`,
+    sort: '-ran_at',
+  });
 }
 
 // Hub Settings (API Key)
