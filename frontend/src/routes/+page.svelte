@@ -18,7 +18,18 @@
   import MiniTrending from '$lib/components/dashboard/MiniTrending.svelte';
   import HeatmapCalendar from '$lib/components/comic/HeatmapCalendar.svelte';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
-  import { Flame, ChevronDown, ChevronUp } from 'lucide-svelte';
+  import { Flame, ChevronDown, ChevronUp, X, FlaskConical } from 'lucide-svelte';
+  import {
+    isDemoMode,
+    dismissDemo,
+    DEMO_PROJECTS,
+    DEMO_ACTIVITIES,
+    DEMO_WEEKLY_INSIGHTS,
+    DEMO_WEEK_COMPARISON,
+    DEMO_TRENDING_TOPICS,
+    generateDemoHeatmap,
+    generateDemoTrend,
+  } from '$lib/utils/demo-data';
   import type {
     Project,
     Activity,
@@ -39,6 +50,7 @@
   let isLoading = $state(true);
   let showAllActivity = $state(false);
   let showHeatmap = $state(false);
+  let demoMode = $state(false);
 
   const totalConversations = $derived(projects.reduce((sum, p) => sum + p.total_conversations, 0));
   const totalIdeas = $derived(projects.reduce((sum, p) => sum + p.total_ideas, 0));
@@ -112,6 +124,18 @@
       isLoading = false;
     }
 
+    // Inject demo data when install is fresh (all collections empty)
+    if (isDemoMode(projects, activities, heatmapData)) {
+      demoMode = true;
+      projects = DEMO_PROJECTS;
+      activities = DEMO_ACTIVITIES;
+      heatmapData = generateDemoHeatmap();
+      trendData = generateDemoTrend(heatmapData);
+      weeklyInsights = DEMO_WEEKLY_INSIGHTS;
+      comparison = DEMO_WEEK_COMPARISON;
+      trendingTopics = DEMO_TRENDING_TOPICS;
+    }
+
     try {
       unsubscribe = await pb.collection('activities').subscribe('*', (e) => {
         if (e.action === 'create') {
@@ -133,6 +157,26 @@
 </svelte:head>
 
 <div class="dashboard">
+  {#if demoMode}
+    <div class="demo-banner" role="status" aria-label="Demo mode active">
+      <span class="demo-icon"><FlaskConical size={16} /></span>
+      <span class="demo-text">
+        <strong>Demo mode</strong> — showing sample data so you can explore the dashboard.
+        <a href="/projects/new" class="demo-link">Create your first project</a> to see real data.
+      </span>
+      <button
+        class="demo-dismiss"
+        aria-label="Dismiss demo banner"
+        onclick={() => {
+          dismissDemo();
+          demoMode = false;
+        }}
+      >
+        <X size={14} />
+      </button>
+    </div>
+  {/if}
+
   <div class="page-header">
     <div class="header-left">
       <h1 class="comic-heading">Dashboard</h1>
@@ -547,6 +591,62 @@
   }
   .dashboard :global(.bento-card:nth-child(8)) {
     animation-delay: 340ms;
+  }
+
+  /* Demo Banner */
+  .demo-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: color-mix(in srgb, var(--accent-yellow) 12%, transparent);
+    border: var(--border-width) solid color-mix(in srgb, var(--accent-yellow) 40%, transparent);
+    border-radius: var(--radius-sketch);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    animation: bentoFadeIn 200ms ease;
+  }
+
+  .demo-icon {
+    color: var(--accent-yellow);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .demo-text {
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  .demo-link {
+    color: var(--accent-blue);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .demo-link:hover {
+    text-decoration: underline;
+  }
+
+  .demo-dismiss {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .demo-dismiss:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
   }
 
   @media (max-width: 768px) {
