@@ -4,43 +4,31 @@
 
 migrate(
   (db) => {
-    // Add column to SQLite
-    db.newQuery("ALTER TABLE plans ADD COLUMN milestones JSON DEFAULT '[]'").execute();
+    // Step 1: Add column to SQLite (idempotent — ignore if already exists)
+    try {
+      db.newQuery("ALTER TABLE plans ADD COLUMN milestones JSON DEFAULT '[]'").execute();
+    } catch (_) {}
 
-    // Update PocketBase schema metadata so the field is visible via API
-    var rows = db.newQuery("SELECT schema FROM _collections WHERE name='plans'").all();
-    if (rows && rows.length > 0) {
-      var existing = rows[0];
-      var schema = JSON.parse(existing.schema || '[]');
-      // Only add if not already present
-      var alreadyHas = false;
-      for (var i = 0; i < schema.length; i++) {
-        if (schema[i].name === 'milestones') { alreadyHas = true; break; }
-      }
-      if (!alreadyHas) {
-        schema.push({
-          id: 'milestones_json_field',
-          name: 'milestones',
-          type: 'json',
-          required: false,
-          presentable: false,
-          options: {},
-        });
-        db.newQuery(
-          "UPDATE _collections SET schema='" + JSON.stringify(schema).replace(/'/g, "''") + "' WHERE name='plans'"
-        ).execute();
-      }
-    }
+    // Step 2: Update PocketBase _collections schema using SQLite JSON functions
+    // (avoids .all() which requires Go pointer types in Goja)
+    db.newQuery(
+      "UPDATE _collections " +
+      "SET schema = json_insert(schema, '$[#]', json('{\"id\":\"milestones_json_field\",\"name\":\"milestones\",\"type\":\"json\",\"required\":false,\"presentable\":false,\"options\":{}}')) " +
+      "WHERE name = 'plans' " +
+      "AND NOT EXISTS (" +
+      "  SELECT 1 FROM json_each(schema) WHERE json_extract(value, '$.name') = 'milestones'" +
+      ")"
+    ).execute();
   },
   (db) => {
-    // Remove from schema metadata (SQLite can't easily drop columns)
-    var rows = db.newQuery("SELECT schema FROM _collections WHERE name='plans'").all();
-    if (rows && rows.length > 0) {
-      var schema = JSON.parse(rows[0].schema || '[]');
-      schema = schema.filter(function (f) { return f.name !== 'milestones'; });
-      db.newQuery(
-        "UPDATE _collections SET schema='" + JSON.stringify(schema).replace(/'/g, "''") + "' WHERE name='plans'"
-      ).execute();
-    }
+    // Remove milestones from _collections schema
+    db.newQuery(
+      "UPDATE _collections " +
+      "SET schema = (" +
+      "  SELECT json_group_array(value) FROM json_each(schema) " +
+      "  WHERE json_extract(value, '$.name') != 'milestones'" +
+      ") " +
+      "WHERE name = 'plans'"
+    ).execute();
   },
 );
