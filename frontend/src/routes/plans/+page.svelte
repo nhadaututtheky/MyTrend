@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import pb from '$lib/config/pocketbase';
-  import { fetchPlans, syncPlanFiles } from '$lib/api/plans';
+  import { fetchPlans, syncPlanFiles, updatePlan, fetchAllPlans } from '$lib/api/plans';
+  import PlanKanban from '$lib/components/comic/PlanKanban.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
@@ -13,9 +14,11 @@
   import type { Plan, PlanStatus, PlanType } from '$lib/types';
 
   let plans = $state<Plan[]>([]);
+  let allPlans = $state<Plan[]>([]); // for kanban
   let isLoading = $state(true);
   let isSyncing = $state(false);
   let statusFilter = $state('all');
+  let viewMode = $state<'list' | 'kanban'>('list');
   let currentPage = $state(1);
   let totalPages = $state(1);
   let totalItems = $state(0);
@@ -87,6 +90,24 @@
     handleTabChange();
   });
 
+  async function loadKanbanPlans(): Promise<void> {
+    try {
+      allPlans = await fetchAllPlans();
+    } catch (err: unknown) {
+      console.error('[Plans/Kanban]', err);
+    }
+  }
+
+  async function handleKanbanStatusChange(planId: string, status: PlanStatus): Promise<void> {
+    try {
+      await updatePlan(planId, { status });
+      allPlans = allPlans.map((p) => (p.id === planId ? { ...p, status } : p));
+      toast.success(`Moved to ${status.replace('_', ' ')}`);
+    } catch {
+      toast.error('Failed to update status');
+    }
+  }
+
   onMount(async () => {
     await loadPlans();
     unsubscribe = await pb.collection('plans').subscribe('*', (e) => {
@@ -94,6 +115,7 @@
       else if (e.action === 'delete') plans = plans.filter((p) => p.id !== e.record.id);
       else if (e.action === 'update') {
         plans = plans.map((p) => (p.id === e.record.id ? (e.record as unknown as Plan) : p));
+        allPlans = allPlans.map((p) => (p.id === e.record.id ? (e.record as unknown as Plan) : p));
       }
     });
   });
@@ -131,12 +153,36 @@
       <p class="subtitle">{totalItems} plans tracked</p>
     </div>
     <div class="header-actions">
+      <div class="view-toggle">
+        <button
+          class="toggle-btn"
+          class:active={viewMode === 'list'}
+          onclick={() => { viewMode = 'list'; }}
+          aria-label="List view"
+        >☰ List</button>
+        <button
+          class="toggle-btn"
+          class:active={viewMode === 'kanban'}
+          onclick={() => { viewMode = 'kanban'; loadKanbanPlans(); }}
+          aria-label="Kanban view"
+        >⊞ Kanban</button>
+      </div>
       <ComicButton variant="outline" disabled={isSyncing} onclick={handleSyncPlanFiles}>
         {isSyncing ? 'Syncing...' : 'Sync Claude Files'}
       </ComicButton>
       <a href="/plans/new"><ComicButton variant="primary">New Plan</ComicButton></a>
     </div>
   </div>
+
+  {#if viewMode === 'kanban'}
+    {#if allPlans.length === 0 && isLoading}
+      <div class="skeleton-list">
+        {#each Array(4) as _}<ComicSkeleton variant="card" height="100px" />{/each}
+      </div>
+    {:else}
+      <PlanKanban plans={allPlans} onStatusChange={handleKanbanStatusChange} />
+    {/if}
+  {:else}
 
   <ComicTabs tabs={statusTabs} bind:active={statusFilter} />
 
@@ -226,6 +272,7 @@
       </div>
     {/if}
   {/if}
+  {/if}
 </div>
 
 <style>
@@ -240,6 +287,28 @@
     justify-content: space-between;
     gap: var(--spacing-md);
   }
+  .view-toggle {
+    display: flex;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .toggle-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 150ms;
+  }
+  .toggle-btn.active {
+    background: var(--accent-blue);
+    color: #1a1a1a;
+  }
+  .toggle-btn:not(.active):hover { color: var(--text-primary); }
   .page-header a {
     text-decoration: none;
   }

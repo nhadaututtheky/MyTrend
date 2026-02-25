@@ -1,6 +1,7 @@
 import pb from '$lib/config/pocketbase';
 import type {
   Plan,
+  PlanMilestone,
   PlanStatus,
   PlanType,
   PlanTimelineResponse,
@@ -78,6 +79,15 @@ export async function updatePlan(id: string, data: Partial<Plan>): Promise<Plan>
 
 export async function deletePlan(id: string): Promise<boolean> {
   return pb.collection('plans').delete(id);
+}
+
+export async function updatePlanMilestones(id: string, milestones: PlanMilestone[]): Promise<Plan> {
+  return pb.collection('plans').update<Plan>(id, { milestones: JSON.stringify(milestones) });
+}
+
+export async function fetchAllPlans(): Promise<Plan[]> {
+  const result = await pb.collection('plans').getList<Plan>(1, 200, { sort: '-created' });
+  return result.items;
 }
 
 export async function transitionPlan(

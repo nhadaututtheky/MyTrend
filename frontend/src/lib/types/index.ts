@@ -107,6 +107,14 @@ export interface Idea extends BaseRecord {
   linked_plan: string;
 }
 
+// Plan Milestone
+export interface PlanMilestone {
+  id: string;
+  title: string;
+  done: boolean;
+  order: number;
+}
+
 // Plan
 export type PlanType =
   | 'implementation'
@@ -161,6 +169,7 @@ export interface Plan extends BaseRecord {
   extraction_source: ExtractionSource;
   extraction_confidence: number;
   signal_phrase: string;
+  milestones: readonly PlanMilestone[];
   started_at: string | null;
   completed_at: string | null;
 }
