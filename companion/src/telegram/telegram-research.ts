@@ -350,8 +350,8 @@ Verdict guide:
       env: buildCleanEnv(),
     });
 
-    // Wait for completion with 30s timeout
-    const timeoutId = setTimeout(() => proc.kill(), 30_000);
+    // Wait for completion with 90s timeout (CLI cold start on Windows is slow)
+    const timeoutId = setTimeout(() => proc.kill(), 90_000);
     const exitCode = await proc.exited;
     clearTimeout(timeoutId);
 
@@ -363,9 +363,13 @@ Verdict guide:
 
     const text = await new Response(proc.stdout).text();
 
-    // Parse JSON — handle potential markdown wrapping
-    const jsonStr = text.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    // Extract JSON object — Claude may wrap in markdown fences or add preamble
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error(`[research] No JSON found in CLI output: ${text.slice(0, 200)}`);
+      return fallbackAnalysis(detected, metadata);
+    }
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
 
     const validVerdicts = ["fit", "partial", "concept-only", "irrelevant"];
     const verdict = validVerdicts.includes(parsed.verdict as string)
@@ -413,7 +417,7 @@ const INTERNAL_SECRET = process.env.COMPANION_INTERNAL_SECRET || "";
 export async function checkExistingResearch(url: string): Promise<string | null> {
   try {
     const res = await fetch(
-      `${PB_URL}/api/internal/research/check?url=${encodeURIComponent(url)}`,
+      `${PB_URL}/api/mytrend/research/internal/check?url=${encodeURIComponent(url)}`,
       {
         headers: { "X-Internal-Secret": INTERNAL_SECRET },
         signal: AbortSignal.timeout(5_000),
@@ -432,7 +436,7 @@ export async function saveResearchToPB(
   record: ResearchRecord,
 ): Promise<string | null> {
   try {
-    const res = await fetch(`${PB_URL}/api/internal/research`, {
+    const res = await fetch(`${PB_URL}/api/mytrend/research/internal`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -443,7 +447,8 @@ export async function saveResearchToPB(
     });
 
     if (!res.ok) {
-      console.error(`[research] PB save failed: ${res.status}`);
+      const errBody = await res.text().catch(() => "");
+      console.error(`[research] PB save failed: ${res.status} — ${errBody.slice(0, 300)}`);
       return null;
     }
 
