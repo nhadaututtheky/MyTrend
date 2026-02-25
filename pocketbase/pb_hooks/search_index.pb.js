@@ -320,3 +320,104 @@ routerAdd('GET', '/api/mytrend/search', (c) => {
 
   return c.json(200, results.slice(0, 20));
 });
+
+// ---------------------------------------------------------------------------
+// GET /api/mytrend/related?collection=ideas&id=<recordId>&q=<text>&limit=5
+// Cross-collection FTS5 "related content" lookup. Auth required.
+// NOTE: routerAdd has ISOLATED scope - must inline all logic.
+// ---------------------------------------------------------------------------
+routerAdd('GET', '/api/mytrend/related', function(c) {
+  var authRecord = c.get('authRecord');
+  if (!authRecord) return c.json(401, { error: 'Authentication required' });
+
+  var userId = authRecord.getId();
+  var sourceCollection = (c.queryParam('collection') || '').trim();
+  var sourceId = (c.queryParam('id') || '').trim();
+  var q = (c.queryParam('q') || '').trim();
+  var limit = parseInt(c.queryParam('limit') || '5', 10);
+  if (isNaN(limit) || limit < 1 || limit > 10) limit = 5;
+
+  if (!q || q.length < 2) return c.json(200, []);
+
+  var dao = $app.dao();
+  var results = [];
+
+  // Search conversations (exclude source if same collection)
+  try {
+    var filter = sourceCollection === 'conversations' && sourceId
+      ? 'user = {:uid} && id != {:excl} && (title ~ {:q} || summary ~ {:q})'
+      : 'user = {:uid} && (title ~ {:q} || summary ~ {:q})';
+    var convs = dao.findRecordsByFilter(
+      'conversations', filter, '-created', limit, 0,
+      { uid: userId, q: q, excl: sourceId }
+    );
+    for (var i = 0; i < convs.length; i++) {
+      results.push({
+        type: 'conversation',
+        id: convs[i].getId(),
+        title: convs[i].getString('title'),
+        snippet: (convs[i].getString('summary') || '').substring(0, 150),
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Search ideas (exclude source if same collection)
+  try {
+    var ideaFilter = sourceCollection === 'ideas' && sourceId
+      ? 'user = {:uid} && id != {:excl} && (title ~ {:q} || content ~ {:q})'
+      : 'user = {:uid} && (title ~ {:q} || content ~ {:q})';
+    var ideas = dao.findRecordsByFilter(
+      'ideas', ideaFilter, '-created', limit, 0,
+      { uid: userId, q: q, excl: sourceId }
+    );
+    for (var j = 0; j < ideas.length; j++) {
+      results.push({
+        type: 'idea',
+        id: ideas[j].getId(),
+        title: ideas[j].getString('title'),
+        snippet: (ideas[j].getString('content') || '').substring(0, 150),
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Search projects (exclude source if same collection)
+  try {
+    var projFilter = sourceCollection === 'projects' && sourceId
+      ? 'user = {:uid} && id != {:excl} && (name ~ {:q} || description ~ {:q})'
+      : 'user = {:uid} && (name ~ {:q} || description ~ {:q})';
+    var projects = dao.findRecordsByFilter(
+      'projects', projFilter, '-created', limit, 0,
+      { uid: userId, q: q, excl: sourceId }
+    );
+    for (var k = 0; k < projects.length; k++) {
+      results.push({
+        type: 'project',
+        id: projects[k].getString('slug'),
+        title: projects[k].getString('name'),
+        snippet: (projects[k].getString('description') || '').substring(0, 150),
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Search plans (exclude source if same collection)
+  try {
+    var planFilter = sourceCollection === 'plans' && sourceId
+      ? 'user = {:uid} && id != {:excl} && (title ~ {:q} || content ~ {:q})'
+      : 'user = {:uid} && (title ~ {:q} || content ~ {:q})';
+    var plans = dao.findRecordsByFilter(
+      'plans', planFilter, '-created', limit, 0,
+      { uid: userId, q: q, excl: sourceId }
+    );
+    for (var pl = 0; pl < plans.length; pl++) {
+      results.push({
+        type: 'plan',
+        id: plans[pl].getId(),
+        title: plans[pl].getString('title'),
+        snippet: (plans[pl].getString('content') || '').substring(0, 150),
+      });
+    }
+  } catch (e) { /* skip */ }
+
+  // Shuffle slightly (each collection already sorted by -created) then cap
+  return c.json(200, results.slice(0, limit));
+});

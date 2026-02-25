@@ -709,13 +709,25 @@ export class TelegramBridge {
               const trimmed = output.trim();
               if (trimmed) {
                 const isError = block.is_error === true;
-                const header = isError ? "⚠️ <b>Error output:</b>" : "📤 <b>Output:</b>";
-                const preview = trimmed.length > 1500 ? trimmed.slice(0, 1500) + "\n…(truncated)" : trimmed;
-                await this.sendToChat(
-                  chatId,
-                  `${header}\n<pre>${escapeHTML(preview)}</pre>`,
-                  topicId,
-                );
+                const threadId = topicId > 0 ? topicId : undefined;
+
+                if (trimmed.length > 3000) {
+                  // Large output → send as downloadable .txt file
+                  const caption = isError
+                    ? "⚠️ <b>Error output</b> (full log attached)"
+                    : "📤 <b>Bash output</b> (full log attached)";
+                  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+                  const fileName = isError ? `error-${ts}.txt` : `output-${ts}.txt`;
+                  await this.api.sendDocument(chatId, fileName, trimmed, caption, threadId);
+                } else {
+                  // Short output → inline code block
+                  const header = isError ? "⚠️ <b>Error output:</b>" : "📤 <b>Output:</b>";
+                  await this.sendToChat(
+                    chatId,
+                    `${header}\n<pre>${escapeHTML(trimmed)}</pre>`,
+                    topicId,
+                  );
+                }
               }
             }
           }

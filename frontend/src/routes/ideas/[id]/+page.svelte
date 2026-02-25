@@ -8,6 +8,8 @@
   import ComicEmptyState from '$lib/components/comic/ComicEmptyState.svelte';
   import TelegramFileList from '$lib/components/telegram/TelegramFileList.svelte';
   import TelegramFileUpload from '$lib/components/telegram/TelegramFileUpload.svelte';
+  import RelatedContent from '$lib/components/comic/RelatedContent.svelte';
+  import { buildRelatedQuery } from '$lib/api/related';
   import { formatDate } from '$lib/utils/date';
   import type { Idea } from '$lib/types';
 
@@ -114,6 +116,12 @@
         </ul>
       </ComicCard>
     {/if}
+
+    <RelatedContent
+      collection="ideas"
+      id={ideaId}
+      query={buildRelatedQuery([idea.title, idea.content])}
+    />
   {/if}
 </div>
 

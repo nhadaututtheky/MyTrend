@@ -4,6 +4,8 @@
   import { fetchConversation } from '$lib/api/conversations';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
+  import RelatedContent from '$lib/components/comic/RelatedContent.svelte';
+  import { buildRelatedQuery } from '$lib/api/related';
   import { formatDateTime, formatDuration } from '$lib/utils/date';
   import type { Conversation } from '$lib/types';
 
@@ -70,6 +72,12 @@
         </div>
       {/each}
     </div>
+
+    <RelatedContent
+      collection="conversations"
+      id={convId}
+      query={buildRelatedQuery([conversation.title, conversation.summary])}
+    />
   {/if}
 </div>
 
