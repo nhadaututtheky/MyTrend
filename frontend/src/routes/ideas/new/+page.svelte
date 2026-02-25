@@ -8,6 +8,7 @@
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import { onMount } from 'svelte';
+  import pb from '$lib/config/pocketbase';
   import type { Project } from '$lib/types';
 
   let title = $state('');
@@ -20,6 +21,31 @@
   let projects = $state<Project[]>([]);
   let pendingFiles = $state<File[]>([]);
   let fileInput: HTMLInputElement | undefined = $state();
+
+  // Duplicate detection
+  type SimilarIdea = { id: string; title: string; status: string; type: string; score: number };
+  let similarIdeas = $state<SimilarIdea[]>([]);
+  let dupCheckTimer: ReturnType<typeof setTimeout> | undefined;
+
+  async function checkDuplicates(text: string): Promise<void> {
+    if (text.trim().length < 8) { similarIdeas = []; return; }
+    try {
+      const token = pb.authStore.token;
+      const res = await fetch(
+        `/api/mytrend/ideas/similar?text=${encodeURIComponent(text)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { items: SimilarIdea[] };
+        similarIdeas = data.items ?? [];
+      }
+    } catch { /* non-critical */ }
+  }
+
+  function onTitleInput(): void {
+    clearTimeout(dupCheckTimer);
+    dupCheckTimer = setTimeout(() => { void checkDuplicates(title + ' ' + content); }, 600);
+  }
 
   onMount(async () => {
     try {
@@ -99,7 +125,7 @@
     <h1 class="comic-heading">New Idea</h1>
     <form onsubmit={handleSubmit}>
       <div class="fields">
-        <ComicInput bind:value={title} label="Title" placeholder="What's the idea?" required />
+        <ComicInput bind:value={title} label="Title" placeholder="What's the idea?" required oninput={onTitleInput} />
         <div class="field">
           <label class="label" for="content">Description</label>
           <textarea
@@ -180,6 +206,18 @@
           {/if}
         </div>
       </div>
+      {#if similarIdeas.length > 0}
+        <div class="dup-warning" role="alert">
+          <p class="dup-header">Similar ideas found — check before creating:</p>
+          {#each similarIdeas as idea (idea.id)}
+            <a href="/ideas/{idea.id}" class="dup-item" target="_blank" rel="noreferrer">
+              <span class="dup-title">{idea.title}</span>
+              <span class="dup-meta">{idea.status} · {idea.type}</span>
+            </a>
+          {/each}
+        </div>
+      {/if}
+
       <div class="actions">
         <ComicButton variant="primary" type="submit" loading={isCreating}>Create Idea</ComicButton>
         <ComicButton variant="outline" onclick={() => goto('/ideas')}>Cancel</ComicButton>
@@ -274,5 +312,58 @@
     font-weight: 700;
     cursor: pointer;
     padding: 0 4px;
+  }
+
+  .dup-warning {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--accent-yellow);
+    border-radius: 6px;
+    background: rgba(255, 230, 109, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dup-header {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent-yellow);
+    margin: 0 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .dup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    padding: 4px 6px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.8rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    transition: background 150ms;
+  }
+
+  .dup-item:hover {
+    background: var(--bg-elevated);
+  }
+
+  .dup-title {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .dup-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    text-transform: capitalize;
   }
 </style>
