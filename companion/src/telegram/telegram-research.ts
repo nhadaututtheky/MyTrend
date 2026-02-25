@@ -1,7 +1,6 @@
 // Research Knowledge Graph — URL Auto-Capture Module
 // Detects URLs in Telegram messages, fetches metadata, AI analysis, saves to PB + NM.
-
-import Anthropic from "@anthropic-ai/sdk";
+// AI analysis uses Claude Code CLI (--print one-shot mode) — same subscription as Vibe Terminal.
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -267,19 +266,29 @@ export async function fetchMetadata(detected: DetectedUrl): Promise<RawMetadata>
   }
 }
 
-// ─── AI Analysis ────────────────────────────────────────────────────────────
+// ─── AI Analysis (via Claude Code CLI — subscription, no API key) ───────────
 
-let anthropicClient: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic | null {
-  if (anthropicClient) return anthropicClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn("[research] ANTHROPIC_API_KEY not set — AI analysis disabled");
-    return null;
+/** Resolve the Claude CLI executable path (same logic as cli-launcher.ts). */
+async function getClaudeCommand(): Promise<string[]> {
+  if (process.platform === "win32") {
+    const npmPrefix = process.env.APPDATA ? `${process.env.APPDATA}\\npm` : "";
+    const cliScript = `${npmPrefix}\\node_modules\\@anthropic-ai\\claude-code\\cli.js`;
+    const { existsSync } = await import("node:fs");
+    if (existsSync(cliScript)) return ["node", cliScript];
+    return ["claude.cmd"];
   }
-  anthropicClient = new Anthropic({ apiKey });
-  return anthropicClient;
+  return ["claude"];
+}
+
+/** Build clean env without nested Claude Code vars (same as cli-launcher). */
+function buildCleanEnv(): Record<string, string> {
+  const cleanEnv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (k === "CLAUDECODE" || k.startsWith("CLAUDE_CODE_")) continue;
+    if (v !== undefined) cleanEnv[k] = v;
+  }
+  cleanEnv.HOME = process.env.USERPROFILE ?? process.env.HOME ?? "";
+  return cleanEnv;
 }
 
 export async function analyzeWithClaude(
@@ -288,11 +297,6 @@ export async function analyzeWithClaude(
   userComment: string,
   knownProjects: KnownProject[],
 ): Promise<AIAnalysis> {
-  const client = getAnthropicClient();
-  if (!client) {
-    return fallbackAnalysis(detected, metadata);
-  }
-
   const projectList = knownProjects
     .map((p) => `- ${p.name} (${p.slug}): ${p.dir}`)
     .join("\n");
@@ -327,14 +331,37 @@ Verdict guide:
 - irrelevant: not relevant to any known project`;
 
   try {
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
-      messages: [{ role: "user", content: prompt }],
+    const cmd = await getClaudeCommand();
+    const args = [
+      ...cmd,
+      "--print",
+      "--model", "haiku",
+      "--permission-mode", "default",
+      "-p", prompt,
+    ];
+
+    console.log(`[research] Spawning Claude CLI for analysis: ${cmd[0]}...`);
+
+    const proc = Bun.spawn(args, {
+      cwd: process.env.PROJECT_DIR || "D:\\Project\\MyTrend",
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: buildCleanEnv(),
     });
 
-    const text =
-      response.content[0].type === "text" ? response.content[0].text : "";
+    // Wait for completion with 30s timeout
+    const timeoutId = setTimeout(() => proc.kill(), 30_000);
+    const exitCode = await proc.exited;
+    clearTimeout(timeoutId);
+
+    if (exitCode !== 0) {
+      const stderrText = await new Response(proc.stderr).text();
+      console.error(`[research] CLI exited ${exitCode}: ${stderrText.slice(0, 200)}`);
+      return fallbackAnalysis(detected, metadata);
+    }
+
+    const text = await new Response(proc.stdout).text();
 
     // Parse JSON — handle potential markdown wrapping
     const jsonStr = text.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
@@ -363,7 +390,7 @@ Verdict guide:
       verdict,
     };
   } catch (err) {
-    console.error("[research] Claude analysis failed:", err);
+    console.error("[research] Claude CLI analysis failed:", err);
     return fallbackAnalysis(detected, metadata);
   }
 }
