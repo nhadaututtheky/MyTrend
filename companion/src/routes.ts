@@ -20,6 +20,8 @@ interface AppContext {
   stopTelegramBridge: () => void;
 }
 
+import { fetchContextSnapshot } from "./context-snapshot.js";
+
 const PB_URL = process.env.PB_URL || "http://localhost:8090";
 
 /** Sync a project profile to PocketBase projects collection. */
@@ -535,6 +537,16 @@ export function createApp(ctx: AppContext): Hono {
     }
 
     return c.json({ ok: true });
+  });
+
+  // ── Context Snapshot ──────────────────────────────────────────────────
+
+  app.get("/api/context/latest", async (c) => {
+    const text = await fetchContextSnapshot();
+    if (!text) {
+      return c.json({ ok: false, text: null, error: "Context snapshot unavailable" }, 503);
+    }
+    return c.json({ ok: true, text });
   });
 
   // ── NM Doc Training ──────────────────────────────────────────────────

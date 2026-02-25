@@ -2,6 +2,7 @@ import type { Subprocess } from "bun";
 import type { CreateSessionRequest } from "./session-types.js";
 import { SessionStore } from "./session-store.js";
 import type { WsBridge } from "./ws-bridge.js";
+import { fetchContextSnapshot, buildContextPrompt } from "./context-snapshot.js";
 
 const VALID_PERMISSION_MODES = new Set([
   "default",
@@ -81,9 +82,21 @@ export class CLILauncher {
       }
     }
 
-    // Initial prompt if provided
+    // Initial prompt — inject daily context snapshot for new (non-resume) prompted sessions
     if (options.prompt?.trim()) {
-      args.push("-p", options.prompt.trim());
+      let prompt = options.prompt.trim();
+      if (!options.resume) {
+        try {
+          const snapshot = await fetchContextSnapshot();
+          if (snapshot) {
+            prompt = buildContextPrompt(prompt, snapshot);
+            console.log(`[cli-launcher] Context snapshot injected (${snapshot.length} chars)`);
+          }
+        } catch {
+          // Non-critical: proceed without context
+        }
+      }
+      args.push("-p", prompt);
     }
 
     console.log(
