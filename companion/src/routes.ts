@@ -489,6 +489,14 @@ export function createApp(ctx: AppContext): Hono {
     }
 
     saveTelegramConfig(updated);
+
+    // Hot-reload into running bridge (no restart needed)
+    const tg = ctx.getTelegramBridge();
+    if (tg) {
+      tg.updateAllowedChatIds(updated.allowedChatIds);
+      tg.updateNotificationGroupId(updated.notificationGroupId ?? null);
+    }
+
     return c.json({ ok: true });
   });
 

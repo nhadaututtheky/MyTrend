@@ -161,6 +161,19 @@ export class TelegramBridge {
     console.log("[telegram] Bridge stopped");
   }
 
+  /** Hot-reload allowed chat IDs without restarting the bridge */
+  updateAllowedChatIds(ids: number[]): void {
+    this.config.allowedChatIds = new Set(ids);
+    console.log(`[telegram] Allowed chat IDs updated: [${ids.join(", ")}]`);
+  }
+
+  /** Hot-reload notification group ID without restarting */
+  updateNotificationGroupId(id: number | null): void {
+    if (id) {
+      this.setNotificationGroupId(id);
+    }
+  }
+
   // ── Polling loop ────────────────────────────────────────────────────────
 
   private async pollingLoop(): Promise<void> {
