@@ -1,22 +1,11 @@
 # MyTrend Roadmap
 
-> Generated: 2026-02-24 | Updated: 2026-02-25
+> Generated: 2026-02-24 | Updated: 2026-02-26
 > Priority: P0 = next sprint, P1 = this month, P2 = backlog, P3 = nice-to-have
 
 ---
 
 ## P1 — This Month
-
-### 4. Research Knowledge Graph — URL Auto-Capture
-**Why**: User shares repos/links during conversations (Telegram, Vibe sessions) but they vanish with context. MyTrend's core purpose is capturing ALL knowledge.
-**Scope**:
-- **PocketBase collection**: `research` — url, source (github/npm/blog), title, description, stars, tech_tags[], patterns_extracted[], applicable_projects[], verdict (fit/partial/concept-only), ai_summary
-- **Telegram bot URL detection**: detect GitHub/npm/blog URLs in messages → fetch metadata (GitHub API) → AI summary → save to PocketBase + Neural Memory
-- **Cross-project mapping**: AI analyzes each research item against ALL projects (MyTrend, Future Bot, Rune, Thor AI, Neural Memory) — not just current project
-- **Dashboard view**: Research activity trends, knowledge graph visualization, "Related research" suggestions when working on a project
-- **Caption support**: URL + user comment → use comment as analysis context
-**Files**: `companion/src/telegram/telegram-bridge.ts` (URL detection in handleTextMessage), `companion/src/telegram/telegram-research.ts` (new: fetch + analyze + save), `pocketbase/pb_migrations/` (research collection), `frontend/src/routes/research/` (dashboard view)
-**Effort**: Medium-High
 
 ### 8. Natural Language Cron (deferred — needs Cron UI first)
 **Why**: Hub Cron Jobs use cron expressions — technical barrier. "Every morning at 9am, summarize yesterday" is more natural.
@@ -44,6 +33,7 @@
 ## Completed
 
 ### 2026-02-25
+- [x] Research Knowledge Graph: URL auto-capture from Telegram → GitHub/npm metadata → Claude Haiku AI analysis → PB + NM save + frontend dashboard `/research`
 - [x] Vibe Terminal Onboarding Wizard: 3-step first-run wizard (welcome → project → launch)
 - [x] Component Gallery: dev route `/dev/components` with all comic components + variants
 - [x] Telegram Bridge hot-reload: save config applies immediately without restart (commit 8a09ec0)

@@ -682,3 +682,34 @@ export interface ClaudeTodoList {
   sessionId: string;
   todos: ClaudeTodoItem[];
 }
+
+// ─── Research Knowledge Graph ────────────────────────────────────────────
+
+export type ResearchSource = 'github' | 'npm' | 'blog' | 'docs' | 'other';
+export type ResearchVerdict = 'fit' | 'partial' | 'concept-only' | 'irrelevant';
+
+export interface Research extends BaseRecord {
+  user: string;
+  url: string;
+  source: ResearchSource;
+  title: string;
+  description: string;
+  stars: number;
+  npm_downloads: number;
+  tech_tags: readonly string[];
+  patterns_extracted: readonly string[];
+  applicable_projects: readonly string[];
+  verdict: ResearchVerdict;
+  ai_summary: string;
+  user_comment: string;
+  raw_metadata: Record<string, unknown>;
+  processed_at: string | null;
+}
+
+export interface ResearchStats {
+  total: number;
+  by_source: Record<ResearchSource, number>;
+  by_verdict: Record<ResearchVerdict, number>;
+  top_tech_tags: Array<{ tag: string; count: number }>;
+  applicable_by_project: Record<string, number>;
+}

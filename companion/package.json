@@ -8,6 +8,7 @@
     "check": "bun run tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "hono": "^4.7.0"
   },
   "devDependencies": {

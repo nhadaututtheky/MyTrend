@@ -5,7 +5,7 @@
   import {
     LayoutDashboard, FolderOpen, MessageCircle, Lightbulb, ClipboardList,
     FileText,
-    TrendingUp, Globe, Search,
+    TrendingUp, Globe, Search, BookOpen,
     Terminal, Zap, Settings,
   } from 'lucide-svelte';
 
@@ -38,6 +38,7 @@
         { label: 'Trends', href: '/trends', icon: '', lucideIcon: TrendingUp },
         { label: 'Graph', href: '/graph', icon: '', lucideIcon: Globe },
         { label: 'Search', href: '/search', icon: '', lucideIcon: Search },
+        { label: 'Research', href: '/research', icon: '', lucideIcon: BookOpen },
       ],
     },
     {

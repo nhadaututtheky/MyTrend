@@ -25,6 +25,18 @@ import { TelegramAPI } from "./telegram-api.js";
 import { dispatchCommand } from "./telegram-commands.js";
 import { isVietnamese, translateText } from "../translate.js";
 import {
+  detectUrls,
+  fetchMetadata,
+  analyzeWithClaude,
+  checkExistingResearch,
+  saveResearchToPB,
+  saveToNeuralMemory,
+  type DetectedUrl,
+  type RawMetadata,
+  type AIAnalysis,
+  type ResearchRecord,
+} from "./telegram-research.js";
+import {
   toTelegramHTML,
   extractText,
   formatResult,
@@ -334,6 +346,14 @@ export class TelegramBridge {
       cleanText = cleanText.replace(new RegExp(`@${this.botUsername}\\s*`, "gi"), "").trim();
     }
     if (!cleanText) return;
+
+    // Research URL detection (fire-and-forget — never blocks message flow)
+    const detectedUrls = detectUrls(cleanText);
+    if (detectedUrls.length > 0) {
+      const userId = process.env.MYTREND_SYNC_USER_ID ?? "";
+      this.processResearchUrls(chatId, topicId, detectedUrls, cleanText, msg.message_id, userId)
+        .catch((err) => console.error("[research] Processing error:", err));
+    }
 
     // Track message ID for reply-to and reaction updates
     this.lastUserMsgId.set(this.key(chatId, topicId), msg.message_id);
@@ -1547,6 +1567,113 @@ export class TelegramBridge {
     }).catch((err) => {
       console.error("[telegram] Conversation sync failed:", err);
     });
+  }
+
+  // ── Research URL Processing ──────────────────────────────────────────
+
+  /** Process detected URLs: fetch metadata, AI analyze, save to PB + NM. Fire-and-forget. */
+  private async processResearchUrls(
+    chatId: number,
+    topicId: number,
+    urls: DetectedUrl[],
+    fullText: string,
+    messageId: number,
+    userId: string,
+  ): Promise<void> {
+    if (!userId) {
+      console.warn("[research] MYTREND_SYNC_USER_ID not set — skipping research capture");
+      return;
+    }
+
+    const knownProjects = this.deps.profiles
+      .getAll()
+      .filter((p) => p.slug !== "hub")
+      .map((p) => ({ slug: p.slug, name: p.name, dir: p.dir }));
+
+    for (const detected of urls) {
+      try {
+        // 1. Dedup check
+        const existingId = await checkExistingResearch(detected.url);
+        if (existingId) {
+          this.api.react(chatId, messageId, "🔖").catch(() => {});
+          continue;
+        }
+
+        // 2. Fetch metadata
+        const metadata = await fetchMetadata(detected);
+
+        // 3. AI analysis
+        const analysis = await analyzeWithClaude(detected, metadata, fullText, knownProjects);
+
+        // 4. Build record
+        const record: ResearchRecord = {
+          url: detected.url,
+          source: detected.source,
+          title: metadata.title,
+          description: metadata.description,
+          stars: metadata.stars,
+          npm_downloads: metadata.npmDownloads,
+          tech_tags: analysis.techTags,
+          patterns_extracted: analysis.patternsExtracted,
+          applicable_projects: analysis.applicableProjects,
+          verdict: analysis.verdict,
+          ai_summary: analysis.summary,
+          user_comment: fullText.replace(detected.url, "").trim().slice(0, 2000),
+          raw_metadata: metadata.raw,
+          processed_at: new Date().toISOString(),
+        };
+
+        // 5. Save to PocketBase
+        const recordId = await saveResearchToPB(userId, record);
+
+        // 6. Save to Neural Memory (async, fire-and-forget)
+        saveToNeuralMemory(record, analysis).catch(() => {});
+
+        // 7. Send confirmation card to Telegram
+        if (recordId) {
+          await this.sendResearchCard(chatId, topicId, detected, metadata, analysis);
+        }
+      } catch (err) {
+        console.error(`[research] Failed for ${detected.url}:`, err);
+      }
+    }
+  }
+
+  /** Send a formatted research card to Telegram. */
+  private async sendResearchCard(
+    chatId: number,
+    topicId: number,
+    detected: DetectedUrl,
+    metadata: RawMetadata,
+    analysis: AIAnalysis,
+  ): Promise<void> {
+    const VERDICT_EMOJI: Record<string, string> = {
+      fit: "✅", partial: "🟡", "concept-only": "💡", irrelevant: "⬜",
+    };
+    const SOURCE_EMOJI: Record<string, string> = {
+      github: "🐙", npm: "📦", blog: "📝", docs: "📖", other: "🔗",
+    };
+
+    const lines: string[] = [
+      `${SOURCE_EMOJI[detected.source] ?? "🔗"} <b>${this.escapeHtml(metadata.title)}</b>`,
+      `${VERDICT_EMOJI[analysis.verdict] ?? "🟡"} <i>${analysis.verdict}</i>`,
+    ];
+
+    if (metadata.stars > 0) lines.push(`⭐ ${metadata.stars.toLocaleString()} stars`);
+    if (metadata.npmDownloads > 0) lines.push(`📥 ${metadata.npmDownloads.toLocaleString()} downloads/week`);
+    if (analysis.techTags.length > 0) lines.push(`🏷 ${analysis.techTags.join(", ")}`);
+    if (analysis.applicableProjects.length > 0) lines.push(`📂 ${analysis.applicableProjects.join(", ")}`);
+    if (analysis.summary) lines.push(`\n${this.escapeHtml(analysis.summary)}`);
+
+    await this.sendToChat(chatId, lines.join("\n"), topicId);
+  }
+
+  /** Escape HTML special characters for Telegram. */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   // ── Persistence ───────────────────────────────────────────────────────
