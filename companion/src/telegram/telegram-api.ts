@@ -220,6 +220,27 @@ export class TelegramAPI {
 
   // ── Media ─────────────────────────────────────────────────────────────
 
+  async sendDocument(
+    chatId: number,
+    fileName: string,
+    content: string,
+    caption?: string,
+    messageThreadId?: number
+  ): Promise<number> {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    form.append("document", new Blob([content], { type: "text/plain" }), fileName);
+    if (caption) {
+      form.append("caption", caption);
+      form.append("parse_mode", "HTML");
+    }
+    if (messageThreadId) form.append("message_thread_id", String(messageThreadId));
+    const res = await fetch(`${this.baseUrl}/sendDocument`, { method: "POST", body: form });
+    const data = (await res.json()) as ApiResponse<{ message_id: number }>;
+    if (!data.ok) throw new Error(`sendDocument failed: ${data.description}`);
+    return data.result.message_id;
+  }
+
   async sendPhoto(
     chatId: number,
     photoUrl: string,

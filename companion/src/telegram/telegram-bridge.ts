@@ -116,6 +116,9 @@ export class TelegramBridge {
   // Notification group for aggregated events
   private notificationGroupId: number | null = null;
 
+  // Track .md files written by Claude per session-key — auto-send on result
+  private pendingMdFiles = new Map<string, Array<{ path: string; content: string }>>();
+
   constructor(config: TelegramConfig, deps: BridgeDeps) {
     this.config = config;
     this.deps = deps;
@@ -745,6 +748,28 @@ export class TelegramBridge {
           this.lastUserMsgId.delete(k);
           this.stopTyping(chatId, topicId);
         }
+
+        // Detect Write tool calls targeting .md files — queue for auto-send after result
+        for (const block of content) {
+          if (
+            block.type === "tool_use" &&
+            block.name === "Write" &&
+            typeof block.input === "object" &&
+            block.input !== null
+          ) {
+            const input = block.input as Record<string, unknown>;
+            const filePath = typeof input.file_path === "string" ? input.file_path : null;
+            const fileContent = typeof input.content === "string" ? input.content : null;
+            if (filePath && fileContent && filePath.toLowerCase().endsWith(".md")) {
+              const list = this.pendingMdFiles.get(k) ?? [];
+              // Deduplicate by path (last write wins)
+              const idx = list.findIndex((f) => f.path === filePath);
+              if (idx >= 0) list[idx] = { path: filePath, content: fileContent };
+              else list.push({ path: filePath, content: fileContent });
+              this.pendingMdFiles.set(k, list);
+            }
+          }
+        }
         break;
       }
 
@@ -770,6 +795,19 @@ export class TelegramBridge {
         // Clean up both maps
         this.responseOriginMsg.delete(k);
         this.lastUserMsgId.delete(k);
+
+        // Auto-send any .md files written during this turn
+        const mdFiles = this.pendingMdFiles.get(k);
+        if (mdFiles && mdFiles.length > 0) {
+          this.pendingMdFiles.delete(k);
+          for (const { path: filePath, content: fileContent } of mdFiles) {
+            const fileName = filePath.split(/[/\\]/).pop() ?? "file.md";
+            const caption = `📄 <code>${fileName}</code>`;
+            this.api
+              .sendDocument(chatId, fileName, fileContent, caption, topicId > 0 ? topicId : undefined)
+              .catch((err) => console.error(`[telegram] Failed to send .md file ${fileName}:`, err));
+          }
+        }
 
         // Cost budget alert
         this.checkCostAlert(chatId, topicId, resultMsg.total_cost_usd);
