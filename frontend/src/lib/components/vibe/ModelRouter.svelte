@@ -79,13 +79,25 @@
   <!-- Quick presets -->
   <div class="presets">
     <span class="presets-label">Quick:</span>
-    <button class="preset-btn preset-haiku" onclick={() => setPreset('search')} aria-label="Quick search preset">
+    <button
+      class="preset-btn preset-haiku"
+      onclick={() => setPreset('search')}
+      aria-label="Quick search preset"
+    >
       🍃 Search
     </button>
-    <button class="preset-btn preset-sonnet" onclick={() => setPreset('code')} aria-label="Write code preset">
+    <button
+      class="preset-btn preset-sonnet"
+      onclick={() => setPreset('code')}
+      aria-label="Write code preset"
+    >
       ⚡ Code
     </button>
-    <button class="preset-btn preset-opus" onclick={() => setPreset('architect')} aria-label="Architect preset">
+    <button
+      class="preset-btn preset-opus"
+      onclick={() => setPreset('architect')}
+      aria-label="Architect preset"
+    >
       🏔️ Architect
     </button>
   </div>
@@ -113,7 +125,8 @@
       <div class="rec-header">
         <span class="rec-label">RECOMMENDED</span>
         <span class="model-chip model-{suggestion.model_info.color}">
-          {suggestion.model_info.emoji} {suggestion.model_info.label}
+          {suggestion.model_info.emoji}
+          {suggestion.model_info.label}
         </span>
       </div>
 
@@ -122,11 +135,7 @@
       <!-- CLI command -->
       <div class="cli-block">
         <code class="cli-code">{suggestion.cli_command}</code>
-        <button
-          class="copy-btn"
-          onclick={copyCommand}
-          aria-label="Copy CLI command"
-        >
+        <button class="copy-btn" onclick={copyCommand} aria-label="Copy CLI command">
           {copySuccess ? '✓ Copied' : 'Copy'}
         </button>
       </div>
@@ -145,7 +154,8 @@
               aria-label="Use {alt.label}"
               title="{alt.reason} — ${alt.input_price}/M in, ${alt.output_price}/M out"
             >
-              {alt.emoji} {alt.label}
+              {alt.emoji}
+              {alt.label}
             </button>
           {/each}
         </div>
@@ -156,7 +166,9 @@
   {:else if !taskDescription.trim()}
     <div class="empty-state">
       <p>Describe your task to get a model recommendation and launch command.</p>
-      <p class="hint-sub">Pick a model tile or type to auto-route: search → Haiku, code → Sonnet 4.6, complex → Opus</p>
+      <p class="hint-sub">
+        Pick a model tile or type to auto-route: search → Haiku, code → Sonnet 4.6, complex → Opus
+      </p>
     </div>
   {/if}
 </div>
@@ -234,10 +246,21 @@
     transition: all 150ms ease;
   }
 
-  .preset-btn:hover { transform: translateY(-1px); }
-  .preset-haiku:hover { border-color: var(--accent-green); color: var(--accent-green); }
-  .preset-sonnet:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
-  .preset-opus:hover { border-color: var(--accent-purple); color: var(--accent-purple); }
+  .preset-btn:hover {
+    transform: translateY(-1px);
+  }
+  .preset-haiku:hover {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+  .preset-sonnet:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .preset-opus:hover {
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+  }
 
   .model-grid {
     display: grid;
@@ -259,17 +282,33 @@
     transition: all 150ms ease;
   }
 
-  .model-tile:hover { transform: translateY(-1px); }
-  .model-tile.model-green:hover, .model-tile.model-green.active { border-color: var(--accent-green); }
-  .model-tile.model-blue:hover, .model-tile.model-blue.active { border-color: var(--accent-blue); }
-  .model-tile.model-purple:hover, .model-tile.model-purple.active { border-color: var(--accent-purple); }
-  .model-tile.model-orange:hover, .model-tile.model-orange.active { border-color: var(--accent-yellow, #FFE66D); }
+  .model-tile:hover {
+    transform: translateY(-1px);
+  }
+  .model-tile.model-green:hover,
+  .model-tile.model-green.active {
+    border-color: var(--accent-green);
+  }
+  .model-tile.model-blue:hover,
+  .model-tile.model-blue.active {
+    border-color: var(--accent-blue);
+  }
+  .model-tile.model-purple:hover,
+  .model-tile.model-purple.active {
+    border-color: var(--accent-purple);
+  }
+  .model-tile.model-orange:hover,
+  .model-tile.model-orange.active {
+    border-color: var(--accent-yellow, #ffe66d);
+  }
 
   .model-tile.active {
     box-shadow: 2px 2px 0 var(--border-color);
   }
 
-  .tile-emoji { font-size: 1rem; }
+  .tile-emoji {
+    font-size: 1rem;
+  }
 
   .tile-label {
     font-family: var(--font-comic);
@@ -315,10 +354,26 @@
     border: 2px solid;
   }
 
-  .model-green { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); border-color: var(--accent-green); }
-  .model-blue { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); border-color: var(--accent-blue); }
-  .model-purple { background: rgba(162, 155, 254, 0.15); color: var(--accent-purple); border-color: var(--accent-purple); }
-  .model-orange { background: rgba(255, 230, 109, 0.15); color: var(--accent-yellow, #FFE66D); border-color: var(--accent-yellow, #FFE66D); }
+  .model-green {
+    background: rgba(0, 210, 106, 0.15);
+    color: var(--accent-green);
+    border-color: var(--accent-green);
+  }
+  .model-blue {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--accent-blue);
+    border-color: var(--accent-blue);
+  }
+  .model-purple {
+    background: rgba(162, 155, 254, 0.15);
+    color: var(--accent-purple);
+    border-color: var(--accent-purple);
+  }
+  .model-orange {
+    background: rgba(255, 230, 109, 0.15);
+    color: var(--accent-yellow, #ffe66d);
+    border-color: var(--accent-yellow, #ffe66d);
+  }
 
   .rec-reason {
     font-size: var(--font-size-sm);
@@ -362,7 +417,9 @@
     flex-shrink: 0;
   }
 
-  .copy-btn:hover { transform: scale(1.05); }
+  .copy-btn:hover {
+    transform: scale(1.05);
+  }
 
   .cost-note {
     font-size: var(--font-size-xs);
@@ -421,6 +478,8 @@
   }
 
   @media (max-width: 480px) {
-    .model-grid { grid-template-columns: repeat(2, 1fr); }
+    .model-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 </style>

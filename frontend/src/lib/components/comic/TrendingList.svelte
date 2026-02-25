@@ -7,10 +7,7 @@
     onTopicClick?: (topic: TrendingTopic) => void;
   }
 
-  const {
-    topics = [],
-    onTopicClick,
-  }: Props = $props();
+  const { topics = [], onTopicClick }: Props = $props();
 
   function getDirectionIcon(direction: string): string {
     if (direction === 'rising') return '\u2191';

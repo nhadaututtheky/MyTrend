@@ -61,7 +61,11 @@
     timeoutSeconds: number;
     allowBash: boolean;
   }
-  let autoApproveConfig = $state<AutoApproveConfig>({ enabled: false, timeoutSeconds: 0, allowBash: false });
+  let autoApproveConfig = $state<AutoApproveConfig>({
+    enabled: false,
+    timeoutSeconds: 0,
+    allowBash: false,
+  });
 
   // Auto-scroll
   let feedEl: HTMLDivElement | undefined = $state();
@@ -70,21 +74,30 @@
   let showEnded = $state(
     typeof localStorage !== 'undefined'
       ? localStorage.getItem('vibe-show-ended') === 'true'
-      : false
+      : false,
   );
   let isCleaningUp = $state(false);
 
   // Onboarding
   let onboardDismissed = $state(false);
   const showOnboarding = $derived(
-    isHealthy && !activeSessionId && sessions.length === 0 && projects.length > 0 && !onboardDismissed
-    && (typeof localStorage !== 'undefined' && !localStorage.getItem('vibe-onboarded'))
+    isHealthy &&
+      !activeSessionId &&
+      sessions.length === 0 &&
+      projects.length > 0 &&
+      !onboardDismissed &&
+      typeof localStorage !== 'undefined' &&
+      !localStorage.getItem('vibe-onboarded'),
   );
 
   // Derived
   const isBusy = $derived(sessionState?.status === 'busy' || sessionState?.status === 'starting');
-  const isConnected = $derived(sessionState !== null && sessionState.status !== 'ended' && sessionState.status !== 'error');
-  const costFormatted = $derived(sessionState ? `$${sessionState.total_cost_usd.toFixed(4)}` : '$0');
+  const isConnected = $derived(
+    sessionState !== null && sessionState.status !== 'ended' && sessionState.status !== 'error',
+  );
+  const costFormatted = $derived(
+    sessionState ? `$${sessionState.total_cost_usd.toFixed(4)}` : '$0',
+  );
 
   // Group sessions by project
   interface SessionGroup {
@@ -115,9 +128,11 @@
     }
 
     // Sort groups alphabetically, _unknown last
-    result.sort((a, b) =>
-      a.slug === '_unknown' ? 1 : b.slug === '_unknown' ? -1 : a.name.localeCompare(b.name)
-    );
+    result.sort((a, b) => {
+      if (a.slug === '_unknown') return 1;
+      if (b.slug === '_unknown') return -1;
+      return a.name.localeCompare(b.name);
+    });
 
     return result;
   });
@@ -315,8 +330,7 @@
         const blocks = msg.message.content;
         if (Array.isArray(blocks)) {
           const hasVisible = blocks.some(
-            (b: ContentBlock) =>
-              (b.type === 'text' && b.text?.trim()) || b.type === 'tool_use'
+            (b: ContentBlock) => (b.type === 'text' && b.text?.trim()) || b.type === 'tool_use',
           );
           if (!hasVisible) break;
         }
@@ -408,8 +422,10 @@
         // Skip if we recently sent a message with the same content (bridge echo).
         // Only add user_message from bridge during history replay.
         const isDuplicate = messages.some(
-          (m) => m.role === 'user' && m.content === msg.content
-            && Math.abs(m.timestamp - msg.timestamp) < 5000
+          (m) =>
+            m.role === 'user' &&
+            m.content === msg.content &&
+            Math.abs(m.timestamp - msg.timestamp) < 5000,
         );
         if (!isDuplicate) {
           const uId = `user-${msg.timestamp}-${++msgCounter}`;
@@ -496,9 +512,7 @@
     <div class="offline-state">
       <div class="offline-icon">X</div>
       <p class="offline-title">Companion Service Offline</p>
-      <p class="offline-sub">
-        Start the companion service to use the terminal:
-      </p>
+      <p class="offline-sub">Start the companion service to use the terminal:</p>
       <code class="offline-cmd">cd companion && bun run dev</code>
       <p class="offline-sub" style="font-size: 11px; margin-top: 4px;">
         Auto-checking every 15s...
@@ -508,7 +522,10 @@
         onclick={async () => {
           isHealthy = await checkCompanionHealth();
           if (isHealthy) {
-            if (healthPollTimer) { clearInterval(healthPollTimer); healthPollTimer = undefined; }
+            if (healthPollTimer) {
+              clearInterval(healthPollTimer);
+              healthPollTimer = undefined;
+            }
             await refreshSessions();
             await refreshProjects();
           }
@@ -518,7 +535,6 @@
         Retry
       </button>
     </div>
-
   {:else if showOnboarding}
     <VibeOnboarding
       {projects}
@@ -533,7 +549,6 @@
         localStorage.setItem('vibe-onboarded', 'true');
       }}
     />
-
   {:else if !activeSessionId}
     <!-- Session selector / creator -->
     <div class="session-panel">
@@ -602,7 +617,10 @@
               <button
                 class="btn-toggle-ended"
                 class:active={showEnded}
-                onclick={() => { showEnded = !showEnded; localStorage.setItem('vibe-show-ended', String(showEnded)); }}
+                onclick={() => {
+                  showEnded = !showEnded;
+                  localStorage.setItem('vibe-show-ended', String(showEnded));
+                }}
                 aria-label="Toggle ended sessions"
                 title="{showEnded ? 'Hide' : 'Show'} ended ({endedCount})"
               >
@@ -634,15 +652,15 @@
                             class="btn-kill-inline"
                             onclick={(e) => handleKillFromList(e, s.id)}
                             aria-label="Kill session"
-                            title="Kill this session"
-                          >Kill</button>
+                            title="Kill this session">Kill</button
+                          >
                         {:else}
                           <button
                             class="btn-delete-inline"
                             onclick={(e) => handleDeleteFromList(e, s.id)}
                             aria-label="Delete session"
-                            title="Remove from history"
-                          >Del</button>
+                            title="Remove from history">Del</button
+                          >
                         {/if}
                       </span>
                     </div>
@@ -658,7 +676,6 @@
         </div>
       {/if}
     </div>
-
   {:else}
     <!-- Active terminal -->
     <div class="active-terminal">
@@ -694,11 +711,7 @@
             <option value="30">Auto: 30s</option>
             <option value="60">Auto: 60s</option>
           </select>
-          <button
-            class="btn-disconnect"
-            onclick={handleKill}
-            aria-label="Kill session"
-          >
+          <button class="btn-disconnect" onclick={handleKill} aria-label="Kill session">
             Kill
           </button>
           <button
@@ -1056,12 +1069,30 @@
     border-radius: 3px;
   }
 
-  .status-idle { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); }
-  .status-busy { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); }
-  .status-starting { background: rgba(255, 230, 109, 0.15); color: var(--accent-yellow); }
-  .status-compacting { background: rgba(255, 230, 109, 0.15); color: var(--accent-yellow); }
-  .status-ended { background: var(--bg-card); color: var(--text-muted); }
-  .status-error { background: rgba(255, 71, 87, 0.15); color: var(--accent-red); }
+  .status-idle {
+    background: rgba(0, 210, 106, 0.15);
+    color: var(--accent-green);
+  }
+  .status-busy {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--accent-blue);
+  }
+  .status-starting {
+    background: rgba(255, 230, 109, 0.15);
+    color: var(--accent-yellow);
+  }
+  .status-compacting {
+    background: rgba(255, 230, 109, 0.15);
+    color: var(--accent-yellow);
+  }
+  .status-ended {
+    background: var(--bg-card);
+    color: var(--text-muted);
+  }
+  .status-error {
+    background: rgba(255, 71, 87, 0.15);
+    color: var(--accent-red);
+  }
 
   .session-meta {
     display: flex;
@@ -1151,8 +1182,13 @@
   }
 
   @keyframes dotPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
   }
 
   .status-model {
@@ -1185,8 +1221,13 @@
   }
 
   @keyframes busyPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
   }
 
   .status-reconnecting {
@@ -1288,8 +1329,13 @@
   }
 
   @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
   }
 
   /* Thinking indicator */
@@ -1322,12 +1368,24 @@
     animation: bounce 1.4s ease-in-out infinite;
   }
 
-  .dot-bounce:nth-child(2) { animation-delay: 0.16s; }
-  .dot-bounce:nth-child(3) { animation-delay: 0.32s; }
+  .dot-bounce:nth-child(2) {
+    animation-delay: 0.16s;
+  }
+  .dot-bounce:nth-child(3) {
+    animation-delay: 0.32s;
+  }
 
   @keyframes bounce {
-    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-    40% { transform: translateY(-6px); opacity: 1; }
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    40% {
+      transform: translateY(-6px);
+      opacity: 1;
+    }
   }
 
   /* Mobile responsive */
@@ -1373,13 +1431,22 @@
   .skeleton-item {
     height: 52px;
     border-radius: var(--radius-sm);
-    background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-card) 50%, var(--bg-elevated) 75%);
+    background: linear-gradient(
+      90deg,
+      var(--bg-elevated) 25%,
+      var(--bg-card) 50%,
+      var(--bg-elevated) 75%
+    );
     background-size: 200% 100%;
     animation: shimmer 1.5s ease-in-out infinite;
   }
 
   @keyframes shimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 </style>

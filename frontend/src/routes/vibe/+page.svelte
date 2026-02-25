@@ -10,7 +10,7 @@
   import ModelRouter from '$lib/components/vibe/ModelRouter.svelte';
   import VibeTerminal from '$lib/components/vibe/VibeTerminal.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
-  import type { ClaudeTask, VibeSession, VibeSyncStatus } from '$lib/types';
+  import type { ClaudeTask, VibeSyncStatus } from '$lib/types';
 
   // ─── State ────────────────────────────────────────────────────────────────
   let tasks = $state<ClaudeTask[]>([]);
@@ -28,9 +28,7 @@
   const sessions = $derived(groupTasksBySessions(tasks));
 
   const filteredTasks = $derived(
-    selectedSessionId
-      ? tasks.filter((t) => t.session_id === selectedSessionId)
-      : tasks,
+    selectedSessionId ? tasks.filter((t) => t.session_id === selectedSessionId) : tasks,
   );
 
   const displayTasks = $derived(
@@ -50,7 +48,7 @@
   const activeSessions = $derived(sessions.filter((s) => s.is_active));
 
   const selectedSession = $derived(
-    selectedSessionId ? sessions.find((s) => s.session_id === selectedSessionId) ?? null : null,
+    selectedSessionId ? (sessions.find((s) => s.session_id === selectedSessionId) ?? null) : null,
   );
 
   const tabs = $derived([
@@ -132,13 +130,17 @@
     try {
       const lines: string[] = ['*Vibe Summary*'];
       lines.push(`Active sessions: ${activeSessions.length}`);
-      lines.push(`Tasks: ${pendingTasks.length} pending • ${inProgressTasks.length} running • ${completedTasks.length} done`);
+      lines.push(
+        `Tasks: ${pendingTasks.length} pending • ${inProgressTasks.length} running • ${completedTasks.length} done`,
+      );
 
       if (activeSessions.length > 0) {
         lines.push('');
         lines.push('*Active Sessions:*');
         for (const s of activeSessions.slice(0, 5)) {
-          lines.push(`• ${s.project_name}: ${s.in_progress_count} running, ${s.pending_count} pending`);
+          lines.push(
+            `• ${s.project_name}: ${s.in_progress_count} running, ${s.pending_count} pending`,
+          );
         }
       }
 
@@ -160,7 +162,9 @@
 <SessionSidebar
   {sessions}
   {selectedSessionId}
-  onselect={(id) => { selectedSessionId = id; }}
+  onselect={(id) => {
+    selectedSessionId = id;
+  }}
 />
 
 <div class="vibe-main">
@@ -238,22 +242,27 @@
         <div class="empty-state">
           <p class="empty-icon">🎯</p>
           <p class="empty-title">No Tasks Yet</p>
-          <p class="empty-sub">Run Claude Code with TodoWrite tool to see tasks here.<br />Click <strong>Sync</strong> to pull current todo files.</p>
+          <p class="empty-sub">
+            Run Claude Code with TodoWrite tool to see tasks here.<br />Click <strong>Sync</strong> to
+            pull current todo files.
+          </p>
         </div>
       {:else}
-        <KanbanBoard pending={pendingTasks} inProgress={inProgressTasks} completed={completedTasks} />
+        <KanbanBoard
+          pending={pendingTasks}
+          inProgress={inProgressTasks}
+          completed={completedTasks}
+        />
       {/if}
-
     {:else if activeTab === 'context'}
       <div class="context-layout">
         <div class="context-top">
-          <ContextMeter session={selectedSession} sessions={sessions} />
+          <ContextMeter session={selectedSession} {sessions} />
         </div>
         <div class="context-bottom">
           <ContextPanel {sessions} />
         </div>
       </div>
-
     {:else if activeTab === 'router'}
       <div class="router-layout">
         <ModelRouter />
@@ -266,7 +275,6 @@
           </ul>
         </div>
       </div>
-
     {:else if activeTab === 'terminal'}
       <div class="terminal-layout">
         <VibeTerminal />
@@ -336,8 +344,13 @@
   }
 
   @keyframes badgePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 
   .badge-running {

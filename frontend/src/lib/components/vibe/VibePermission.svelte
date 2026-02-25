@@ -11,12 +11,10 @@
 
   let { request, autoApproveTimeout = 0, onapprove, ondeny }: Props = $props();
 
-  const inputPreview = $derived(
-    JSON.stringify(request.input, null, 2).slice(0, 400)
-  );
+  const inputPreview = $derived(JSON.stringify(request.input, null, 2).slice(0, 400));
 
   const time = $derived(
-    new Date(request.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    new Date(request.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   );
 
   // ─── Countdown logic ───────────────────────────────────────────────────
@@ -49,7 +47,7 @@
   });
 
   const countdownPercent = $derived(
-    autoApproveTimeout > 0 ? (remaining / autoApproveTimeout) * 100 : 0
+    autoApproveTimeout > 0 ? (remaining / autoApproveTimeout) * 100 : 0,
   );
 </script>
 
@@ -105,8 +103,13 @@
   }
 
   @keyframes permPulse {
-    0%, 100% { border-color: var(--accent-orange); }
-    50% { border-color: var(--accent-yellow); }
+    0%,
+    100% {
+      border-color: var(--accent-orange);
+    }
+    50% {
+      border-color: var(--accent-yellow);
+    }
   }
 
   .perm-header {

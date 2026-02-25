@@ -69,13 +69,18 @@
 </script>
 
 {#if collapsible}
-  <button class="collapse-toggle" onclick={() => collapsed = !collapsed}>
+  <button class="collapse-toggle" onclick={() => (collapsed = !collapsed)}>
     {collapsed ? '+ Show content' : '- Hide content'}
   </button>
 {/if}
 
 {#if !collapsed}
-  <div class="comic-markdown" style:max-height={maxHeight} style:overflow={maxHeight ? 'auto' : undefined}>
+  <div
+    class="comic-markdown"
+    style:max-height={maxHeight}
+    style:overflow={maxHeight ? 'auto' : undefined}
+  >
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
     {@html html}
   </div>
 {/if}
@@ -98,10 +103,18 @@
     color: var(--text-primary);
   }
 
-  .comic-markdown :global(h1) { font-size: var(--font-size-2xl); }
-  .comic-markdown :global(h2) { font-size: var(--font-size-xl); }
-  .comic-markdown :global(h3) { font-size: var(--font-size-lg); }
-  .comic-markdown :global(h4) { font-size: var(--font-size-md); }
+  .comic-markdown :global(h1) {
+    font-size: var(--font-size-2xl);
+  }
+  .comic-markdown :global(h2) {
+    font-size: var(--font-size-xl);
+  }
+  .comic-markdown :global(h3) {
+    font-size: var(--font-size-lg);
+  }
+  .comic-markdown :global(h4) {
+    font-size: var(--font-size-md);
+  }
 
   .comic-markdown :global(p) {
     margin: 0 0 var(--spacing-sm);

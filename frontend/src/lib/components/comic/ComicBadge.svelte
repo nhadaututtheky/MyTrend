@@ -40,12 +40,30 @@
     padding: 1px 6px;
   }
 
-  .badge-green { background: var(--accent-green); color: #1a1a1a; }
-  .badge-red { background: var(--accent-red); color: #ffffff; }
-  .badge-yellow { background: var(--accent-yellow); color: #1a1a1a; }
-  .badge-blue { background: var(--accent-blue); color: #1a1a1a; }
-  .badge-purple { background: var(--accent-purple); color: #1a1a1a; }
-  .badge-orange { background: var(--accent-orange); color: #1a1a1a; }
+  .badge-green {
+    background: var(--accent-green);
+    color: #1a1a1a;
+  }
+  .badge-red {
+    background: var(--accent-red);
+    color: #ffffff;
+  }
+  .badge-yellow {
+    background: var(--accent-yellow);
+    color: #1a1a1a;
+  }
+  .badge-blue {
+    background: var(--accent-blue);
+    color: #1a1a1a;
+  }
+  .badge-purple {
+    background: var(--accent-purple);
+    color: #1a1a1a;
+  }
+  .badge-orange {
+    background: var(--accent-orange);
+    color: #1a1a1a;
+  }
 
   .animated {
     animation: neonPulse 2s ease-in-out infinite;

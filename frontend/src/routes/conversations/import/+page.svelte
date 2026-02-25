@@ -208,8 +208,8 @@
       <span class="cron-badge">Cron: every 30 min</span>
     </div>
     <p class="section-desc">
-      Automatically scans Claude Code CLI session logs from the mounted volume
-      and imports new conversations.
+      Automatically scans Claude Code CLI session logs from the mounted volume and imports new
+      conversations.
     </p>
 
     {#if isLoadingStatus}
@@ -304,9 +304,7 @@
         class="file-input"
         id="file-upload"
       />
-      <label for="file-upload" class="upload-label">
-        Choose files or drag & drop
-      </label>
+      <label for="file-upload" class="upload-label"> Choose files or drag & drop </label>
     </div>
 
     {#if isImporting}
@@ -353,8 +351,8 @@
     font-family: var(--font-mono, 'JetBrains Mono', monospace);
     font-size: 0.75rem;
     padding: 2px 8px;
-    border: 1px solid var(--accent-green, #00D26A);
-    color: var(--accent-green, #00D26A);
+    border: 1px solid var(--accent-green, #00d26a);
+    color: var(--accent-green, #00d26a);
     border-radius: var(--radius-sm, 6px);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -403,11 +401,11 @@
   }
 
   .status-item.imported .status-value {
-    color: var(--accent-green, #00D26A);
+    color: var(--accent-green, #00d26a);
   }
 
   .status-item.pending .status-value {
-    color: var(--accent-yellow, #FFE66D);
+    color: var(--accent-yellow, #ffe66d);
   }
 
   /* Projects List */
@@ -443,7 +441,7 @@
   }
 
   .pending-count {
-    color: var(--accent-green, #00D26A);
+    color: var(--accent-green, #00d26a);
     font-weight: 700;
     margin-left: var(--spacing-xs);
   }
@@ -451,16 +449,16 @@
   /* Sync Result */
   .sync-result {
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 2px solid var(--accent-green, #00D26A);
+    border: 2px solid var(--accent-green, #00d26a);
     border-radius: var(--radius-md, 8px);
     margin-bottom: var(--spacing-md);
     font-size: 0.875rem;
-    background: color-mix(in srgb, var(--accent-green, #00D26A) 5%, transparent);
+    background: color-mix(in srgb, var(--accent-green, #00d26a) 5%, transparent);
   }
 
   .sync-result.has-errors {
-    border-color: var(--accent-yellow, #FFE66D);
-    background: color-mix(in srgb, var(--accent-yellow, #FFE66D) 5%, transparent);
+    border-color: var(--accent-yellow, #ffe66d);
+    background: color-mix(in srgb, var(--accent-yellow, #ffe66d) 5%, transparent);
   }
 
   .result-summary {
@@ -472,7 +470,7 @@
   .result-errors {
     margin-top: var(--spacing-sm);
     font-size: 0.8rem;
-    color: var(--accent-red, #FF4757);
+    color: var(--accent-red, #ff4757);
   }
 
   .result-errors ul {
@@ -525,13 +523,13 @@
   .upload-label {
     font-family: var(--font-comic, 'Comic Mono', monospace);
     font-weight: 700;
-    color: var(--accent-blue, #4ECDC4);
+    color: var(--accent-blue, #4ecdc4);
     cursor: pointer;
     font-size: 1rem;
   }
 
   .upload-label:hover {
-    color: var(--accent-green, #00D26A);
+    color: var(--accent-green, #00d26a);
   }
 
   .status {

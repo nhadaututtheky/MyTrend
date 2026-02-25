@@ -26,11 +26,7 @@ sw.addEventListener('activate', (event: ExtendableEvent) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== CACHE_NAME)
-            .map((key) => caches.delete(key)),
-        ),
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
       )
       .then(() => sw.clients.claim()),
   );
@@ -48,9 +44,7 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
 
   // Cache-first for static assets (build output + static files)
   if (ASSETS.includes(url.pathname)) {
-    event.respondWith(
-      caches.match(event.request).then((cached) => cached ?? fetch(event.request)),
-    );
+    event.respondWith(caches.match(event.request).then((cached) => cached ?? fetch(event.request)));
     return;
   }
 
@@ -64,7 +58,11 @@ sw.addEventListener('fetch', (event: FetchEvent) => {
           return response;
         })
         .catch(() =>
-          caches.match(event.request).then((cached) => cached ?? caches.match('/') ?? new Response('Offline', { status: 503 })),
+          caches
+            .match(event.request)
+            .then(
+              (cached) => cached ?? caches.match('/') ?? new Response('Offline', { status: 503 }),
+            ),
         ),
     );
     return;

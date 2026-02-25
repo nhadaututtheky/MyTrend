@@ -53,10 +53,7 @@
 
   onMount(async () => {
     try {
-      const [result, statsData] = await Promise.allSettled([
-        fetchResearch(),
-        fetchResearchStats(),
-      ]);
+      const [result, statsData] = await Promise.allSettled([fetchResearch(), fetchResearchStats()]);
       if (result.status === 'fulfilled') items = result.value.items;
       if (statsData.status === 'fulfilled') stats = statsData.value;
     } catch (err: unknown) {
@@ -67,14 +64,10 @@
 
     try {
       unsubscribe = await pb.collection('research').subscribe('*', (e) => {
-        if (e.action === 'create')
-          items = [e.record as unknown as Research, ...items];
+        if (e.action === 'create') items = [e.record as unknown as Research, ...items];
         else if (e.action === 'update')
-          items = items.map((r) =>
-            r.id === e.record.id ? (e.record as unknown as Research) : r,
-          );
-        else if (e.action === 'delete')
-          items = items.filter((r) => r.id !== e.record.id);
+          items = items.map((r) => (r.id === e.record.id ? (e.record as unknown as Research) : r));
+        else if (e.action === 'delete') items = items.filter((r) => r.id !== e.record.id);
       });
     } catch (err: unknown) {
       console.error('[Research] Realtime subscribe failed:', err);
@@ -112,7 +105,7 @@
         {#if stats.by_source.npm > 0}
           <span class="stat-chip">📦 {stats.by_source.npm}</span>
         {/if}
-        {#if (stats.by_source.blog + stats.by_source.docs) > 0}
+        {#if stats.by_source.blog + stats.by_source.docs > 0}
           <span class="stat-chip">📝 {stats.by_source.blog + stats.by_source.docs}</span>
         {/if}
       </div>
@@ -159,7 +152,9 @@
 
               {#if item.ai_summary}
                 <p class="item-summary">
-                  {item.ai_summary.length > 150 ? item.ai_summary.slice(0, 147) + '...' : item.ai_summary}
+                  {item.ai_summary.length > 150
+                    ? item.ai_summary.slice(0, 147) + '...'
+                    : item.ai_summary}
                 </p>
               {/if}
 

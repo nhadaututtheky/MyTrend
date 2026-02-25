@@ -24,9 +24,7 @@ export async function fetchConversation(id: string): Promise<Conversation | null
   }
 }
 
-export async function createConversation(
-  data: Partial<Conversation>,
-): Promise<Conversation> {
+export async function createConversation(data: Partial<Conversation>): Promise<Conversation> {
   return pb.collection('conversations').create<Conversation>({
     ...data,
     user: pb.authStore.model?.id,

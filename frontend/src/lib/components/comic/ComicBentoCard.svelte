@@ -33,7 +33,7 @@
   };
 
   const cardAccent = $derived(neonColor ? accentMap[neonColor] : '');
-  const getNeonClass = () => variant === 'neon' ? `sketch-card-neon-${neonColor}` : '';
+  const getNeonClass = () => (variant === 'neon' ? `sketch-card-neon-${neonColor}` : '');
 
   function getSpanAttr(s: typeof span): string | undefined {
     if (s === 'full') return 'full';

@@ -201,7 +201,16 @@ export interface PlanStats {
 }
 
 // Activity
-export type ActivityType = 'conversation' | 'coding' | 'idea' | 'search' | 'review' | 'plan' | 'commit' | 'pr' | 'issue';
+export type ActivityType =
+  | 'conversation'
+  | 'coding'
+  | 'idea'
+  | 'search'
+  | 'review'
+  | 'plan'
+  | 'commit'
+  | 'pr'
+  | 'issue';
 
 export interface Activity extends BaseRecord {
   user: string;
@@ -589,7 +598,13 @@ export const MODEL_PRICING: Record<string, [number, number]> = {
   default: [3, 15],
 };
 
-export type ModelTier = 'haiku-4.5' | 'sonnet-4.5' | 'sonnet-4.6' | 'opus-4.6' | 'opus-4.6-1m' | 'sonnet-4.6-1m';
+export type ModelTier =
+  | 'haiku-4.5'
+  | 'sonnet-4.5'
+  | 'sonnet-4.6'
+  | 'opus-4.6'
+  | 'opus-4.6-1m'
+  | 'sonnet-4.6-1m';
 
 export interface ModelInfo {
   tier: ModelTier;
@@ -606,40 +621,76 @@ export interface ModelInfo {
 
 export const MODEL_CATALOG: ModelInfo[] = [
   {
-    tier: 'haiku-4.5', label: 'Haiku 4.5', model_id: 'claude-haiku-4-5-20251001',
-    family: 'haiku', version: '4.5', color: 'green', emoji: '🍃',
+    tier: 'haiku-4.5',
+    label: 'Haiku 4.5',
+    model_id: 'claude-haiku-4-5-20251001',
+    family: 'haiku',
+    version: '4.5',
+    color: 'green',
+    emoji: '🍃',
     reason: 'Simple task — fastest and cheapest',
-    input_price: 0.8, output_price: 4,
+    input_price: 0.8,
+    output_price: 4,
   },
   {
-    tier: 'sonnet-4.5', label: 'Sonnet 4.5', model_id: 'claude-sonnet-4-5-20250929',
-    family: 'sonnet', version: '4.5', color: 'blue', emoji: '⚡',
+    tier: 'sonnet-4.5',
+    label: 'Sonnet 4.5',
+    model_id: 'claude-sonnet-4-5-20250929',
+    family: 'sonnet',
+    version: '4.5',
+    color: 'blue',
+    emoji: '⚡',
     reason: 'Standard code task — great balance',
-    input_price: 3, output_price: 15,
+    input_price: 3,
+    output_price: 15,
   },
   {
-    tier: 'sonnet-4.6', label: 'Sonnet 4.6', model_id: 'claude-sonnet-4-6',
-    family: 'sonnet', version: '4.6', color: 'blue', emoji: '⚡',
+    tier: 'sonnet-4.6',
+    label: 'Sonnet 4.6',
+    model_id: 'claude-sonnet-4-6',
+    family: 'sonnet',
+    version: '4.6',
+    color: 'blue',
+    emoji: '⚡',
     reason: 'Latest Sonnet — best cost/quality for code',
-    input_price: 3, output_price: 15,
+    input_price: 3,
+    output_price: 15,
   },
   {
-    tier: 'opus-4.6', label: 'Opus 4.6', model_id: 'claude-opus-4-6',
-    family: 'opus', version: '4.6', color: 'purple', emoji: '🏔️',
+    tier: 'opus-4.6',
+    label: 'Opus 4.6',
+    model_id: 'claude-opus-4-6',
+    family: 'opus',
+    version: '4.6',
+    color: 'purple',
+    emoji: '🏔️',
     reason: 'Maximum reasoning — architecture & complex tasks',
-    input_price: 15, output_price: 75,
+    input_price: 15,
+    output_price: 75,
   },
   {
-    tier: 'opus-4.6-1m', label: 'Opus 4.6 (1M)', model_id: 'claude-opus-4-6-1m',
-    family: 'opus', version: '4.6', color: 'orange', emoji: '🏔️',
+    tier: 'opus-4.6-1m',
+    label: 'Opus 4.6 (1M)',
+    model_id: 'claude-opus-4-6-1m',
+    family: 'opus',
+    version: '4.6',
+    color: 'orange',
+    emoji: '🏔️',
     reason: '1M context — massive codebase analysis',
-    input_price: 10, output_price: 37.5,
+    input_price: 10,
+    output_price: 37.5,
   },
   {
-    tier: 'sonnet-4.6-1m', label: 'Sonnet 4.6 (1M)', model_id: 'claude-sonnet-4-6-1m',
-    family: 'sonnet', version: '4.6', color: 'orange', emoji: '⚡',
+    tier: 'sonnet-4.6-1m',
+    label: 'Sonnet 4.6 (1M)',
+    model_id: 'claude-sonnet-4-6-1m',
+    family: 'sonnet',
+    version: '4.6',
+    color: 'orange',
+    emoji: '⚡',
     reason: '1M context — large file processing',
-    input_price: 6, output_price: 22.5,
+    input_price: 6,
+    output_price: 22.5,
   },
 ];
 

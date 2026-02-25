@@ -20,8 +20,13 @@
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import { Flame, ChevronDown, ChevronUp } from 'lucide-svelte';
   import type {
-    Project, Activity, HeatmapDay, TimeSeriesPoint,
-    WeeklyInsights, WeekComparison, TrendingTopic,
+    Project,
+    Activity,
+    HeatmapDay,
+    TimeSeriesPoint,
+    WeeklyInsights,
+    WeekComparison,
+    TrendingTopic,
   } from '$lib/types';
 
   let projects = $state<Project[]>([]);
@@ -37,7 +42,9 @@
 
   const totalConversations = $derived(projects.reduce((sum, p) => sum + p.total_conversations, 0));
   const totalIdeas = $derived(projects.reduce((sum, p) => sum + p.total_ideas, 0));
-  const totalHours = $derived(Math.round(projects.reduce((sum, p) => sum + p.total_minutes, 0) / 60));
+  const totalHours = $derived(
+    Math.round(projects.reduce((sum, p) => sum + p.total_minutes, 0) / 60),
+  );
 
   const conversationSpark = $derived(trendData.map((d) => d.value));
   const streakDays = $derived(computeStreak(heatmapData));
@@ -64,15 +71,21 @@
 
   onMount(async () => {
     try {
-      const [projectsResult, activitiesResult, heatmap, insightsResult, compareResult, trendingResult] =
-        await Promise.allSettled([
-          fetchProjects(1, 'active'),
-          fetchActivities(1),
-          fetchHeatmapData(),
-          fetchWeeklyInsights(),
-          fetchWeekComparison('week'),
-          fetchTrendingTopics(5),
-        ]);
+      const [
+        projectsResult,
+        activitiesResult,
+        heatmap,
+        insightsResult,
+        compareResult,
+        trendingResult,
+      ] = await Promise.allSettled([
+        fetchProjects(1, 'active'),
+        fetchActivities(1),
+        fetchHeatmapData(),
+        fetchWeeklyInsights(),
+        fetchWeekComparison('week'),
+        fetchTrendingTopics(5),
+      ]);
 
       if (projectsResult.status === 'fulfilled') {
         projects = projectsResult.value.items;
@@ -110,7 +123,9 @@
     }
   });
 
-  onDestroy(() => { unsubscribe?.(); });
+  onDestroy(() => {
+    unsubscribe?.();
+  });
 </script>
 
 <svelte:head>
@@ -124,7 +139,9 @@
       <p class="greeting">
         {getGreeting()}!
         {#if streakDays > 0}
-          <span class="streak-inline"><Flame size={14} /> <strong>{streakDays}</strong> day streak</span>
+          <span class="streak-inline"
+            ><Flame size={14} /> <strong>{streakDays}</strong> day streak</span
+          >
         {/if}
       </p>
     </div>
@@ -150,11 +167,7 @@
       <!-- Hero: Weekly Pulse (full width, accent border) -->
       <ComicBentoCard title="Weekly Pulse" icon="💡" span="full" neonColor="green" variant="neon">
         <div class="hero-pulse">
-          <WeeklyPulse
-            {comparison}
-            topTopics={weeklyInsights?.top_topics}
-            streak={streakDays}
-          />
+          <WeeklyPulse {comparison} topTopics={weeklyInsights?.top_topics} streak={streakDays} />
         </div>
       </ComicBentoCard>
 
@@ -163,22 +176,42 @@
         <div class="stat-chip">
           <span class="stat-value animate-countUp">{projects.length}</span>
           <span class="stat-label">Projects</span>
-          <ComicSparkline data={[3, 5, 4, 7, projects.length]} color="var(--accent-green)" width={48} height={16} />
+          <ComicSparkline
+            data={[3, 5, 4, 7, projects.length]}
+            color="var(--accent-green)"
+            width={48}
+            height={16}
+          />
         </div>
         <div class="stat-chip">
           <span class="stat-value animate-countUp">{totalConversations}</span>
           <span class="stat-label">Conversations</span>
-          <ComicSparkline data={conversationSpark.slice(-7)} color="var(--accent-blue)" width={48} height={16} />
+          <ComicSparkline
+            data={conversationSpark.slice(-7)}
+            color="var(--accent-blue)"
+            width={48}
+            height={16}
+          />
         </div>
         <div class="stat-chip">
           <span class="stat-value animate-countUp">{totalIdeas}</span>
           <span class="stat-label">Ideas</span>
-          <ComicSparkline data={[2, 3, 1, 4, totalIdeas]} color="var(--accent-yellow)" width={48} height={16} />
+          <ComicSparkline
+            data={[2, 3, 1, 4, totalIdeas]}
+            color="var(--accent-yellow)"
+            width={48}
+            height={16}
+          />
         </div>
         <div class="stat-chip">
           <span class="stat-value animate-countUp">{totalHours}</span>
           <span class="stat-label">Hours</span>
-          <ComicSparkline data={[5, 8, 6, 10, totalHours]} color="var(--accent-purple)" width={48} height={16} />
+          <ComicSparkline
+            data={[5, 8, 6, 10, totalHours]}
+            color="var(--accent-purple)"
+            width={48}
+            height={16}
+          />
         </div>
       </div>
 
@@ -206,7 +239,12 @@
       <ComicBentoCard title="Recent Activity" icon="⚡">
         <ActivityTimeline activities={visibleActivities} />
         {#if activities.length > 5}
-          <button class="toggle-btn" onclick={() => { showAllActivity = !showAllActivity; }}>
+          <button
+            class="toggle-btn"
+            onclick={() => {
+              showAllActivity = !showAllActivity;
+            }}
+          >
             {#if showAllActivity}
               <ChevronUp size={14} /> Show less
             {:else}
@@ -218,9 +256,16 @@
 
       <!-- Collapsible: Heatmap -->
       <div data-span="full" class="collapsible-section">
-        <button class="collapse-header" onclick={() => { showHeatmap = !showHeatmap; }}>
+        <button
+          class="collapse-header"
+          onclick={() => {
+            showHeatmap = !showHeatmap;
+          }}
+        >
           <span class="collapse-title">Activity Heatmap</span>
-          <span class="collapse-meta">{heatmapData.reduce((s, d) => s + d.count, 0)} activities in the last year</span>
+          <span class="collapse-meta"
+            >{heatmapData.reduce((s, d) => s + d.count, 0)} activities in the last year</span
+          >
           {#if showHeatmap}
             <ChevronUp size={16} />
           {:else}
@@ -320,10 +365,18 @@
     box-shadow: var(--shadow-sm);
   }
 
-  .stat-chip:nth-child(1) { border-left: 4px solid var(--accent-green); }
-  .stat-chip:nth-child(2) { border-left: 4px solid var(--accent-blue); }
-  .stat-chip:nth-child(3) { border-left: 4px solid var(--accent-yellow); }
-  .stat-chip:nth-child(4) { border-left: 4px solid var(--accent-purple); }
+  .stat-chip:nth-child(1) {
+    border-left: 4px solid var(--accent-green);
+  }
+  .stat-chip:nth-child(2) {
+    border-left: 4px solid var(--accent-blue);
+  }
+  .stat-chip:nth-child(3) {
+    border-left: 4px solid var(--accent-yellow);
+  }
+  .stat-chip:nth-child(4) {
+    border-left: 4px solid var(--accent-purple);
+  }
 
   .stat-chip .stat-value {
     font-family: var(--font-display);
@@ -439,7 +492,9 @@
     border-radius: var(--radius-sketch);
     padding: var(--spacing-xl);
     text-decoration: none;
-    transition: color var(--transition-fast), border-color var(--transition-fast);
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast);
   }
 
   .see-all-card:hover {
@@ -469,14 +524,30 @@
     animation: bentoFadeIn 280ms ease backwards;
   }
 
-  .dashboard :global(.bento-card:nth-child(1)) { animation-delay: 0ms; }
-  .dashboard :global(.bento-card:nth-child(2)) { animation-delay: 60ms; }
-  .dashboard :global(.bento-card:nth-child(3)) { animation-delay: 120ms; }
-  .dashboard :global(.bento-card:nth-child(4)) { animation-delay: 180ms; }
-  .dashboard :global(.bento-card:nth-child(5)) { animation-delay: 220ms; }
-  .dashboard :global(.bento-card:nth-child(6)) { animation-delay: 260ms; }
-  .dashboard :global(.bento-card:nth-child(7)) { animation-delay: 300ms; }
-  .dashboard :global(.bento-card:nth-child(8)) { animation-delay: 340ms; }
+  .dashboard :global(.bento-card:nth-child(1)) {
+    animation-delay: 0ms;
+  }
+  .dashboard :global(.bento-card:nth-child(2)) {
+    animation-delay: 60ms;
+  }
+  .dashboard :global(.bento-card:nth-child(3)) {
+    animation-delay: 120ms;
+  }
+  .dashboard :global(.bento-card:nth-child(4)) {
+    animation-delay: 180ms;
+  }
+  .dashboard :global(.bento-card:nth-child(5)) {
+    animation-delay: 220ms;
+  }
+  .dashboard :global(.bento-card:nth-child(6)) {
+    animation-delay: 260ms;
+  }
+  .dashboard :global(.bento-card:nth-child(7)) {
+    animation-delay: 300ms;
+  }
+  .dashboard :global(.bento-card:nth-child(8)) {
+    animation-delay: 340ms;
+  }
 
   @media (max-width: 768px) {
     .page-header {

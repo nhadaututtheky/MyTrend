@@ -92,20 +92,22 @@ export async function askQuestion(question: string): Promise<AskResult> {
   }
 
   // Fallback: build from NM only
-  const nmSources = nmResult.status === 'fulfilled'
-    ? nmResult.value.map((nm) => ({
-        type: (nm.metadata['type'] as string) ?? 'conversation',
-        id: nm.id,
-        title: (nm.metadata['title'] as string) ?? '',
-        snippet: nm.content.slice(0, 200),
-        relevance: nm.score,
-      }))
-    : [];
+  const nmSources =
+    nmResult.status === 'fulfilled'
+      ? nmResult.value.map((nm) => ({
+          type: (nm.metadata['type'] as string) ?? 'conversation',
+          id: nm.id,
+          title: (nm.metadata['title'] as string) ?? '',
+          snippet: nm.content.slice(0, 200),
+          relevance: nm.score,
+        }))
+      : [];
 
   return {
-    answer: nmSources.length > 0
-      ? 'Found relevant memories from Neural Memory.'
-      : 'Could not find an answer. Try rephrasing your question.',
+    answer:
+      nmSources.length > 0
+        ? 'Found relevant memories from Neural Memory.'
+        : 'Could not find an answer. Try rephrasing your question.',
     sources: nmSources,
     query: question,
   };
@@ -118,10 +120,9 @@ async function backendSearch(query: string): Promise<SearchResult[]> {
   const token = pb.authStore.token;
   const headers: Record<string, string> = token ? { Authorization: token } : {};
 
-  const res = await fetch(
-    `${getPbUrl()}/api/mytrend/search?q=${encodeURIComponent(query)}`,
-    { headers },
-  );
+  const res = await fetch(`${getPbUrl()}/api/mytrend/search?q=${encodeURIComponent(query)}`, {
+    headers,
+  });
 
   if (!res.ok) return [];
 

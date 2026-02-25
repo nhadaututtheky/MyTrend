@@ -62,8 +62,8 @@
   <ComicCard>
     <h3 class="section-title">API Configuration</h3>
     <p class="hint">
-      Set your Anthropic API key in the .env file (ANTHROPIC_API_KEY).
-      The key is used server-side only and never exposed to the browser.
+      Set your Anthropic API key in the .env file (ANTHROPIC_API_KEY). The key is used server-side
+      only and never exposed to the browser.
     </p>
   </ComicCard>
 
@@ -166,7 +166,8 @@
     align-items: flex-end;
   }
 
-  .loading, .empty {
+  .loading,
+  .empty {
     font-size: 0.875rem;
     color: var(--text-muted);
   }

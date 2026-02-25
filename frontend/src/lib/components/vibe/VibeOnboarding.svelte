@@ -47,16 +47,38 @@
       <div class="step step-welcome">
         <div class="hero-icon" aria-hidden="true">
           <svg width="80" height="80" viewBox="0 0 100 100">
-            <path d="M 50 15 Q 20 15 15 45 Q 10 75 50 85 Q 90 75 85 45 Q 80 15 50 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-            <path d="M 35 45 L 35 40" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-            <path d="M 65 45 L 65 40" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-            <path d="M 38 58 Q 50 68 62 58" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+            <path
+              d="M 50 15 Q 20 15 15 45 Q 10 75 50 85 Q 90 75 85 45 Q 80 15 50 15"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <path
+              d="M 35 45 L 35 40"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <path
+              d="M 65 45 L 65 40"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+            <path
+              d="M 38 58 Q 50 68 62 58"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
           </svg>
         </div>
         <h2 class="onboarding-title">Welcome to Vibe Terminal</h2>
         <p class="onboarding-desc">
-          Your browser-based Claude Code interface.
-          Connect to any project and start coding with AI assistance.
+          Your browser-based Claude Code interface. Connect to any project and start coding with AI
+          assistance.
         </p>
         <div class="step-actions">
           <ComicButton variant="primary" size="lg" onclick={() => (step = 'project')}>
@@ -65,7 +87,6 @@
           <button class="skip-link" onclick={ondismiss}>Skip setup</button>
         </div>
       </div>
-
     {:else if step === 'project'}
       <div class="step step-project">
         <h2 class="onboarding-title">Pick a Project</h2>
@@ -87,12 +108,9 @@
         </div>
 
         <div class="step-actions">
-          <ComicButton variant="outline" size="sm" onclick={handleBack}>
-            Back
-          </ComicButton>
+          <ComicButton variant="outline" size="sm" onclick={handleBack}>Back</ComicButton>
         </div>
       </div>
-
     {:else if step === 'confirm'}
       <div class="step step-confirm">
         <h2 class="onboarding-title">Ready to Launch</h2>
@@ -117,9 +135,7 @@
         </ComicCard>
 
         <div class="step-actions">
-          <ComicButton variant="outline" size="sm" onclick={handleBack}>
-            Back
-          </ComicButton>
+          <ComicButton variant="outline" size="sm" onclick={handleBack}>Back</ComicButton>
           <ComicButton variant="primary" size="lg" onclick={handleLaunch}>
             Launch Session
           </ComicButton>
@@ -282,7 +298,9 @@
     border-radius: 50%;
     background: var(--border-color);
     opacity: 0.3;
-    transition: opacity var(--transition-fast), background var(--transition-fast);
+    transition:
+      opacity var(--transition-fast),
+      background var(--transition-fast);
   }
 
   .dot.active {

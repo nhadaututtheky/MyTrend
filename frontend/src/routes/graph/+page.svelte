@@ -84,7 +84,13 @@
     />
   {:else}
     <BentoGrid columns={3} gap="md">
-      <ComicBentoCard title="Knowledge Graph" icon="🌐" span="full" neonColor="purple" variant="neon">
+      <ComicBentoCard
+        title="Knowledge Graph"
+        icon="🌐"
+        span="full"
+        neonColor="purple"
+        variant="neon"
+      >
         <div class="graph-container">
           <RoughGraph {nodes} {edges} width={900} height={600} />
         </div>
@@ -115,7 +121,9 @@
           <div class="stat-row">
             <span class="stat-label">Density</span>
             <ComicBadge color="purple" size="sm">
-              {nodes.length > 1 ? Math.round(edges.length / (nodes.length * (nodes.length - 1) / 2) * 100) : 0}%
+              {nodes.length > 1
+                ? Math.round((edges.length / ((nodes.length * (nodes.length - 1)) / 2)) * 100)
+                : 0}%
             </ComicBadge>
           </div>
         </div>

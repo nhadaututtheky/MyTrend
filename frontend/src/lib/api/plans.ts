@@ -13,7 +13,7 @@ const ITEMS_PER_PAGE = 50;
 function getPbUrl(): string {
   return typeof window !== 'undefined'
     ? pb.baseUrl
-    : (import.meta.env.VITE_PB_URL || 'http://pocketbase:8090');
+    : import.meta.env.VITE_PB_URL || 'http://pocketbase:8090';
 }
 
 export async function fetchPlans(
@@ -69,7 +69,8 @@ export async function createPlan(data: Partial<Plan>): Promise<Plan> {
 export async function updatePlan(id: string, data: Partial<Plan>): Promise<Plan> {
   const payload: Record<string, unknown> = { ...data };
   if (data.tags) payload.tags = JSON.stringify(data.tags);
-  if (data.source_conversations) payload.source_conversations = JSON.stringify(data.source_conversations);
+  if (data.source_conversations)
+    payload.source_conversations = JSON.stringify(data.source_conversations);
   if (data.source_ideas) payload.source_ideas = JSON.stringify(data.source_ideas);
   if (data.stage_history) payload.stage_history = JSON.stringify(data.stage_history);
   return pb.collection('plans').update<Plan>(id, payload);

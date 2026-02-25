@@ -122,11 +122,7 @@
       >
         Search
       </button>
-      <button
-        class="mode-btn"
-        class:active={mode === 'ask'}
-        onclick={() => switchMode('ask')}
-      >
+      <button class="mode-btn" class:active={mode === 'ask'} onclick={() => switchMode('ask')}>
         Ask
       </button>
     </div>
@@ -150,7 +146,12 @@
           placeholder="Ask a question about your knowledge base..."
           icon="💬"
         />
-        <ComicButton variant="primary" size="sm" onclick={handleAsk} disabled={isSearching || query.length < 3}>
+        <ComicButton
+          variant="primary"
+          size="sm"
+          onclick={handleAsk}
+          disabled={isSearching || query.length < 3}
+        >
           Ask
         </ComicButton>
       </div>
@@ -163,7 +164,6 @@
         <ComicSkeleton variant="card" height="90px" />
       {/each}
     </div>
-
   {:else if mode === 'ask' && askResult}
     <!-- Ask Mode: Answer + Sources -->
     <ComicCallout type="tip" title="Answer">
@@ -191,14 +191,12 @@
         {/each}
       </div>
     {/if}
-
   {:else if mode === 'search' && hasSearched && results.length === 0}
     <ComicEmptyState
       illustration="search"
       message="No results found"
       description="Try different keywords or check your spelling."
     />
-
   {:else if mode === 'search' && results.length > 0}
     <p class="result-count">{resultCount} result{resultCount !== 1 ? 's' : ''} found</p>
     <div class="results">
@@ -221,14 +219,12 @@
         </a>
       {/each}
     </div>
-
   {:else if mode === 'ask' && hasSearched && !askResult}
     <ComicEmptyState
       illustration="search"
       message="Could not find an answer"
       description="Try rephrasing your question or asking something different."
     />
-
   {:else}
     <div class="search-hints">
       <ComicCard>

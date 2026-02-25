@@ -32,7 +32,11 @@
   ]);
 
   const SOURCE_COLORS: Record<string, 'green' | 'blue' | 'purple' | 'orange' | 'yellow'> = {
-    cli: 'green', desktop: 'blue', web: 'purple', hub: 'orange', imported: 'yellow',
+    cli: 'green',
+    desktop: 'blue',
+    web: 'purple',
+    hub: 'orange',
+    imported: 'yellow',
   };
 
   const filtered = $derived(
@@ -56,15 +60,19 @@
     await loadConversations();
     try {
       unsubscribe = await pb.collection('conversations').subscribe('*', (e) => {
-        if (e.action === 'create') conversations = [e.record as unknown as Conversation, ...conversations].slice(0, 100);
-        else if (e.action === 'delete') conversations = conversations.filter((c) => c.id !== e.record.id);
+        if (e.action === 'create')
+          conversations = [e.record as unknown as Conversation, ...conversations].slice(0, 100);
+        else if (e.action === 'delete')
+          conversations = conversations.filter((c) => c.id !== e.record.id);
       });
     } catch (err: unknown) {
       console.error('[Conversations] Realtime subscribe failed:', err);
     }
   });
 
-  onDestroy(() => { unsubscribe?.(); });
+  onDestroy(() => {
+    unsubscribe?.();
+  });
 </script>
 
 <svelte:head><title>Conversations - MyTrend</title></svelte:head>
@@ -101,7 +109,9 @@
           <ComicCard variant="standard">
             <div class="conv-header">
               <h3 class="conv-title">{conv.title}</h3>
-              <ComicBadge color={SOURCE_COLORS[conv.source] ?? 'blue'} size="sm">{conv.source}</ComicBadge>
+              <ComicBadge color={SOURCE_COLORS[conv.source] ?? 'blue'} size="sm"
+                >{conv.source}</ComicBadge
+              >
             </div>
             {#if conv.summary}<p class="conv-summary">{conv.summary}</p>{/if}
             <div class="conv-meta">
@@ -111,7 +121,11 @@
               <span class="time">{formatRelative(conv.started_at)}</span>
             </div>
             {#if conv.tags.length > 0}
-              <div class="tags">{#each conv.tags.slice(0, 5) as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}</div>
+              <div class="tags">
+                {#each conv.tags.slice(0, 5) as tag (tag)}<ComicBadge color="purple" size="sm"
+                    >{tag}</ComicBadge
+                  >{/each}
+              </div>
             {/if}
           </ComicCard>
         </a>
@@ -120,32 +134,117 @@
 
     {#if totalPages > 1}
       <div class="pagination">
-        <ComicButton variant="outline" disabled={currentPage <= 1} onclick={() => { currentPage--; loadConversations(); }}>Prev</ComicButton>
+        <ComicButton
+          variant="outline"
+          disabled={currentPage <= 1}
+          onclick={() => {
+            currentPage--;
+            loadConversations();
+          }}>Prev</ComicButton
+        >
         <span class="page-info">Page {currentPage} / {totalPages}</span>
-        <ComicButton variant="outline" disabled={currentPage >= totalPages} onclick={() => { currentPage++; loadConversations(); }}>Next</ComicButton>
+        <ComicButton
+          variant="outline"
+          disabled={currentPage >= totalPages}
+          onclick={() => {
+            currentPage++;
+            loadConversations();
+          }}>Next</ComicButton
+        >
       </div>
     {/if}
   {/if}
 </div>
 
 <style>
-  .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
-  .page-header a { text-decoration: none; }
-  .subtitle { font-size: var(--font-size-md); color: var(--text-muted); margin: var(--spacing-xs) 0 0; }
-  .skeleton-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-  .list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-  .list-link { text-decoration: none; color: inherit; animation: sketchFadeIn 0.3s ease both; }
-  .conv-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-xs); }
-  .conv-title { font-size: var(--font-size-lg); font-weight: 700; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .conv-summary { font-size: var(--font-size-md); color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-  .conv-meta { display: flex; gap: var(--spacing-md); font-size: var(--font-size-xs); color: var(--text-muted); }
-  .time { margin-left: auto; }
-  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
-  .pagination { display: flex; align-items: center; justify-content: center; gap: var(--spacing-md); }
-  .page-info { font-size: var(--font-size-md); color: var(--text-secondary); }
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+  }
+  .page-header a {
+    text-decoration: none;
+  }
+  .subtitle {
+    font-size: var(--font-size-md);
+    color: var(--text-muted);
+    margin: var(--spacing-xs) 0 0;
+  }
+  .skeleton-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  .list-link {
+    text-decoration: none;
+    color: inherit;
+    animation: sketchFadeIn 0.3s ease both;
+  }
+  .conv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+  }
+  .conv-title {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .conv-summary {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    margin: 0 0 var(--spacing-xs);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .conv-meta {
+    display: flex;
+    gap: var(--spacing-md);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+  }
+  .time {
+    margin-left: auto;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: var(--spacing-xs);
+  }
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+  }
+  .page-info {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+  }
 
   @media (max-width: 768px) {
-    .page-header { flex-direction: column; }
+    .page-header {
+      flex-direction: column;
+    }
   }
 </style>

@@ -35,10 +35,7 @@
   onMount(() => {
     void (async () => {
       try {
-        const [roughModule, d3Scale] = await Promise.all([
-          import('roughjs'),
-          import('d3-scale'),
-        ]);
+        const [roughModule, d3Scale] = await Promise.all([import('roughjs'), import('d3-scale')]);
         const rough = roughModule.default;
         renderChart(rough, d3Scale);
       } catch (err) {
@@ -54,16 +51,49 @@
   });
 
   interface RoughSVG {
-    rectangle: (x: number, y: number, w: number, h: number, opts?: Record<string, unknown>) => SVGGElement;
-    line: (x1: number, y1: number, x2: number, y2: number, opts?: Record<string, unknown>) => SVGGElement;
-    arc: (x: number, y: number, w: number, h: number, start: number, stop: number, closed: boolean, opts?: Record<string, unknown>) => SVGGElement;
+    rectangle: (
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      opts?: Record<string, unknown>,
+    ) => SVGGElement;
+    line: (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      opts?: Record<string, unknown>,
+    ) => SVGGElement;
+    arc: (
+      x: number,
+      y: number,
+      w: number,
+      h: number,
+      start: number,
+      stop: number,
+      closed: boolean,
+      opts?: Record<string, unknown>,
+    ) => SVGGElement;
     circle: (x: number, y: number, d: number, opts?: Record<string, unknown>) => SVGGElement;
     linearPath: (points: [number, number][], opts?: Record<string, unknown>) => SVGGElement;
   }
 
   interface D3ScaleModule {
-    scaleLinear: () => { domain: (d: number[]) => { range: (r: number[]) => (v: number) => number } };
-    scaleBand: () => { domain: (d: string[]) => { range: (r: number[]) => { padding: (p: number) => { (v: string): number | undefined; bandwidth: () => number; domain: () => string[] } } } };
+    scaleLinear: () => {
+      domain: (d: number[]) => { range: (r: number[]) => (v: number) => number };
+    };
+    scaleBand: () => {
+      domain: (d: string[]) => {
+        range: (r: number[]) => {
+          padding: (p: number) => {
+            (v: string): number | undefined;
+            bandwidth: () => number;
+            domain: () => string[];
+          };
+        };
+      };
+    };
   }
 
   function getChartData(): { labels: string[]; values: number[] } {
@@ -74,7 +104,9 @@
   }
 
   function addSvgText(
-    text: string, x: number, y: number,
+    text: string,
+    x: number,
+    y: number,
     opts: { anchor?: string; size?: string; fill?: string; rotate?: number } = {},
   ): void {
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -91,7 +123,10 @@
     svgElement.appendChild(el);
   }
 
-  function renderChart(rough: { svg: (el: SVGSVGElement) => RoughSVG }, d3Scale: D3ScaleModule): void {
+  function renderChart(
+    rough: { svg: (el: SVGSVGElement) => RoughSVG },
+    d3Scale: D3ScaleModule,
+  ): void {
     if (!svgElement) return;
     while (svgElement.firstChild) svgElement.removeChild(svgElement.firstChild);
 
@@ -123,28 +158,47 @@
     const maxVal = Math.max(...chartData.values, 1);
 
     const xScale = d3Scale.scaleBand().domain(chartData.labels).range([0, plotW]).padding(0.3);
-    const yScale = d3Scale.scaleLinear().domain([0, maxVal * 1.1]).range([plotH, 0]);
+    const yScale = d3Scale
+      .scaleLinear()
+      .domain([0, maxVal * 1.1])
+      .range([plotH, 0]);
 
     // Y-axis line
-    svgElement.appendChild(rc.line(MARGIN.left, MARGIN.top, MARGIN.left, MARGIN.top + plotH, {
-      roughness: 0.8, stroke: '#888', strokeWidth: 1.5,
-    }));
+    svgElement.appendChild(
+      rc.line(MARGIN.left, MARGIN.top, MARGIN.left, MARGIN.top + plotH, {
+        roughness: 0.8,
+        stroke: '#888',
+        strokeWidth: 1.5,
+      }),
+    );
 
     // X-axis line
-    svgElement.appendChild(rc.line(MARGIN.left, MARGIN.top + plotH, MARGIN.left + plotW, MARGIN.top + plotH, {
-      roughness: 0.8, stroke: '#888', strokeWidth: 1.5,
-    }));
+    svgElement.appendChild(
+      rc.line(MARGIN.left, MARGIN.top + plotH, MARGIN.left + plotW, MARGIN.top + plotH, {
+        roughness: 0.8,
+        stroke: '#888',
+        strokeWidth: 1.5,
+      }),
+    );
 
     // Y-axis ticks (5 ticks)
     const tickCount = 5;
     for (let i = 0; i <= tickCount; i++) {
       const val = Math.round((maxVal * 1.1 * i) / tickCount);
       const yPos = MARGIN.top + yScale(val);
-      addSvgText(String(val), MARGIN.left - 8, yPos + 4, { anchor: 'end', size: '10', fill: '#888' });
+      addSvgText(String(val), MARGIN.left - 8, yPos + 4, {
+        anchor: 'end',
+        size: '10',
+        fill: '#888',
+      });
       // Grid line
-      svgElement.appendChild(rc.line(MARGIN.left, yPos, MARGIN.left + plotW, yPos, {
-        roughness: 0.3, stroke: '#ddd', strokeWidth: 0.5,
-      }));
+      svgElement.appendChild(
+        rc.line(MARGIN.left, yPos, MARGIN.left + plotW, yPos, {
+          roughness: 0.3,
+          stroke: '#ddd',
+          strokeWidth: 0.5,
+        }),
+      );
     }
 
     // Bars
@@ -160,18 +214,22 @@
       const barX = MARGIN.left + bx;
 
       const barColor = colors[i % colors.length] ?? color;
-      svgElement.appendChild(rc.rectangle(barX, barY, bw, barH, {
-        fill: barColor,
-        fillStyle: 'solid',
-        roughness,
-        stroke: barColor,
-        strokeWidth: 1.5,
-      }));
+      svgElement.appendChild(
+        rc.rectangle(barX, barY, bw, barH, {
+          fill: barColor,
+          fillStyle: 'solid',
+          roughness,
+          stroke: barColor,
+          strokeWidth: 1.5,
+        }),
+      );
 
       // X label
       const displayLabel = label.length > 8 ? label.slice(0, 7) + '..' : label;
       addSvgText(displayLabel, barX + bw / 2, MARGIN.top + plotH + 16, {
-        size: '10', fill: '#888', rotate: chartData.labels.length > 6 ? -35 : 0,
+        size: '10',
+        fill: '#888',
+        rotate: chartData.labels.length > 6 ? -35 : 0,
       });
 
       // Value on top
@@ -189,15 +247,26 @@
     const plotH = height - MARGIN.top - MARGIN.bottom;
     const maxVal = Math.max(...chartData.values, 1);
 
-    const yScale = d3Scale.scaleLinear().domain([0, maxVal * 1.1]).range([plotH, 0]);
+    const yScale = d3Scale
+      .scaleLinear()
+      .domain([0, maxVal * 1.1])
+      .range([plotH, 0]);
 
     // Axes
-    svgElement.appendChild(rc.line(MARGIN.left, MARGIN.top, MARGIN.left, MARGIN.top + plotH, {
-      roughness: 0.8, stroke: '#888', strokeWidth: 1.5,
-    }));
-    svgElement.appendChild(rc.line(MARGIN.left, MARGIN.top + plotH, MARGIN.left + plotW, MARGIN.top + plotH, {
-      roughness: 0.8, stroke: '#888', strokeWidth: 1.5,
-    }));
+    svgElement.appendChild(
+      rc.line(MARGIN.left, MARGIN.top, MARGIN.left, MARGIN.top + plotH, {
+        roughness: 0.8,
+        stroke: '#888',
+        strokeWidth: 1.5,
+      }),
+    );
+    svgElement.appendChild(
+      rc.line(MARGIN.left, MARGIN.top + plotH, MARGIN.left + plotW, MARGIN.top + plotH, {
+        roughness: 0.8,
+        stroke: '#888',
+        strokeWidth: 1.5,
+      }),
+    );
 
     // Points
     const points: [number, number][] = chartData.values.map((v, i) => {
@@ -208,16 +277,25 @@
 
     // Line path
     if (points.length > 1) {
-      svgElement.appendChild(rc.linearPath(points, {
-        roughness, stroke: color, strokeWidth: 2.5,
-      }));
+      svgElement.appendChild(
+        rc.linearPath(points, {
+          roughness,
+          stroke: color,
+          strokeWidth: 2.5,
+        }),
+      );
     }
 
     // Dots
     for (const [px, py] of points) {
-      svgElement.appendChild(rc.circle(px, py, 8, {
-        fill: color, fillStyle: 'solid', roughness: 1, stroke: color,
-      }));
+      svgElement.appendChild(
+        rc.circle(px, py, 8, {
+          fill: color,
+          fillStyle: 'solid',
+          roughness: 1,
+          stroke: color,
+        }),
+      );
     }
 
     // X labels
@@ -253,13 +331,15 @@
       const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       pathEl.setAttribute('d', arcPath);
       // Use roughjs to generate a filled rough shape
-      svgElement.appendChild(rc.arc(cx, cy, outerR * 2, outerR * 2, startAngle, endAngle, true, {
-        fill: sliceColor,
-        fillStyle: 'solid',
-        roughness: roughness * 0.8,
-        stroke: sliceColor,
-        strokeWidth: 1,
-      }));
+      svgElement.appendChild(
+        rc.arc(cx, cy, outerR * 2, outerR * 2, startAngle, endAngle, true, {
+          fill: sliceColor,
+          fillStyle: 'solid',
+          roughness: roughness * 0.8,
+          stroke: sliceColor,
+          strokeWidth: 1,
+        }),
+      );
 
       // Label
       const midAngle = startAngle + sliceAngle / 2;
@@ -270,7 +350,9 @@
       const sliceLabel = chartData.labels[i] ?? '';
       const lbl = sliceLabel.length > 10 ? sliceLabel.slice(0, 9) + '..' : sliceLabel;
       addSvgText(`${lbl} ${pct}%`, lx, ly, {
-        size: '10', fill: '#aaa', anchor: midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'end' : 'start',
+        size: '10',
+        fill: '#aaa',
+        anchor: midAngle > Math.PI / 2 && midAngle < Math.PI * 1.5 ? 'end' : 'start',
       });
 
       angle = endAngle;
@@ -278,20 +360,26 @@
 
     // Inner circle for donut
     if (type === 'donut' && innerR > 0) {
-      svgElement.appendChild(rc.circle(cx, cy, innerR * 2, {
-        fill: 'var(--bg-primary, #0d0d1a)',
-        fillStyle: 'solid',
-        roughness: 1,
-        stroke: 'none',
-      }));
+      svgElement.appendChild(
+        rc.circle(cx, cy, innerR * 2, {
+          fill: 'var(--bg-primary, #0d0d1a)',
+          fillStyle: 'solid',
+          roughness: 1,
+          stroke: 'none',
+        }),
+      );
       // Total in center
       addSvgText(String(total), cx, cy + 4, { size: '18', fill: '#fff' });
     }
   }
 
   function describeArc(
-    cx: number, cy: number, r: number,
-    startAngle: number, endAngle: number, innerR: number,
+    cx: number,
+    cy: number,
+    r: number,
+    startAngle: number,
+    endAngle: number,
+    innerR: number,
   ): string {
     const x1 = cx + r * Math.cos(startAngle);
     const y1 = cy + r * Math.sin(startAngle);
@@ -318,7 +406,7 @@
   class="chart-container"
   data-testid="rough-chart"
 >
-  {#if (data.length === 0 && timeseries.length === 0)}
+  {#if data.length === 0 && timeseries.length === 0}
     <text x={width / 2} y={height / 2} text-anchor="middle" fill="var(--text-muted)">
       No chart data
     </text>

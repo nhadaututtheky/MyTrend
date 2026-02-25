@@ -7,10 +7,33 @@
   import { toast } from '$lib/stores/toast';
   import { getHubSettings, saveHubApiKey } from '$lib/api/hub';
   import type { HubSettings } from '$lib/api/hub';
-  import { getTelegramStatus, testTelegramConnection, resolveChannel, setupWebhook, removeWebhook, getTelegramSettings, saveTelegramSettings } from '$lib/api/telegram';
-  import type { TelegramSettings } from '$lib/api/telegram';
-  import { getTelegramBridgeStatus, getTelegramBridgeConfig, saveTelegramBridgeConfig, startTelegramBridge, stopTelegramBridge, checkCompanionHealth, listProjects, createCompanionProject, updateCompanionProject, deleteCompanionProject } from '$lib/api/companion';
-  import type { TelegramBridgeStatus, TelegramBridgeConfigResponse, CompanionProjectProfile } from '$lib/api/companion';
+  import {
+    getTelegramStatus,
+    testTelegramConnection,
+    resolveChannel,
+    setupWebhook,
+    removeWebhook,
+    getTelegramSettings,
+    saveTelegramSettings,
+  } from '$lib/api/telegram';
+  // TelegramSettings type used implicitly by saveTelegramSettings/getTelegramSettings
+  import {
+    getTelegramBridgeStatus,
+    getTelegramBridgeConfig,
+    saveTelegramBridgeConfig,
+    startTelegramBridge,
+    stopTelegramBridge,
+    checkCompanionHealth,
+    listProjects,
+    createCompanionProject,
+    updateCompanionProject,
+    deleteCompanionProject,
+  } from '$lib/api/companion';
+  import type {
+    TelegramBridgeStatus,
+    TelegramBridgeConfigResponse,
+    CompanionProjectProfile,
+  } from '$lib/api/companion';
   import ComicButton from '$lib/components/comic/ComicButton.svelte';
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
@@ -43,7 +66,7 @@
   // Telegram credentials (DB-stored)
   let tgBotToken = $state('');
   let tgChannelId = $state('');
-  let tgSettingsLoading = $state(false);
+  // tgSettingsLoading removed — was set but never read in template
   let tgSettingsSaving = $state(false);
   let tgEnvTokenSet = $state(false);
   let tgEnvChannelSet = $state(false);
@@ -178,7 +201,6 @@
   }
 
   async function loadTelegramSettings(): Promise<void> {
-    tgSettingsLoading = true;
     try {
       const s = await getTelegramSettings();
       tgBotToken = s.telegram_bot_token;
@@ -188,7 +210,7 @@
     } catch {
       // ignore — settings may not exist yet
     } finally {
-      tgSettingsLoading = false;
+      // loading complete
     }
   }
 
@@ -320,7 +342,9 @@
         config.botToken = cbBotToken;
       }
 
-      const result = await saveTelegramBridgeConfig(config as { botToken?: string; allowedChatIds?: number[] });
+      const result = await saveTelegramBridgeConfig(
+        config as { botToken?: string; allowedChatIds?: number[] },
+      );
       if (result.ok) {
         toast.success('Claude Bridge config saved!');
         await loadClaudeBridge();
@@ -516,16 +540,10 @@
   <ComicCard>
     <h2 class="section-title">Device</h2>
     <div class="form-fields">
-      <ComicInput
-        bind:value={deviceName}
-        label="Device Name"
-        placeholder="My Laptop"
-      />
+      <ComicInput bind:value={deviceName} label="Device Name" placeholder="My Laptop" />
     </div>
     <div class="actions">
-      <ComicButton variant="secondary" onclick={saveDeviceName}>
-        Save Device Name
-      </ComicButton>
+      <ComicButton variant="secondary" onclick={saveDeviceName}>Save Device Name</ComicButton>
     </div>
   </ComicCard>
 
@@ -571,7 +589,11 @@
         </ComicButton>
       </div>
       <p class="tg-hint">
-        Get your key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a>
+        Get your key at <a
+          href="https://platform.claude.com/settings/keys"
+          target="_blank"
+          rel="noopener">platform.claude.com/settings/keys</a
+        >
       </p>
     {/if}
   </ComicCard>
@@ -589,7 +611,9 @@
     </div>
 
     {#if !companionOnline && !projectsLoading}
-      <p class="tg-hint">Companion service is offline. Start it with <code>cd companion && bun run dev</code></p>
+      <p class="tg-hint">
+        Companion service is offline. Start it with <code>cd companion && bun run dev</code>
+      </p>
     {:else}
       {#if projectProfiles.length > 0}
         <div class="project-list">
@@ -598,7 +622,11 @@
               <div class="project-item project-editing">
                 <div class="form-fields">
                   <ComicInput bind:value={editName} label="Name" />
-                  <FolderPicker bind:value={editDir} label="Local Directory" placeholder="Select project folder..." />
+                  <FolderPicker
+                    bind:value={editDir}
+                    label="Local Directory"
+                    placeholder="Select project folder..."
+                  />
                   <div class="project-row">
                     <div class="project-field">
                       <label class="label" for="edit-model">Model</label>
@@ -622,7 +650,9 @@
                   </div>
                 </div>
                 <div class="actions">
-                  <ComicButton variant="primary" loading={projectSaving} onclick={saveEdit}>Save</ComicButton>
+                  <ComicButton variant="primary" loading={projectSaving} onclick={saveEdit}
+                    >Save</ComicButton
+                  >
                   <ComicButton variant="outline" onclick={cancelEdit}>Cancel</ComicButton>
                 </div>
               </div>
@@ -639,7 +669,10 @@
                 <div class="project-actions">
                   <ComicButton variant="outline" onclick={() => startEdit(p)}>Edit</ComicButton>
                   {#if p.slug !== 'hub'}
-                    <ComicButton variant="danger" onclick={() => handleDeleteProject(p.slug, p.name)}>✕</ComicButton>
+                    <ComicButton
+                      variant="danger"
+                      onclick={() => handleDeleteProject(p.slug, p.name)}>✕</ComicButton
+                    >
                   {:else}
                     <ComicBadge color="purple" size="sm">Built-in</ComicBadge>
                   {/if}
@@ -656,8 +689,16 @@
         <div class="project-add-form">
           <h3 class="subsection-title">Add Project</h3>
           <div class="form-fields">
-            <ComicInput bind:value={newProjectName} label="Project Name" placeholder="My Awesome Project" />
-            <FolderPicker bind:value={newProjectDir} label="Local Directory" placeholder="Select project folder..." />
+            <ComicInput
+              bind:value={newProjectName}
+              label="Project Name"
+              placeholder="My Awesome Project"
+            />
+            <FolderPicker
+              bind:value={newProjectDir}
+              label="Local Directory"
+              placeholder="Select project folder..."
+            />
             <div class="project-row">
               <div class="project-field">
                 <label class="label" for="new-model">Model</label>
@@ -679,14 +720,28 @@
             </div>
           </div>
           <div class="actions">
-            <ComicButton variant="primary" loading={projectSaving} onclick={handleAddProject}>Add Project</ComicButton>
-            <ComicButton variant="outline" onclick={() => { showAddProject = false; }}>Cancel</ComicButton>
+            <ComicButton variant="primary" loading={projectSaving} onclick={handleAddProject}
+              >Add Project</ComicButton
+            >
+            <ComicButton
+              variant="outline"
+              onclick={() => {
+                showAddProject = false;
+              }}>Cancel</ComicButton
+            >
           </div>
         </div>
       {:else}
         <div class="actions" style="margin-top: var(--spacing-md)">
-          <ComicButton variant="secondary" onclick={() => { showAddProject = true; }}>+ Add Project</ComicButton>
-          <ComicButton variant="outline" loading={projectsLoading} onclick={loadProjectProfiles}>Refresh</ComicButton>
+          <ComicButton
+            variant="secondary"
+            onclick={() => {
+              showAddProject = true;
+            }}>+ Add Project</ComicButton
+          >
+          <ComicButton variant="outline" loading={projectsLoading} onclick={loadProjectProfiles}
+            >Refresh</ComicButton
+          >
         </div>
       {/if}
     {/if}
@@ -719,15 +774,15 @@
       {#if tgEnvChannelSet}
         <p class="tg-hint tg-env-note">Channel ID: set via environment variable</p>
       {:else}
-        <ComicInput
-          bind:value={tgChannelId}
-          label="Channel ID"
-          placeholder="-100123456789"
-        />
+        <ComicInput bind:value={tgChannelId} label="Channel ID" placeholder="-100123456789" />
       {/if}
       {#if !tgEnvTokenSet || !tgEnvChannelSet}
         <div class="actions">
-          <ComicButton variant="primary" loading={tgSettingsSaving} onclick={handleSaveTelegramSettings}>
+          <ComicButton
+            variant="primary"
+            loading={tgSettingsSaving}
+            onclick={handleSaveTelegramSettings}
+          >
             Save Credentials
           </ComicButton>
         </div>
@@ -769,8 +824,14 @@
 
       {#if !tgStatus.channel_id_set}
         <div class="tg-resolve">
-          <p class="tg-hint">Add the bot to your channel as admin, send a message, then click Detect:</p>
-          <ComicButton variant="secondary" loading={tgResolvingChannel} onclick={handleResolveChannel}>
+          <p class="tg-hint">
+            Add the bot to your channel as admin, send a message, then click Detect:
+          </p>
+          <ComicButton
+            variant="secondary"
+            loading={tgResolvingChannel}
+            onclick={handleResolveChannel}
+          >
             Detect Channel ID
           </ComicButton>
           {#if tgChannels.length > 0}
@@ -782,30 +843,38 @@
                   <span class="tg-channel-type">{ch.type}</span>
                 </div>
               {/each}
-              <p class="tg-hint">Set TELEGRAM_STORAGE_CHANNEL_ID in docker-compose.yml to one of these IDs.</p>
+              <p class="tg-hint">
+                Set TELEGRAM_STORAGE_CHANNEL_ID in docker-compose.yml to one of these IDs.
+              </p>
             </div>
           {/if}
         </div>
       {/if}
     {:else if !tgLoading}
-      <p class="tg-hint">Set TELEGRAM_BOT_TOKEN and TELEGRAM_STORAGE_CHANNEL_ID in docker-compose.yml to enable.</p>
+      <p class="tg-hint">
+        Set TELEGRAM_BOT_TOKEN and TELEGRAM_STORAGE_CHANNEL_ID in docker-compose.yml to enable.
+      </p>
     {/if}
 
     <!-- Webhook setup (Knowledge Inbox) -->
     {#if tgStatus?.configured}
       <div class="tg-webhook">
         <h3 class="subsection-title">Knowledge Inbox (Webhook)</h3>
-        <p class="tg-hint">Forward messages to the bot to auto-create ideas. Requires a public HTTPS URL.</p>
+        <p class="tg-hint">
+          Forward messages to the bot to auto-create ideas. Requires a public HTTPS URL.
+        </p>
         <div class="form-fields">
-          <ComicInput bind:value={webhookUrl} label="Public URL" placeholder="https://mytrend.example.com" />
+          <ComicInput
+            bind:value={webhookUrl}
+            label="Public URL"
+            placeholder="https://mytrend.example.com"
+          />
         </div>
         <div class="actions">
           <ComicButton variant="secondary" loading={webhookSaving} onclick={handleSetupWebhook}>
             Setup Webhook
           </ComicButton>
-          <ComicButton variant="outline" onclick={handleRemoveWebhook}>
-            Remove Webhook
-          </ComicButton>
+          <ComicButton variant="outline" onclick={handleRemoveWebhook}>Remove Webhook</ComicButton>
         </div>
       </div>
     {/if}
@@ -828,10 +897,14 @@
     </div>
 
     {#if !companionOnline && !cbLoading}
-      <p class="tg-hint">Companion service is offline. Start it with <code>cd companion && bun run dev</code></p>
+      <p class="tg-hint">
+        Companion service is offline. Start it with <code>cd companion && bun run dev</code>
+      </p>
     {:else if companionOnline}
       {#if cbConfig?.envConfigured}
-        <p class="tg-hint tg-env-note">Config managed by environment variables (TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_CHAT_IDS)</p>
+        <p class="tg-hint tg-env-note">
+          Config managed by environment variables (TELEGRAM_BOT_TOKEN + TELEGRAM_ALLOWED_CHAT_IDS)
+        </p>
       {:else}
         <div class="tg-credentials">
           <ComicInput
@@ -847,7 +920,11 @@
           />
           <p class="tg-hint">Comma-separated Telegram chat/group IDs allowed to use the bot.</p>
           <div class="actions">
-            <ComicButton variant="primary" loading={cbSaving} onclick={handleSaveClaudeBridgeConfig}>
+            <ComicButton
+              variant="primary"
+              loading={cbSaving}
+              onclick={handleSaveClaudeBridgeConfig}
+            >
               Save Config
             </ComicButton>
           </div>
@@ -897,7 +974,9 @@
       <ComicButton variant="outline">Export All Data (JSON)</ComicButton>
       <ComicButton variant="danger">Clear All Data</ComicButton>
     </div>
-    <p class="seed-hint">Creates Neural Memory, MyTrend, Future Bot, Companion projects if not already there.</p>
+    <p class="seed-hint">
+      Creates Neural Memory, MyTrend, Future Bot, Companion projects if not already there.
+    </p>
   </ComicCard>
 </div>
 

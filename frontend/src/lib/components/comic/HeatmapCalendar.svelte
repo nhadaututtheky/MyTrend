@@ -32,7 +32,13 @@
   const grid = $derived.by(() => {
     if (data.length === 0) return [];
 
-    const cells: { x: number; y: number; date: string; count: number; level: HeatmapDay['level'] }[] = [];
+    const cells: {
+      x: number;
+      y: number;
+      date: string;
+      count: number;
+      level: HeatmapDay['level'];
+    }[] = [];
 
     for (let i = 0; i < data.length; i++) {
       const day = data[i];

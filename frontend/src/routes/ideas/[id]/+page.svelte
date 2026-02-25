@@ -17,9 +17,13 @@
   let isPromoting = $state(false);
 
   onMount(async () => {
-    try { idea = await fetchIdea(ideaId); }
-    catch (err: unknown) { console.error('[Idea]', err); }
-    finally { isLoading = false; }
+    try {
+      idea = await fetchIdea(ideaId);
+    } catch (err: unknown) {
+      console.error('[Idea]', err);
+    } finally {
+      isLoading = false;
+    }
   });
 
   async function handlePromote() {
@@ -66,9 +70,7 @@
       <ComicCard>
         <div class="plan-link-section">
           <h3 class="section-title">Linked Plan</h3>
-          <a href="/plans/{idea.linked_plan}" class="plan-link">
-            View Plan →
-          </a>
+          <a href="/plans/{idea.linked_plan}" class="plan-link"> View Plan → </a>
         </div>
       </ComicCard>
     {:else if idea.status === 'considering' || idea.status === 'inbox'}
@@ -89,7 +91,9 @@
     {/if}
 
     {#if idea.tags.length > 0}
-      <div class="tags">{#each idea.tags as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}</div>
+      <div class="tags">
+        {#each idea.tags as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}
+      </div>
     {/if}
 
     <!-- Telegram Files -->
@@ -103,24 +107,63 @@
     {#if idea.related_ideas.length > 0}
       <ComicCard>
         <h3 class="section-title">Related Ideas</h3>
-        <ul class="related-list">{#each idea.related_ideas as relId (relId)}<li><a href="/ideas/{relId}" class="related-link">{relId}</a></li>{/each}</ul>
+        <ul class="related-list">
+          {#each idea.related_ideas as relId (relId)}<li>
+              <a href="/ideas/{relId}" class="related-link">{relId}</a>
+            </li>{/each}
+        </ul>
       </ComicCard>
     {/if}
   {/if}
 </div>
 
 <style>
-  .idea-page { display: flex; flex-direction: column; gap: var(--spacing-lg); max-width: 800px; }
-  .idea-header { animation: sketchFadeIn 0.3s ease; }
-  .badges { display: flex; gap: var(--spacing-xs); margin: var(--spacing-sm) 0 4px; }
-  .date { font-size: 0.75rem; color: var(--text-muted); }
-  .content { font-size: 0.875rem; line-height: 1.7; white-space: pre-wrap; }
-  .tags { display: flex; flex-wrap: wrap; gap: 4px; }
-  .section-title { font-size: 0.875rem; text-transform: uppercase; margin: 0 0 var(--spacing-sm); }
-  .related-list { padding-left: var(--spacing-lg); font-size: 0.85rem; }
-  .related-link { color: var(--accent-blue); }
+  .idea-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    max-width: 800px;
+  }
+  .idea-header {
+    animation: sketchFadeIn 0.3s ease;
+  }
+  .badges {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin: var(--spacing-sm) 0 4px;
+  }
+  .date {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .content {
+    font-size: 0.875rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .section-title {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    margin: 0 0 var(--spacing-sm);
+  }
+  .related-list {
+    padding-left: var(--spacing-lg);
+    font-size: 0.85rem;
+  }
+  .related-link {
+    color: var(--accent-blue);
+  }
 
-  .plan-link-section { display: flex; align-items: center; justify-content: space-between; }
+  .plan-link-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   .plan-link {
     color: var(--accent-green);
     font-family: 'Comic Mono', monospace;
@@ -130,7 +173,9 @@
     padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: 4px;
     box-shadow: 2px 2px 0 var(--accent-green);
-    transition: transform 150ms ease, box-shadow 150ms ease;
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease;
     cursor: pointer;
   }
   .plan-link:hover {
@@ -149,7 +194,9 @@
     border-radius: 4px;
     box-shadow: 3px 3px 0 var(--accent-blue);
     cursor: pointer;
-    transition: transform 150ms ease, box-shadow 150ms ease;
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease;
     min-height: 44px;
   }
   .promote-btn:hover:not(:disabled) {

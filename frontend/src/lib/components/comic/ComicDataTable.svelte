@@ -64,7 +64,9 @@
               class:active={sortKey === col.key}
               style:width={col.width}
               onclick={() => handleSort(col)}
-              onkeydown={(e) => { if (e.key === 'Enter' && col.sortable) handleSort(col); }}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' && col.sortable) handleSort(col);
+              }}
               tabindex={col.sortable ? 0 : undefined}
               role={col.sortable ? 'button' : undefined}
               aria-sort={sortKey === col.key ? getSortLabel(sortDir) : undefined}

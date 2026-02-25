@@ -56,7 +56,13 @@
 
   <div class="header-center">
     {#if searchExpanded}
-      <form class="search-form" onsubmit={(e) => { e.preventDefault(); handleSearchSubmit(); }}>
+      <form
+        class="search-form"
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleSearchSubmit();
+        }}
+      >
         <input
           class="search-input"
           type="search"
@@ -64,7 +70,15 @@
           bind:value={searchValue}
           onkeydown={handleSearchKeydown}
         />
-        <button type="button" class="search-close" onclick={() => { searchExpanded = false; searchValue = ''; }} aria-label="Close search">
+        <button
+          type="button"
+          class="search-close"
+          onclick={() => {
+            searchExpanded = false;
+            searchValue = '';
+          }}
+          aria-label="Close search"
+        >
           <X size={16} />
         </button>
       </form>
@@ -73,12 +87,24 @@
 
   <div class="header-right">
     {#if !searchExpanded}
-      <button class="icon-btn" onclick={() => { searchExpanded = true; }} aria-label="Search" title="Search (Ctrl+K)">
+      <button
+        class="icon-btn"
+        onclick={() => {
+          searchExpanded = true;
+        }}
+        aria-label="Search"
+        title="Search (Ctrl+K)"
+      >
         <Search size={18} />
       </button>
     {/if}
     {#if onToggleDrawer}
-      <button class="icon-btn ai-btn" onclick={onToggleDrawer} aria-label="Toggle AI assistant" title="AI Assistant">
+      <button
+        class="icon-btn ai-btn"
+        onclick={onToggleDrawer}
+        aria-label="Toggle AI assistant"
+        title="AI Assistant"
+      >
         <Sparkles size={18} />
       </button>
     {/if}

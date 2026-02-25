@@ -44,7 +44,12 @@
 
       const plan = await createPlan({
         title: title.trim(),
-        slug: title.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').substring(0, 200),
+        slug: title
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, '-')
+          .replace(/-+/g, '-')
+          .substring(0, 200),
         plan_type: planType,
         status: 'draft',
         priority: priority as 'low' | 'medium' | 'high' | 'critical',
@@ -77,8 +82,19 @@
   </div>
 
   <ComicCard>
-    <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }} class="plan-form">
-      <ComicInput label="Title" bind:value={title} placeholder="What is this plan about?" required />
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        handleSubmit();
+      }}
+      class="plan-form"
+    >
+      <ComicInput
+        label="Title"
+        bind:value={title}
+        placeholder="What is this plan about?"
+        required
+      />
 
       <div class="field">
         <span class="field-label">Type</span>
@@ -106,31 +122,63 @@
           </select>
         </div>
         <div class="field">
-          <ComicInput label="Estimated Effort" bind:value={estimatedEffort} placeholder="e.g. 2-3 hours" />
+          <ComicInput
+            label="Estimated Effort"
+            bind:value={estimatedEffort}
+            placeholder="e.g. 2-3 hours"
+          />
         </div>
       </div>
 
       <div class="field">
         <label class="field-label" for="trigger">Trigger / Context</label>
-        <textarea id="trigger" class="comic-textarea" bind:value={trigger} placeholder="What triggered this plan? What problem needs solving?" rows="3"></textarea>
+        <textarea
+          id="trigger"
+          class="comic-textarea"
+          bind:value={trigger}
+          placeholder="What triggered this plan? What problem needs solving?"
+          rows="3"
+        ></textarea>
       </div>
 
       <div class="field">
         <label class="field-label" for="content">Plan Content</label>
-        <textarea id="content" class="comic-textarea" bind:value={content} placeholder="The actual plan - steps, approach, details (supports markdown)" rows="10"></textarea>
+        <textarea
+          id="content"
+          class="comic-textarea"
+          bind:value={content}
+          placeholder="The actual plan - steps, approach, details (supports markdown)"
+          rows="10"
+        ></textarea>
       </div>
 
       <div class="field">
         <label class="field-label" for="reasoning">Reasoning</label>
-        <textarea id="reasoning" class="comic-textarea" bind:value={reasoning} placeholder="Why this approach? Trade-offs considered?" rows="4"></textarea>
+        <textarea
+          id="reasoning"
+          class="comic-textarea"
+          bind:value={reasoning}
+          placeholder="Why this approach? Trade-offs considered?"
+          rows="4"
+        ></textarea>
       </div>
 
       <div class="field">
         <label class="field-label" for="alternatives">Alternatives Rejected</label>
-        <textarea id="alternatives" class="comic-textarea" bind:value={alternatives} placeholder="What other approaches were considered and why were they rejected?" rows="3"></textarea>
+        <textarea
+          id="alternatives"
+          class="comic-textarea"
+          bind:value={alternatives}
+          placeholder="What other approaches were considered and why were they rejected?"
+          rows="3"
+        ></textarea>
       </div>
 
-      <ComicInput label="Tags (comma-separated)" bind:value={tagsInput} placeholder="e.g. frontend, svelte, performance" />
+      <ComicInput
+        label="Tags (comma-separated)"
+        bind:value={tagsInput}
+        placeholder="e.g. frontend, svelte, performance"
+      />
 
       <div class="actions">
         <ComicButton variant="primary" disabled={isSubmitting || !title.trim()}>
@@ -143,15 +191,49 @@
 </div>
 
 <style>
-  .page { display: flex; flex-direction: column; gap: var(--spacing-lg); max-width: 800px; }
-  .page-header { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-  .back-link { font-family: var(--font-comic); font-size: var(--font-size-sm); color: var(--accent-blue); text-decoration: underline; font-weight: 700; }
-  .plan-form { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-  .field { display: flex; flex-direction: column; gap: var(--spacing-xs); }
-  .field-label { font-family: var(--font-comic); font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; color: var(--text-secondary); }
-  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--spacing-md); }
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    max-width: 800px;
+  }
+  .page-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  .back-link {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
+    color: var(--accent-blue);
+    text-decoration: underline;
+    font-weight: 700;
+  }
+  .plan-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  .field-label {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--spacing-md);
+  }
 
-  .comic-select, .comic-textarea {
+  .comic-select,
+  .comic-textarea {
     font-family: var(--font-comic);
     font-size: var(--font-size-md);
     background: var(--bg-secondary);
@@ -168,16 +250,24 @@
     line-height: 1.5;
   }
 
-  .comic-select:focus, .comic-textarea:focus {
+  .comic-select:focus,
+  .comic-textarea:focus {
     outline: none;
     border-color: var(--accent-green);
     box-shadow: var(--shadow-sm);
   }
 
-  .actions { display: flex; gap: var(--spacing-sm); }
-  .actions a { text-decoration: none; }
+  .actions {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+  .actions a {
+    text-decoration: none;
+  }
 
   @media (max-width: 768px) {
-    .row { grid-template-columns: 1fr; }
+    .row {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

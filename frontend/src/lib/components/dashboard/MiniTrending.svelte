@@ -39,7 +39,8 @@
           <span class="rank">#{idx + 1}</span>
           <a href="/trends?topic={topic.slug}" class="topic-name">{topic.name}</a>
           <ComicBadge color={directionColor(topic.direction)} size="sm">
-            {directionArrow(topic.direction)} {Math.abs(topic.change_pct)}%
+            {directionArrow(topic.direction)}
+            {Math.abs(topic.change_pct)}%
           </ComicBadge>
           <ComicSparkline
             data={topic.sparkline}

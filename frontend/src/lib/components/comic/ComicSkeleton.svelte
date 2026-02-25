@@ -9,13 +9,7 @@
     height?: string;
   }
 
-  const {
-    variant = 'text',
-    size = 'md',
-    lines = 1,
-    width,
-    height,
-  }: Props = $props();
+  const { variant = 'text', size = 'md', lines = 1, width, height }: Props = $props();
 
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let mounted = $state(false);
@@ -98,7 +92,10 @@
 
     if (variant === 'text') {
       for (let i = 0; i < lines; i++) {
-        const lineW = i === lines - 1 ? rect.width * (0.5 + Math.random() * 0.3) : rect.width * (0.85 + Math.random() * 0.15);
+        const lineW =
+          i === lines - 1
+            ? rect.width * (0.5 + Math.random() * 0.3)
+            : rect.width * (0.85 + Math.random() * 0.15);
         ctx.globalAlpha = 0.08;
         ctx.fillStyle = borderColor;
         drawSketchRect(ctx, 0, i * 28, lineW, 16, roughness);
@@ -107,7 +104,13 @@
       ctx.globalAlpha = 0.08;
       ctx.fillStyle = borderColor;
       ctx.beginPath();
-      ctx.arc(rect.width / 2, rect.height / 2, Math.min(rect.width, rect.height) / 2 - 2, 0, Math.PI * 2);
+      ctx.arc(
+        rect.width / 2,
+        rect.height / 2,
+        Math.min(rect.width, rect.height) / 2 - 2,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
       ctx.globalAlpha = 0.12;
       ctx.stroke();

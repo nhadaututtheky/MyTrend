@@ -15,12 +15,7 @@
     roughness?: number;
   }
 
-  const {
-    series = [],
-    width = 800,
-    height = 350,
-    roughness = 1.2,
-  }: Props = $props();
+  const { series = [], width = 800, height = 350, roughness = 1.2 }: Props = $props();
 
   let svgElement: SVGSVGElement;
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -69,8 +64,14 @@
     if (allDates.length === 0) return;
     if (maxVal === 0) maxVal = 1;
 
-    const xScale = d3Module.scaleLinear().domain([0, allDates.length - 1]).range([0, chartW]);
-    const yScale = d3Module.scaleLinear().domain([0, maxVal * 1.1]).range([chartH, 0]);
+    const xScale = d3Module
+      .scaleLinear()
+      .domain([0, allDates.length - 1])
+      .range([0, chartW]);
+    const yScale = d3Module
+      .scaleLinear()
+      .domain([0, maxVal * 1.1])
+      .range([chartH, 0]);
 
     // Container group
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -90,22 +91,26 @@
     }
 
     // X-axis
-    g.appendChild(rc.line(0, chartH, chartW, chartH, {
-      stroke: 'rgba(255,255,255,0.2)',
-      strokeWidth: 1,
-      roughness: 0.5,
-    }));
+    g.appendChild(
+      rc.line(0, chartH, chartW, chartH, {
+        stroke: 'rgba(255,255,255,0.2)',
+        strokeWidth: 1,
+        roughness: 0.5,
+      }),
+    );
 
     // Y-axis
-    g.appendChild(rc.line(0, 0, 0, chartH, {
-      stroke: 'rgba(255,255,255,0.2)',
-      strokeWidth: 1,
-      roughness: 0.5,
-    }));
+    g.appendChild(
+      rc.line(0, 0, 0, chartH, {
+        stroke: 'rgba(255,255,255,0.2)',
+        strokeWidth: 1,
+        roughness: 0.5,
+      }),
+    );
 
     // Y-axis labels
     for (let i = 0; i <= gridTicks; i++) {
-      const val = Math.round((maxVal * 1.1 / gridTicks) * (gridTicks - i));
+      const val = Math.round(((maxVal * 1.1) / gridTicks) * (gridTicks - i));
       const y = (chartH / gridTicks) * i;
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       label.textContent = String(val);

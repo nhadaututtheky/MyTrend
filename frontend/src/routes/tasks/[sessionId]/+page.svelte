@@ -57,9 +57,7 @@
       </a>
       <h1 class="comic-heading">Session {sessionId.substring(0, 8)}</h1>
     </div>
-    <ComicButton size="sm" variant="outline" onclick={loadTasks}>
-      Refresh
-    </ComicButton>
+    <ComicButton size="sm" variant="outline" onclick={loadTasks}>Refresh</ComicButton>
   </div>
 
   {#if isLoading}

@@ -68,7 +68,9 @@
 
   // Context window for display
   const contextWindow = $derived(
-    data ? (MODEL_CONTEXT_WINDOWS[data.model] ?? MODEL_CONTEXT_WINDOWS['default'] ?? 200_000) : 200_000,
+    data
+      ? (MODEL_CONTEXT_WINDOWS[data.model] ?? MODEL_CONTEXT_WINDOWS['default'] ?? 200_000)
+      : 200_000,
   );
 
   const isWarning = $derived(data ? data.context_pct >= 80 : false);
@@ -92,11 +94,34 @@
     </div>
 
     <!-- Segmented bar -->
-    <div class="seg-bar" role="progressbar" aria-valuenow={data.context_pct} aria-valuemin={0} aria-valuemax={100} aria-label="{data.context_pct}% context used">
-      <div class="seg-input" style="width: {pctOf(data.input_tokens, contextWindow)}%" title="Input: {formatNum(data.input_tokens)}"></div>
-      <div class="seg-output" style="width: {pctOf(data.output_tokens, contextWindow)}%" title="Output: {formatNum(data.output_tokens)}"></div>
-      <div class="seg-cache-read" style="width: {pctOf(data.cache_read_tokens, contextWindow)}%" title="Cache Read: {formatNum(data.cache_read_tokens)}"></div>
-      <div class="seg-cache-create" style="width: {pctOf(data.cache_create_tokens, contextWindow)}%" title="Cache Create: {formatNum(data.cache_create_tokens)}"></div>
+    <div
+      class="seg-bar"
+      role="progressbar"
+      aria-valuenow={data.context_pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="{data.context_pct}% context used"
+    >
+      <div
+        class="seg-input"
+        style="width: {pctOf(data.input_tokens, contextWindow)}%"
+        title="Input: {formatNum(data.input_tokens)}"
+      ></div>
+      <div
+        class="seg-output"
+        style="width: {pctOf(data.output_tokens, contextWindow)}%"
+        title="Output: {formatNum(data.output_tokens)}"
+      ></div>
+      <div
+        class="seg-cache-read"
+        style="width: {pctOf(data.cache_read_tokens, contextWindow)}%"
+        title="Cache Read: {formatNum(data.cache_read_tokens)}"
+      ></div>
+      <div
+        class="seg-cache-create"
+        style="width: {pctOf(data.cache_create_tokens, contextWindow)}%"
+        title="Cache Create: {formatNum(data.cache_create_tokens)}"
+      ></div>
     </div>
 
     <p class="context-summary">
@@ -167,8 +192,13 @@
   }
 
   @keyframes criticalGlow {
-    0%, 100% { box-shadow: 0 0 0 rgba(255, 71, 87, 0); }
-    50% { box-shadow: 0 0 16px rgba(255, 71, 87, 0.3); }
+    0%,
+    100% {
+      box-shadow: 0 0 0 rgba(255, 71, 87, 0);
+    }
+    50% {
+      box-shadow: 0 0 16px rgba(255, 71, 87, 0.3);
+    }
   }
 
   .meter-header {
@@ -195,8 +225,12 @@
     color: var(--accent-green);
   }
 
-  .pct-warn { color: var(--accent-orange); }
-  .pct-crit { color: var(--accent-red); }
+  .pct-warn {
+    color: var(--accent-orange);
+  }
+  .pct-crit {
+    color: var(--accent-red);
+  }
 
   .warn-badge {
     font-size: var(--font-size-2xs);
@@ -218,10 +252,22 @@
     margin-bottom: var(--spacing-xs);
   }
 
-  .seg-input { background: var(--accent-blue); transition: width 500ms ease; }
-  .seg-output { background: var(--accent-green); transition: width 500ms ease; }
-  .seg-cache-read { background: var(--accent-yellow); transition: width 500ms ease; }
-  .seg-cache-create { background: var(--accent-purple, #A29BFE); transition: width 500ms ease; }
+  .seg-input {
+    background: var(--accent-blue);
+    transition: width 500ms ease;
+  }
+  .seg-output {
+    background: var(--accent-green);
+    transition: width 500ms ease;
+  }
+  .seg-cache-read {
+    background: var(--accent-yellow);
+    transition: width 500ms ease;
+  }
+  .seg-cache-create {
+    background: var(--accent-purple, #a29bfe);
+    transition: width 500ms ease;
+  }
 
   .context-summary {
     font-size: var(--font-size-sm);
@@ -250,10 +296,18 @@
     border-radius: 2px;
   }
 
-  .dot-input { background: var(--accent-blue); }
-  .dot-output { background: var(--accent-green); }
-  .dot-cache-read { background: var(--accent-yellow); }
-  .dot-cache-create { background: var(--accent-purple, #A29BFE); }
+  .dot-input {
+    background: var(--accent-blue);
+  }
+  .dot-output {
+    background: var(--accent-green);
+  }
+  .dot-cache-read {
+    background: var(--accent-yellow);
+  }
+  .dot-cache-create {
+    background: var(--accent-purple, #a29bfe);
+  }
 
   .breakdown-table {
     display: flex;
@@ -277,9 +331,20 @@
     border-bottom: 2px solid var(--border-color);
   }
 
-  .row-label { color: var(--text-secondary); }
-  .row-val { font-family: var(--font-mono); color: var(--text-primary); text-align: right; }
-  .row-pct { font-family: var(--font-mono); color: var(--text-muted); text-align: right; min-width: 45px; }
+  .row-label {
+    color: var(--text-secondary);
+  }
+  .row-val {
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    text-align: right;
+  }
+  .row-pct {
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-align: right;
+    min-width: 45px;
+  }
 
   .cost {
     display: flex;

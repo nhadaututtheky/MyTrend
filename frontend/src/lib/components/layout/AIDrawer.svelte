@@ -80,7 +80,9 @@
         if (data.type === 'content_block_delta' && data.delta?.text) {
           result += data.delta.text as string;
         }
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
     return result;
   }
@@ -92,7 +94,16 @@
 
 {#if open}
   <!-- svelte-ignore a11y_interactive_supports_focus -->
-  <div class="drawer-overlay" onclick={(e) => { if (e.target === e.currentTarget) handleClose(); }} onkeydown={handleKeydown} role="dialog" aria-modal="true" aria-label="AI Assistant">
+  <div
+    class="drawer-overlay"
+    onclick={(e) => {
+      if (e.target === e.currentTarget) handleClose();
+    }}
+    onkeydown={handleKeydown}
+    role="dialog"
+    aria-modal="true"
+    aria-label="AI Assistant"
+  >
     <aside class="drawer">
       <div class="drawer-header">
         <h3 class="drawer-title">⚡ AI Assistant</h3>
@@ -116,7 +127,11 @@
             {#each messages as msg}
               <div class="msg msg-{msg.role}">
                 <span class="msg-role">{msg.role === 'user' ? '🧑' : '⚡'}</span>
-                <div class="msg-content">{msg.content}{#if msg.role === 'assistant' && isStreaming && msg === messages[messages.length - 1]}<span class="cursor">▊</span>{/if}</div>
+                <div class="msg-content">
+                  {msg.content}{#if msg.role === 'assistant' && isStreaming && msg === messages[messages.length - 1]}<span
+                      class="cursor">▊</span
+                    >{/if}
+                </div>
               </div>
             {/each}
           </div>
@@ -124,7 +139,13 @@
       </div>
 
       <div class="drawer-footer">
-        <form class="input-row" onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <form
+          class="input-row"
+          onsubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+        >
           <input
             class="drawer-input"
             type="text"
@@ -132,7 +153,13 @@
             bind:value={inputValue}
             disabled={isStreaming}
           />
-          <ComicButton variant="primary" size="sm" type="submit" loading={isStreaming} disabled={!inputValue.trim()}>
+          <ComicButton
+            variant="primary"
+            size="sm"
+            type="submit"
+            loading={isStreaming}
+            disabled={!inputValue.trim()}
+          >
             Send
           </ComicButton>
         </form>
@@ -166,8 +193,12 @@
   }
 
   @keyframes slideRight {
-    from { transform: translateX(100%); }
-    to { transform: translateX(0); }
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
   }
 
   .drawer-header {

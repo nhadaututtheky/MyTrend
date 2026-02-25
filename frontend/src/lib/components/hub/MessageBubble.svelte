@@ -23,6 +23,7 @@
     {#if isUser}
       <div class="content">{message.content}</div>
     {:else}
+      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       <div class="content markdown-body">{@html renderMarkdown(message.content)}</div>
     {/if}
     <div class="meta">
@@ -30,12 +31,7 @@
       {#if message.tokens > 0}
         <span class="tokens">{message.tokens} tokens</span>
       {/if}
-      <button
-        class="copy-btn"
-        onclick={copyContent}
-        aria-label="Copy message"
-        type="button"
-      >
+      <button class="copy-btn" onclick={copyContent} aria-label="Copy message" type="button">
         copy
       </button>
     </div>
@@ -128,9 +124,15 @@
     font-weight: 700;
   }
 
-  .markdown-body :global(h1) { font-size: 1.2em; }
-  .markdown-body :global(h2) { font-size: 1.1em; }
-  .markdown-body :global(h3) { font-size: 1em; }
+  .markdown-body :global(h1) {
+    font-size: 1.2em;
+  }
+  .markdown-body :global(h2) {
+    font-size: 1.1em;
+  }
+  .markdown-body :global(h3) {
+    font-size: 1em;
+  }
 
   .markdown-body :global(blockquote) {
     border-left: 3px solid var(--border-color);

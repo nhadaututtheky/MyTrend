@@ -3,10 +3,19 @@
   import type { NavItem } from '$lib/types';
   import type { ComponentType } from 'svelte';
   import {
-    LayoutDashboard, FolderOpen, MessageCircle, Lightbulb, ClipboardList,
+    LayoutDashboard,
+    FolderOpen,
+    MessageCircle,
+    Lightbulb,
+    ClipboardList,
     FileText,
-    TrendingUp, Globe, Search, BookOpen,
-    Terminal, Zap, Settings,
+    TrendingUp,
+    Globe,
+    Search,
+    BookOpen,
+    Terminal,
+    Zap,
+    Settings,
   } from 'lucide-svelte';
 
   interface Props {

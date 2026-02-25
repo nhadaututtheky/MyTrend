@@ -66,7 +66,9 @@
   <!-- ─── Cards ────────────────────────────────────────── -->
   <section class="section">
     <h2 class="section-title">ComicCard</h2>
-    <p class="section-desc">Variants: standard, skewed, interactive | Neon: green, blue, red, purple, yellow, orange</p>
+    <p class="section-desc">
+      Variants: standard, skewed, interactive | Neon: green, blue, red, purple, yellow, orange
+    </p>
 
     <div class="demo-group">
       <h3 class="demo-label">Variants</h3>
@@ -99,7 +101,9 @@
   <!-- ─── Badges ───────────────────────────────────────── -->
   <section class="section">
     <h2 class="section-title">ComicBadge</h2>
-    <p class="section-desc">Colors: green, red, yellow, blue, purple, orange | Sizes: sm, md | Animated</p>
+    <p class="section-desc">
+      Colors: green, red, yellow, blue, purple, orange | Sizes: sm, md | Animated
+    </p>
 
     <div class="demo-group">
       <div class="demo-row">
@@ -212,9 +216,21 @@
 
     <div class="demo-group">
       <div class="demo-grid-2">
-        <ComicEmptyState illustration="empty" message="Nothing here yet" description="Create something new" />
-        <ComicEmptyState illustration="search" message="No results" description="Try different keywords" />
-        <ComicEmptyState illustration="error" message="Something went wrong" description="Please try again" />
+        <ComicEmptyState
+          illustration="empty"
+          message="Nothing here yet"
+          description="Create something new"
+        />
+        <ComicEmptyState
+          illustration="search"
+          message="No results"
+          description="Try different keywords"
+        />
+        <ComicEmptyState
+          illustration="error"
+          message="Something went wrong"
+          description="Please try again"
+        />
         <ComicEmptyState illustration="inbox" message="Inbox empty" description="All caught up!" />
       </div>
     </div>
@@ -271,8 +287,12 @@
       <ComicDialog bind:open={dialogOpen} title="Example Dialog">
         <p>This is the dialog content. It supports any child elements.</p>
         {#snippet actions()}
-          <ComicButton variant="outline" size="sm" onclick={() => (dialogOpen = false)}>Cancel</ComicButton>
-          <ComicButton variant="primary" size="sm" onclick={() => (dialogOpen = false)}>Confirm</ComicButton>
+          <ComicButton variant="outline" size="sm" onclick={() => (dialogOpen = false)}
+            >Cancel</ComicButton
+          >
+          <ComicButton variant="primary" size="sm" onclick={() => (dialogOpen = false)}
+            >Confirm</ComicButton
+          >
         {/snippet}
       </ComicDialog>
     </div>
@@ -291,11 +311,23 @@
         </div>
         <div>
           <h3 class="demo-label">Red + Fill</h3>
-          <ComicSparkline data={sparkData2} color="var(--accent-red)" fill width={120} height={32} />
+          <ComicSparkline
+            data={sparkData2}
+            color="var(--accent-red)"
+            fill
+            width={120}
+            height={32}
+          />
         </div>
         <div>
           <h3 class="demo-label">Blue + Rough</h3>
-          <ComicSparkline data={sparkData} color="var(--accent-blue)" roughness={3} width={120} height={32} />
+          <ComicSparkline
+            data={sparkData}
+            color="var(--accent-blue)"
+            roughness={3}
+            width={120}
+            height={32}
+          />
         </div>
         <div>
           <h3 class="demo-label">Wide</h3>

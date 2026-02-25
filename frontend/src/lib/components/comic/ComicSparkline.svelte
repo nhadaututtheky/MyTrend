@@ -96,7 +96,9 @@
     }
   }
 
-  onMount(() => { draw(); });
+  onMount(() => {
+    draw();
+  });
 
   $effect(() => {
     if (data.length > 0) draw();

@@ -11,7 +11,12 @@
     maxSizeMB?: number;
   }
 
-  let { linkedCollection = '', linkedRecordId = '', maxFiles = 10, maxSizeMB = 50 }: Props = $props();
+  let {
+    linkedCollection = '',
+    linkedRecordId = '',
+    maxFiles = 10,
+    maxSizeMB = 50,
+  }: Props = $props();
 
   let files = $state<TelegramFile[]>([]);
   let isUploading = $state(false);
@@ -70,14 +75,17 @@
           linkedCollection,
           linkedRecordId,
         });
-        files = [...files, {
-          id: result.id,
-          filename: result.filename,
-          mime_type: result.mime_type,
-          file_size: result.file_size,
-          telegram_msg_id: result.telegram_msg_id,
-          created: result.created,
-        } as TelegramFile];
+        files = [
+          ...files,
+          {
+            id: result.id,
+            filename: result.filename,
+            mime_type: result.mime_type,
+            file_size: result.file_size,
+            telegram_msg_id: result.telegram_msg_id,
+            created: result.created,
+          } as TelegramFile,
+        ];
         uploaded++;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Upload failed';
@@ -124,11 +132,18 @@
     class:drag-over={isDragOver}
     role="button"
     tabindex="0"
-    ondragover={(e) => { e.preventDefault(); isDragOver = true; }}
-    ondragleave={() => { isDragOver = false; }}
+    ondragover={(e) => {
+      e.preventDefault();
+      isDragOver = true;
+    }}
+    ondragleave={() => {
+      isDragOver = false;
+    }}
     ondrop={handleDrop}
     onclick={() => fileInput?.click()}
-    onkeydown={(e) => { if (e.key === 'Enter') fileInput?.click(); }}
+    onkeydown={(e) => {
+      if (e.key === 'Enter') fileInput?.click();
+    }}
   >
     <input
       bind:this={fileInput}
@@ -157,7 +172,9 @@
             <span class="file-name" title={file.filename}>{file.filename}</span>
             <span class="file-meta">{formatSize(file.file_size)}</span>
           </div>
-          <ComicButton variant="danger" size="sm" onclick={() => handleDelete(file.id)}>x</ComicButton>
+          <ComicButton variant="danger" size="sm" onclick={() => handleDelete(file.id)}
+            >x</ComicButton
+          >
         </div>
       {/each}
     </div>
@@ -177,7 +194,9 @@
     padding: var(--spacing-lg);
     text-align: center;
     cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
     display: flex;
     flex-direction: column;
     align-items: center;

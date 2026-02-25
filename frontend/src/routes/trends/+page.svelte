@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Topic, TrendingTopic, TopicTrendSeries, HeatmapDay, InsightPatterns } from '$lib/types';
+  import type {
+    Topic,
+    TrendingTopic,
+    TopicTrendSeries,
+    HeatmapDay,
+    InsightPatterns,
+  } from '$lib/types';
   import { fetchTopicTrends, fetchTrendingTopics, fetchAllTopics } from '$lib/api/topics';
   import { fetchHeatmapData } from '$lib/api/activity';
   import { fetchPatterns } from '$lib/api/insights';
@@ -83,12 +89,25 @@
       // Auto-select top 3 trending topics
       const topSlugs = trendingTopics.slice(0, 3);
       for (const t of topSlugs) {
-        selectedTopics = [...selectedTopics, {
-          id: t.id, name: t.name, slug: t.slug, category: t.category,
-          mention_count: t.mention_count,
-          user: '', first_seen: '', last_seen: '', trend_data: [], related: [],
-          created: '', updated: '', collectionId: '', collectionName: '',
-        }];
+        selectedTopics = [
+          ...selectedTopics,
+          {
+            id: t.id,
+            name: t.name,
+            slug: t.slug,
+            category: t.category,
+            mention_count: t.mention_count,
+            user: '',
+            first_seen: '',
+            last_seen: '',
+            trend_data: [],
+            related: [],
+            created: '',
+            updated: '',
+            collectionId: '',
+            collectionName: '',
+          },
+        ];
       }
     }
     isLoadingTrending = false;
@@ -118,9 +137,16 @@
 
     isLoadingChart = true;
     fetchTopicTrends(slugs, timeRange)
-      .then((res) => { trendSeries = res.series; })
-      .catch((err) => { console.error('[Trends] Fetch error:', err); trendSeries = []; })
-      .finally(() => { isLoadingChart = false; });
+      .then((res) => {
+        trendSeries = res.series;
+      })
+      .catch((err) => {
+        console.error('[Trends] Fetch error:', err);
+        trendSeries = [];
+      })
+      .finally(() => {
+        isLoadingChart = false;
+      });
   });
 
   function addTopic(topic: Topic): void {
@@ -135,10 +161,20 @@
   function addTrendingTopic(trending: TrendingTopic): void {
     if (selectedTopics.some((t) => t.slug === trending.slug)) return;
     addTopic({
-      id: trending.id, name: trending.name, slug: trending.slug,
-      category: trending.category, mention_count: trending.mention_count,
-      user: '', first_seen: '', last_seen: '', trend_data: [], related: [],
-      created: '', updated: '', collectionId: '', collectionName: '',
+      id: trending.id,
+      name: trending.name,
+      slug: trending.slug,
+      category: trending.category,
+      mention_count: trending.mention_count,
+      user: '',
+      first_seen: '',
+      last_seen: '',
+      trend_data: [],
+      related: [],
+      created: '',
+      updated: '',
+      collectionId: '',
+      collectionName: '',
     });
   }
 
@@ -150,7 +186,9 @@
       const result = await fetchAllTopics(page, 20, sort);
       allTopics = result.items;
       allTopicsTotal = result.totalItems;
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
     isLoadingTopics = false;
   }
 
@@ -198,7 +236,9 @@
         <button
           class="range-btn"
           class:active={timeRange === tr.id}
-          onclick={() => { timeRange = tr.id; }}
+          onclick={() => {
+            timeRange = tr.id;
+          }}
         >
           {tr.label}
         </button>
@@ -214,20 +254,27 @@
   {/if}
 
   <!-- Topic Search -->
-  <TopicSearchBar
-    {selectedTopics}
-    onselect={addTopic}
-    onremove={removeTopic}
-  />
+  <TopicSearchBar {selectedTopics} onselect={addTopic} onremove={removeTopic} />
 
   <!-- Comparison Chart -->
   <div class="chart-section" bind:clientWidth={chartWidth}>
-    <ComicBentoCard title="Interest Over Time" icon="&#128200;" variant="neon" neonColor="green" span="full">
+    <ComicBentoCard
+      title="Interest Over Time"
+      icon="&#128200;"
+      variant="neon"
+      neonColor="green"
+      span="full"
+    >
       {#if isLoadingChart}
         <ComicSkeleton variant="chart" />
       {:else}
         <RoughMultiLineChart
-          series={trendSeries.map((s) => ({ id: s.topic_id, label: s.name, color: s.color, data: s.data }))}
+          series={trendSeries.map((s) => ({
+            id: s.topic_id,
+            label: s.name,
+            color: s.color,
+            data: s.data,
+          }))}
           width={Math.max(chartWidth - 48, 400)}
           height={350}
         />
@@ -281,7 +328,13 @@
   </BentoGrid>
 
   <!-- All Topics Table -->
-  <ComicBentoCard title="All Topics ({allTopicsTotal})" icon="&#128203;" variant="neon" neonColor="purple" span="full">
+  <ComicBentoCard
+    title="All Topics ({allTopicsTotal})"
+    icon="&#128203;"
+    variant="neon"
+    neonColor="purple"
+    span="full"
+  >
     {#if isLoadingTopics}
       <ComicSkeleton variant="text" lines={10} />
     {:else if allTopics.length === 0}
@@ -327,8 +380,8 @@
                     class="add-btn"
                     onclick={() => addTopic(topic)}
                     disabled={selectedTopics.some((t) => t.id === topic.id)}
-                    aria-label="Compare {topic.name}"
-                  >+</button>
+                    aria-label="Compare {topic.name}">+</button
+                  >
                 </td>
               </tr>
             {/each}
@@ -341,14 +394,14 @@
           <button
             class="page-btn"
             disabled={topicsPage <= 1}
-            onclick={() => loadTopicsPage(topicsPage - 1)}
-          >Prev</button>
+            onclick={() => loadTopicsPage(topicsPage - 1)}>Prev</button
+          >
           <span class="page-info">{topicsPage} / {totalTopicPages}</span>
           <button
             class="page-btn"
             disabled={topicsPage >= totalTopicPages}
-            onclick={() => loadTopicsPage(topicsPage + 1)}
-          >Next</button>
+            onclick={() => loadTopicsPage(topicsPage + 1)}>Next</button
+          >
         </div>
       {/if}
     {/if}

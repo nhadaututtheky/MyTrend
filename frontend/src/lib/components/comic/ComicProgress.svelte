@@ -44,8 +44,14 @@
     border: 1.5px solid var(--border-color);
   }
 
-  .progress-sm .progress-track { height: 6px; border-radius: 3px; }
-  .progress-md .progress-track { height: 10px; border-radius: 5px; }
+  .progress-sm .progress-track {
+    height: 6px;
+    border-radius: 3px;
+  }
+  .progress-md .progress-track {
+    height: 10px;
+    border-radius: 5px;
+  }
 
   .progress-fill {
     height: 100%;
@@ -53,11 +59,21 @@
     transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .fill-green { background: var(--accent-green); }
-  .fill-blue { background: var(--accent-blue); }
-  .fill-purple { background: var(--accent-purple); }
-  .fill-yellow { background: var(--accent-yellow); }
-  .fill-orange { background: var(--accent-orange); }
+  .fill-green {
+    background: var(--accent-green);
+  }
+  .fill-blue {
+    background: var(--accent-blue);
+  }
+  .fill-purple {
+    background: var(--accent-purple);
+  }
+  .fill-yellow {
+    background: var(--accent-yellow);
+  }
+  .fill-orange {
+    background: var(--accent-orange);
+  }
 
   .progress-label {
     font-family: var(--font-mono, monospace);

@@ -23,7 +23,7 @@
   class:padded={padding}
   role={isClickable ? 'button' : undefined}
   tabindex={isClickable ? 0 : undefined}
-  onclick={onclick}
+  {onclick}
   onkeydown={(e) => {
     if (isClickable && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();

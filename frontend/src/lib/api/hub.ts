@@ -4,9 +4,7 @@ import type { HubSession, HubEnvironment, HubCronJob, PBListResult } from '$lib/
 const ITEMS_PER_PAGE = 50;
 
 // Sessions
-export async function fetchSessions(
-  projectId?: string,
-): Promise<PBListResult<HubSession>> {
+export async function fetchSessions(projectId?: string): Promise<PBListResult<HubSession>> {
   const filter = projectId ? `project = "${projectId}"` : '';
   return pb.collection('hub_sessions').getList<HubSession>(1, ITEMS_PER_PAGE, {
     sort: '-updated',
@@ -48,10 +46,7 @@ export async function createSession(data: {
   });
 }
 
-export async function updateSession(
-  id: string,
-  data: Partial<HubSession>,
-): Promise<HubSession> {
+export async function updateSession(id: string, data: Partial<HubSession>): Promise<HubSession> {
   return pb.collection('hub_sessions').update<HubSession>(id, data);
 }
 
@@ -73,9 +68,7 @@ export async function fetchEnvironments(): Promise<HubEnvironment[]> {
   return result.items;
 }
 
-export async function createEnvironment(
-  data: Partial<HubEnvironment>,
-): Promise<HubEnvironment> {
+export async function createEnvironment(data: Partial<HubEnvironment>): Promise<HubEnvironment> {
   return pb.collection('hub_environments').create<HubEnvironment>({
     ...data,
     user: pb.authStore.model?.id,
@@ -91,11 +84,9 @@ export async function updateEnvironment(
 
 // Cron Jobs
 export async function fetchCronJobs(): Promise<HubCronJob[]> {
-  const result = await pb
-    .collection('hub_cron_jobs')
-    .getList<HubCronJob>(1, ITEMS_PER_PAGE, {
-      sort: '-created',
-    });
+  const result = await pb.collection('hub_cron_jobs').getList<HubCronJob>(1, ITEMS_PER_PAGE, {
+    sort: '-created',
+  });
   return result.items;
 }
 
@@ -107,10 +98,7 @@ export async function createCronJob(data: Partial<HubCronJob>): Promise<HubCronJ
   });
 }
 
-export async function updateCronJob(
-  id: string,
-  data: Partial<HubCronJob>,
-): Promise<HubCronJob> {
+export async function updateCronJob(id: string, data: Partial<HubCronJob>): Promise<HubCronJob> {
   return pb.collection('hub_cron_jobs').update<HubCronJob>(id, data);
 }
 

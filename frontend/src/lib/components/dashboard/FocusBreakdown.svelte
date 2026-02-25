@@ -22,9 +22,8 @@
     const top5 = breakdown.slice(0, 5);
     const rest = breakdown.slice(5);
     const points = top5.map((item) => ({
-      label: item.project_name.length > 12
-        ? item.project_name.slice(0, 11) + '..'
-        : item.project_name,
+      label:
+        item.project_name.length > 12 ? item.project_name.slice(0, 11) + '..' : item.project_name,
       value: Math.round(item.minutes),
     }));
 
@@ -37,7 +36,7 @@
   });
 
   const totalHours = $derived(
-    Math.round(breakdown.reduce((sum, item) => sum + item.minutes, 0) / 60 * 10) / 10,
+    Math.round((breakdown.reduce((sum, item) => sum + item.minutes, 0) / 60) * 10) / 10,
   );
 </script>
 

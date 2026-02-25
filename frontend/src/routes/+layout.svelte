@@ -57,7 +57,12 @@
     {@render children()}
   </main>
 {:else}
-  <Header onToggleSidebar={toggleSidebar} onToggleDrawer={() => { drawerOpen = !drawerOpen; }} />
+  <Header
+    onToggleSidebar={toggleSidebar}
+    onToggleDrawer={() => {
+      drawerOpen = !drawerOpen;
+    }}
+  />
   <div class="app-layout">
     <Sidebar collapsed={sidebarCollapsed} />
     <main id="main-content" class="main-content">
@@ -65,7 +70,12 @@
     </main>
   </div>
   <AIDrawer bind:open={drawerOpen} />
-  <CommandPalette open={commandPaletteOpen} onclose={() => { commandPaletteOpen = false; }} />
+  <CommandPalette
+    open={commandPaletteOpen}
+    onclose={() => {
+      commandPaletteOpen = false;
+    }}
+  />
 {/if}
 
 <style>

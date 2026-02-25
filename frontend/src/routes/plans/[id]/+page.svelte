@@ -25,7 +25,10 @@
   let isEditing = $state(false);
   let editOutcome = $state('');
 
-  const STATUS_COLORS: Record<PlanStatus | 'none', 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> = {
+  const STATUS_COLORS: Record<
+    PlanStatus | 'none',
+    'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'
+  > = {
     none: 'yellow',
     draft: 'yellow',
     approved: 'blue',
@@ -44,10 +47,16 @@
     abandoned: ['draft'],
   };
 
+  function getPriorityColor(priority: string): 'red' | 'orange' | 'yellow' {
+    if (priority === 'critical') return 'red';
+    if (priority === 'high') return 'orange';
+    return 'yellow';
+  }
+
   let planId = $derived($page.params.id ?? '');
 
   const plan = $derived(data?.plan);
-  const allowedTransitions = $derived(plan ? (TRANSITIONS[plan.status] || []) : []);
+  const allowedTransitions = $derived(plan ? TRANSITIONS[plan.status] || [] : []);
 
   const timelineNodes = $derived.by(() => {
     if (!data?.stage_history) return [];
@@ -57,7 +66,7 @@
       sublabel: t.from === 'none' ? 'Created' : `From ${t.from.replace('_', ' ')}`,
       timestamp: formatDateTime(t.timestamp),
       color: STATUS_COLORS[t.to] || ('yellow' as const),
-      active: i === data!.stage_history.length - 1,
+      active: i === (data?.stage_history.length ?? 0) - 1,
       note: t.note,
       href: t.conversation_id ? `/conversations/${t.conversation_id}` : undefined,
     }));
@@ -100,7 +109,7 @@
       toast.success('Outcome saved');
       isEditing = false;
       await load();
-    } catch (err: unknown) {
+    } catch {
       toast.error('Failed to save outcome');
     }
   }
@@ -111,12 +120,14 @@
       await deletePlan(planId);
       toast.success('Plan deleted');
       goto('/plans');
-    } catch (err: unknown) {
+    } catch {
       toast.error('Failed to delete plan');
     }
   }
 
-  onMount(() => { load(); });
+  onMount(() => {
+    load();
+  });
 </script>
 
 <svelte:head><title>{plan?.title ?? 'Plan Detail'} - MyTrend</title></svelte:head>
@@ -140,13 +151,15 @@
           <ComicBadge color="blue">{plan.plan_type}</ComicBadge>
         {/if}
         {#if plan.priority}
-          <ComicBadge color={plan.priority === 'critical' ? 'red' : plan.priority === 'high' ? 'orange' : 'yellow'}>{plan.priority}</ComicBadge>
+          <ComicBadge color={getPriorityColor(plan.priority)}>{plan.priority}</ComicBadge>
         {/if}
         {#if plan.complexity}
           <ComicBadge color="purple">{plan.complexity}</ComicBadge>
         {/if}
         {#if plan.extraction_source === 'auto'}
-          <ComicBadge color="purple" size="sm">auto-extracted ({Math.round(plan.extraction_confidence * 100)}%)</ComicBadge>
+          <ComicBadge color="purple" size="sm"
+            >auto-extracted ({Math.round(plan.extraction_confidence * 100)}%)</ComicBadge
+          >
         {/if}
       </div>
       <div class="meta-row">
@@ -157,9 +170,11 @@
       </div>
       <div class="action-row">
         {#if allowedTransitions.length > 0}
-          <ComicButton variant="primary" onclick={() => showTransition = true}>Transition</ComicButton>
+          <ComicButton variant="primary" onclick={() => (showTransition = true)}
+            >Transition</ComicButton
+          >
         {/if}
-        <ComicButton variant="danger" onclick={() => showDelete = true}>Delete</ComicButton>
+        <ComicButton variant="danger" onclick={() => (showDelete = true)}>Delete</ComicButton>
       </div>
     </div>
 
@@ -211,7 +226,12 @@
           <h3 class="subsection-title">Conversations</h3>
           <ul class="linked-list">
             {#each data.conversations as conv (conv.id)}
-              <li><a href="/conversations/{conv.id}" class="linked-item">{conv.title} <span class="linked-meta">{formatRelative(conv.started_at)}</span></a></li>
+              <li>
+                <a href="/conversations/{conv.id}" class="linked-item"
+                  >{conv.title}
+                  <span class="linked-meta">{formatRelative(conv.started_at)}</span></a
+                >
+              </li>
             {/each}
           </ul>
         {/if}
@@ -219,7 +239,11 @@
           <h3 class="subsection-title">Ideas</h3>
           <ul class="linked-list">
             {#each data.ideas as idea (idea.id)}
-              <li><a href="/ideas/{idea.id}" class="linked-item">{idea.title} <ComicBadge color="yellow" size="sm">{idea.status}</ComicBadge></a></li>
+              <li>
+                <a href="/ideas/{idea.id}" class="linked-item"
+                  >{idea.title} <ComicBadge color="yellow" size="sm">{idea.status}</ComicBadge></a
+                >
+              </li>
             {/each}
           </ul>
         {/if}
@@ -227,7 +251,14 @@
           <h3 class="subsection-title">Related Plans</h3>
           <ul class="linked-list">
             {#each data.related_plans as rp (rp.id)}
-              <li><a href="/plans/{rp.id}" class="linked-item">{rp.title} <ComicBadge color={STATUS_COLORS[rp.status as PlanStatus]} size="sm">{rp.status}</ComicBadge> <span class="linked-meta">({rp.relation})</span></a></li>
+              <li>
+                <a href="/plans/{rp.id}" class="linked-item"
+                  >{rp.title}
+                  <ComicBadge color={STATUS_COLORS[rp.status as PlanStatus]} size="sm"
+                    >{rp.status}</ComicBadge
+                  > <span class="linked-meta">({rp.relation})</span></a
+                >
+              </li>
             {/each}
           </ul>
         {/if}
@@ -240,14 +271,25 @@
         <div class="outcome-header">
           <h2 class="section-title">Outcome / Retrospective</h2>
           {#if !isEditing}
-            <ComicButton variant="outline" onclick={() => isEditing = true}>Edit</ComicButton>
+            <ComicButton variant="outline" onclick={() => (isEditing = true)}>Edit</ComicButton>
           {/if}
         </div>
         {#if isEditing}
-          <textarea class="outcome-editor" bind:value={editOutcome} placeholder="What actually happened? Lessons learned?" rows="6"></textarea>
+          <textarea
+            class="outcome-editor"
+            bind:value={editOutcome}
+            placeholder="What actually happened? Lessons learned?"
+            rows="6"
+          ></textarea>
           <div class="outcome-actions">
             <ComicButton variant="primary" onclick={handleSaveOutcome}>Save</ComicButton>
-            <ComicButton variant="outline" onclick={() => { isEditing = false; editOutcome = plan.outcome; }}>Cancel</ComicButton>
+            <ComicButton
+              variant="outline"
+              onclick={() => {
+                isEditing = false;
+                editOutcome = plan.outcome;
+              }}>Cancel</ComicButton
+            >
           </div>
         {:else if plan.outcome}
           <ComicMarkdown content={plan.outcome} />
@@ -258,55 +300,136 @@
     {/if}
 
     <!-- Transition Dialog -->
-    <ComicDialog title="Transition Plan" bind:open={showTransition} onclose={() => showTransition = false}>
+    <ComicDialog
+      title="Transition Plan"
+      bind:open={showTransition}
+      onclose={() => (showTransition = false)}
+    >
       <div class="transition-form">
         <p class="transition-label">Move from <strong>{plan.status}</strong> to:</p>
         <div class="transition-options">
           {#each allowedTransitions as t (t)}
             <ComicButton
               variant={selectedTransition === t ? 'primary' : 'outline'}
-              onclick={() => selectedTransition = t}
+              onclick={() => (selectedTransition = t)}
             >
               {t.replace('_', ' ')}
             </ComicButton>
           {/each}
         </div>
-        <ComicInput label="Note (required)" bind:value={transitionNote} placeholder="Why this transition?" />
+        <ComicInput
+          label="Note (required)"
+          bind:value={transitionNote}
+          placeholder="Why this transition?"
+        />
         <div class="transition-actions">
-          <ComicButton variant="primary" disabled={!selectedTransition || !transitionNote.trim() || isTransitioning} onclick={handleTransition}>
+          <ComicButton
+            variant="primary"
+            disabled={!selectedTransition || !transitionNote.trim() || isTransitioning}
+            onclick={handleTransition}
+          >
             {isTransitioning ? 'Transitioning...' : 'Confirm'}
           </ComicButton>
-          <ComicButton variant="outline" onclick={() => showTransition = false}>Cancel</ComicButton>
+          <ComicButton variant="outline" onclick={() => (showTransition = false)}
+            >Cancel</ComicButton
+          >
         </div>
       </div>
     </ComicDialog>
 
     <!-- Delete Confirmation -->
-    <ComicDialog title="Delete Plan?" bind:open={showDelete} onclose={() => showDelete = false}>
+    <ComicDialog title="Delete Plan?" bind:open={showDelete} onclose={() => (showDelete = false)}>
       <p>This will permanently delete this plan. This cannot be undone.</p>
       <div class="transition-actions">
         <ComicButton variant="danger" onclick={handleDelete}>Delete</ComicButton>
-        <ComicButton variant="outline" onclick={() => showDelete = false}>Cancel</ComicButton>
+        <ComicButton variant="outline" onclick={() => (showDelete = false)}>Cancel</ComicButton>
       </div>
     </ComicDialog>
   {/if}
 </div>
 
 <style>
-  .page { display: flex; flex-direction: column; gap: var(--spacing-lg); max-width: 900px; }
-  .plan-header { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-  .header-top { display: flex; align-items: center; }
-  .back-link { font-family: var(--font-comic); font-size: var(--font-size-sm); color: var(--accent-blue); text-decoration: underline; font-weight: 700; }
-  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; }
-  .meta-row { display: flex; flex-wrap: wrap; gap: var(--spacing-md); font-size: var(--font-size-sm); color: var(--text-muted); }
-  .action-row { display: flex; gap: var(--spacing-sm); }
-  .section-title { font-family: var(--font-comic); font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 var(--spacing-md); text-transform: uppercase; }
-  .subsection-title { font-family: var(--font-comic); font-size: var(--font-size-md); font-weight: 700; margin: var(--spacing-md) 0 var(--spacing-xs); color: var(--text-secondary); }
-  .linked-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-xs); }
-  .linked-item { color: var(--accent-blue); text-decoration: underline; display: flex; align-items: center; gap: var(--spacing-sm); cursor: pointer; }
-  .linked-meta { font-size: var(--font-size-xs); color: var(--text-muted); }
-  .outcome-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); margin-bottom: var(--spacing-sm); }
-  .outcome-header .section-title { margin: 0; }
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    max-width: 900px;
+  }
+  .plan-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+  }
+  .back-link {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
+    color: var(--accent-blue);
+    text-decoration: underline;
+    font-weight: 700;
+  }
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+  }
+  .action-row {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+  .section-title {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-xl);
+    font-weight: 700;
+    margin: 0 0 var(--spacing-md);
+    text-transform: uppercase;
+  }
+  .subsection-title {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+    color: var(--text-secondary);
+  }
+  .linked-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+  .linked-item {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+  }
+  .linked-meta {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+  }
+  .outcome-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+  }
+  .outcome-header .section-title {
+    margin: 0;
+  }
   .outcome-editor {
     width: 100%;
     min-height: 120px;
@@ -319,10 +442,32 @@
     color: var(--text-primary);
     resize: vertical;
   }
-  .outcome-actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
-  .empty-outcome { color: var(--text-muted); font-style: italic; }
-  .transition-form { display: flex; flex-direction: column; gap: var(--spacing-md); }
-  .transition-label { margin: 0; font-size: var(--font-size-md); }
-  .transition-options { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); }
-  .transition-actions { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); }
+  .outcome-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+  }
+  .empty-outcome {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .transition-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+  .transition-label {
+    margin: 0;
+    font-size: var(--font-size-md);
+  }
+  .transition-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+  .transition-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+  }
 </style>

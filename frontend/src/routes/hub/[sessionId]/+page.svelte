@@ -31,6 +31,28 @@
     outputTokens: number;
   }
 
+  function parseSSEEvent(parsed: Record<string, unknown>, result: SSEParsed): void {
+    if (parsed.type === 'content_block_delta') {
+      const delta = parsed.delta as Record<string, unknown> | undefined;
+      if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+        result.text += delta.text;
+      }
+    }
+    if (parsed.type === 'message_start') {
+      const msg = parsed.message as Record<string, unknown> | undefined;
+      const usage = msg?.usage as Record<string, unknown> | undefined;
+      if (typeof usage?.input_tokens === 'number') {
+        result.inputTokens = usage.input_tokens;
+      }
+    }
+    if (parsed.type === 'message_delta') {
+      const usage = parsed.usage as Record<string, unknown> | undefined;
+      if (typeof usage?.output_tokens === 'number') {
+        result.outputTokens = usage.output_tokens;
+      }
+    }
+  }
+
   function parseSSEChunk(chunk: string): SSEParsed {
     const result: SSEParsed = { text: '', inputTokens: 0, outputTokens: 0 };
     const lines = chunk.split('\n');
@@ -40,28 +62,7 @@
       if (data === '[DONE]') break;
       try {
         const parsed = JSON.parse(data) as Record<string, unknown>;
-        // Text: content_block_delta → delta.text
-        if (parsed.type === 'content_block_delta') {
-          const delta = parsed.delta as Record<string, unknown> | undefined;
-          if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
-            result.text += delta.text;
-          }
-        }
-        // Input tokens: message_start → message.usage.input_tokens
-        if (parsed.type === 'message_start') {
-          const msg = parsed.message as Record<string, unknown> | undefined;
-          const usage = msg?.usage as Record<string, unknown> | undefined;
-          if (typeof usage?.input_tokens === 'number') {
-            result.inputTokens = usage.input_tokens;
-          }
-        }
-        // Output tokens: message_delta → usage.output_tokens
-        if (parsed.type === 'message_delta') {
-          const usage = parsed.usage as Record<string, unknown> | undefined;
-          if (typeof usage?.output_tokens === 'number') {
-            result.outputTokens = usage.output_tokens;
-          }
-        }
+        parseSSEEvent(parsed, result);
       } catch {
         // Skip non-JSON lines
       }
@@ -73,10 +74,7 @@
 
   onMount(async () => {
     try {
-      const [sess, sessList] = await Promise.all([
-        fetchSession(sessionId),
-        fetchSessions(),
-      ]);
+      const [sess, sessList] = await Promise.all([fetchSession(sessionId), fetchSessions()]);
       session = sess;
       sessions = sessList.items;
       messages = sess?.messages ?? [];
@@ -169,8 +167,7 @@
 
       const pricing = MODEL_PRICING[session.model] ?? MODEL_PRICING['default'] ?? [3, 15];
       const [inputRate, outputRate] = pricing;
-      const estimatedCost =
-        (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000;
+      const estimatedCost = (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000;
 
       await updateSession(session.id, {
         messages,
@@ -219,9 +216,7 @@
   function exportAsMarkdown(): void {
     if (!session) return;
     const md = messages
-      .map((m) =>
-        m.role === 'user' ? `## User\n${m.content}` : `## Assistant\n${m.content}`,
-      )
+      .map((m) => (m.role === 'user' ? `## User\n${m.content}` : `## Assistant\n${m.content}`))
       .join('\n\n---\n\n');
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -276,12 +271,8 @@
         </div>
       </div>
       <div class="chat-actions">
-        <ComicButton variant="outline" size="sm" onclick={copyLastResponse}>
-          Copy Last
-        </ComicButton>
-        <ComicButton variant="outline" size="sm" onclick={exportAsMarkdown}>
-          Export .md
-        </ComicButton>
+        <ComicButton variant="outline" size="sm" onclick={copyLastResponse}>Copy Last</ComicButton>
+        <ComicButton variant="outline" size="sm" onclick={exportAsMarkdown}>Export .md</ComicButton>
       </div>
     </div>
 

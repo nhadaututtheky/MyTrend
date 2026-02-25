@@ -22,9 +22,7 @@
     <div class="toast toast-{t.type}" role="alert">
       <span class="icon">{getIcon(t.type)}</span>
       <span class="message">{t.message}</span>
-      <button class="dismiss" onclick={() => dismiss(t.id)} aria-label="Dismiss">
-        &times;
-      </button>
+      <button class="dismiss" onclick={() => dismiss(t.id)} aria-label="Dismiss"> &times; </button>
     </div>
   {/each}
 </div>
@@ -54,15 +52,35 @@
     animation: slideIn 0.3s ease;
   }
 
-  .toast-success { background: #d4edda; }
-  .toast-error { background: #f8d7da; }
-  .toast-info { background: #d1ecf1; }
-  .toast-warning { background: #fff3cd; }
+  .toast-success {
+    background: #d4edda;
+  }
+  .toast-error {
+    background: #f8d7da;
+  }
+  .toast-info {
+    background: #d1ecf1;
+  }
+  .toast-warning {
+    background: #fff3cd;
+  }
 
-  :global([data-theme='dark']) .toast-success { background: #1a3d2a; color: #d4edda; }
-  :global([data-theme='dark']) .toast-error { background: #3d1a1a; color: #f8d7da; }
-  :global([data-theme='dark']) .toast-info { background: #1a2d3d; color: #d1ecf1; }
-  :global([data-theme='dark']) .toast-warning { background: #3d3a1a; color: #fff3cd; }
+  :global([data-theme='dark']) .toast-success {
+    background: #1a3d2a;
+    color: #d4edda;
+  }
+  :global([data-theme='dark']) .toast-error {
+    background: #3d1a1a;
+    color: #f8d7da;
+  }
+  :global([data-theme='dark']) .toast-info {
+    background: #1a2d3d;
+    color: #d1ecf1;
+  }
+  :global([data-theme='dark']) .toast-warning {
+    background: #3d3a1a;
+    color: #fff3cd;
+  }
 
   .icon {
     font-weight: 700;

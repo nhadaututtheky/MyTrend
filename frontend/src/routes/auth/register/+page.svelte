@@ -76,9 +76,7 @@
           <p class="error" role="alert">{error}</p>
         {/if}
 
-        <ComicButton variant="primary" type="submit" {loading}>
-          Register
-        </ComicButton>
+        <ComicButton variant="primary" type="submit" {loading}>Register</ComicButton>
       </form>
 
       <p class="link">

@@ -31,7 +31,10 @@
     { id: 'abandoned', label: 'Abandoned' },
   ];
 
-  const STATUS_COLORS: Record<PlanStatus, 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> = {
+  const STATUS_COLORS: Record<
+    PlanStatus,
+    'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'
+  > = {
     draft: 'yellow',
     approved: 'blue',
     in_progress: 'orange',
@@ -51,17 +54,18 @@
     migration: 'blue',
   };
 
-  const PRIORITY_COLORS: Record<string, 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> = {
-    low: 'blue',
-    medium: 'yellow',
-    high: 'orange',
-    critical: 'red',
-  };
+  const PRIORITY_COLORS: Record<string, 'green' | 'blue' | 'yellow' | 'orange' | 'red' | 'purple'> =
+    {
+      low: 'blue',
+      medium: 'yellow',
+      high: 'orange',
+      critical: 'red',
+    };
 
   async function loadPlans(): Promise<void> {
     isLoading = true;
     try {
-      const status = statusFilter === 'all' ? undefined : statusFilter as PlanStatus;
+      const status = statusFilter === 'all' ? undefined : (statusFilter as PlanStatus);
       const result = await fetchPlans(currentPage, { status });
       plans = result.items;
       totalPages = result.totalPages;
@@ -79,7 +83,7 @@
   }
 
   $effect(() => {
-    statusFilter; // Track
+    void statusFilter; // Track dependency
     handleTabChange();
   });
 
@@ -94,7 +98,9 @@
     });
   });
 
-  onDestroy(() => { unsubscribe?.(); });
+  onDestroy(() => {
+    unsubscribe?.();
+  });
 
   async function handleSyncPlanFiles(): Promise<void> {
     isSyncing = true;
@@ -156,9 +162,13 @@
             <div class="plan-header">
               <h3 class="plan-title">{plan.title}</h3>
               <div class="plan-badges">
-                <ComicBadge color={STATUS_COLORS[plan.status]} size="sm">{plan.status.replace('_', ' ')}</ComicBadge>
+                <ComicBadge color={STATUS_COLORS[plan.status]} size="sm"
+                  >{plan.status.replace('_', ' ')}</ComicBadge
+                >
                 {#if plan.plan_type}
-                  <ComicBadge color={TYPE_COLORS[plan.plan_type]} size="sm">{plan.plan_type}</ComicBadge>
+                  <ComicBadge color={TYPE_COLORS[plan.plan_type]} size="sm"
+                    >{plan.plan_type}</ComicBadge
+                  >
                 {/if}
               </div>
             </div>
@@ -167,7 +177,9 @@
             {/if}
             <div class="plan-meta">
               {#if plan.priority}
-                <ComicBadge color={PRIORITY_COLORS[plan.priority] ?? 'blue'} size="sm">{plan.priority}</ComicBadge>
+                <ComicBadge color={PRIORITY_COLORS[plan.priority] ?? 'blue'} size="sm"
+                  >{plan.priority}</ComicBadge
+                >
               {/if}
               {#if plan.complexity}
                 <span class="meta-text">{plan.complexity}</span>
@@ -194,36 +206,139 @@
 
     {#if totalPages > 1}
       <div class="pagination">
-        <ComicButton variant="outline" disabled={currentPage <= 1} onclick={() => { currentPage--; loadPlans(); }}>Prev</ComicButton>
+        <ComicButton
+          variant="outline"
+          disabled={currentPage <= 1}
+          onclick={() => {
+            currentPage--;
+            loadPlans();
+          }}>Prev</ComicButton
+        >
         <span class="page-info">Page {currentPage} / {totalPages}</span>
-        <ComicButton variant="outline" disabled={currentPage >= totalPages} onclick={() => { currentPage++; loadPlans(); }}>Next</ComicButton>
+        <ComicButton
+          variant="outline"
+          disabled={currentPage >= totalPages}
+          onclick={() => {
+            currentPage++;
+            loadPlans();
+          }}>Next</ComicButton
+        >
       </div>
     {/if}
   {/if}
 </div>
 
 <style>
-  .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
-  .page-header a { text-decoration: none; }
-  .header-actions { display: flex; gap: var(--spacing-sm); align-items: center; flex-shrink: 0; }
-  .subtitle { font-size: var(--font-size-md); color: var(--text-muted); margin: var(--spacing-xs) 0 0; }
-  .skeleton-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-  .list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-  .list-link { text-decoration: none; color: inherit; animation: sketchFadeIn 0.3s ease both; }
-  .plan-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: var(--spacing-xs); }
-  .plan-title { font-size: var(--font-size-lg); font-weight: 700; margin: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; }
-  .plan-badges { display: flex; gap: 4px; flex-shrink: 0; }
-  .plan-trigger { font-size: var(--font-size-md); color: var(--text-secondary); margin: 0 0 var(--spacing-xs); display: -webkit-box; -webkit-line-clamp: 1; line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-  .plan-meta { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-xs); color: var(--text-muted); flex-wrap: wrap; }
-  .meta-text { text-transform: capitalize; }
-  .time { margin-left: auto; }
-  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
-  .pagination { display: flex; align-items: center; justify-content: center; gap: var(--spacing-md); }
-  .page-info { font-size: var(--font-size-md); color: var(--text-secondary); }
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+  }
+  .page-header a {
+    text-decoration: none;
+  }
+  .header-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .subtitle {
+    font-size: var(--font-size-md);
+    color: var(--text-muted);
+    margin: var(--spacing-xs) 0 0;
+  }
+  .skeleton-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+  .list-link {
+    text-decoration: none;
+    color: inherit;
+    animation: sketchFadeIn 0.3s ease both;
+  }
+  .plan-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+  }
+  .plan-title {
+    font-size: var(--font-size-lg);
+    font-weight: 700;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .plan-badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .plan-trigger {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+    margin: 0 0 var(--spacing-xs);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .plan-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+  .meta-text {
+    text-transform: capitalize;
+  }
+  .time {
+    margin-left: auto;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: var(--spacing-xs);
+  }
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+  }
+  .page-info {
+    font-size: var(--font-size-md);
+    color: var(--text-secondary);
+  }
 
   @media (max-width: 768px) {
-    .page-header { flex-direction: column; }
-    .plan-header { flex-direction: column; }
+    .page-header {
+      flex-direction: column;
+    }
+    .plan-header {
+      flex-direction: column;
+    }
   }
 </style>

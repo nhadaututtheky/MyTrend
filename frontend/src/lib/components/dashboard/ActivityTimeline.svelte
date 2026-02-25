@@ -28,10 +28,7 @@
   {:else}
     {#each activities as activity (activity.id)}
       <div class="timeline-item animate-fadeIn">
-        <div
-          class="dot"
-          style:background={getActivityTypeColor(activity.type)}
-        ></div>
+        <div class="dot" style:background={getActivityTypeColor(activity.type)}></div>
         <div class="content">
           <div class="header">
             <ComicBadge color="blue" size="sm">

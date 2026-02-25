@@ -46,22 +46,15 @@
       class="message-input"
       placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
       rows="1"
-      disabled={disabled}
+      {disabled}
       onkeydown={handleKeydown}
       oninput={resizeTextarea}
     ></textarea>
   </div>
   {#if disabled}
-    <ComicButton variant="danger" onclick={onstop} size="md">
-      Stop
-    </ComicButton>
+    <ComicButton variant="danger" onclick={onstop} size="md">Stop</ComicButton>
   {:else}
-    <ComicButton
-      variant="primary"
-      type="submit"
-      disabled={!content.trim()}
-      size="md"
-    >
+    <ComicButton variant="primary" type="submit" disabled={!content.trim()} size="md">
       Send
     </ComicButton>
   {/if}

@@ -54,13 +54,7 @@
 
 <div class="peak-hours" data-testid="peak-hours-chart">
   {#if chartData.length > 0}
-    <RoughChart
-      type="bar"
-      data={chartData}
-      height={160}
-      color="#4ECDC4"
-      roughness={1.5}
-    />
+    <RoughChart type="bar" data={chartData} height={160} color="#4ECDC4" roughness={1.5} />
   {/if}
   <p class="peak-label">{peakLabel}</p>
 </div>

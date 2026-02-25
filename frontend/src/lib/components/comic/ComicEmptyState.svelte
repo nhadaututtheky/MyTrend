@@ -36,11 +36,7 @@
       'M 45 48 L 52 48',
       'M 58 48 L 65 48',
     ],
-    error: [
-      'M 50 25 L 20 80 L 80 80 Z',
-      'M 50 45 L 50 60',
-      'M 50 67 L 50 70',
-    ],
+    error: ['M 50 25 L 20 80 L 80 80 Z', 'M 50 45 L 50 60', 'M 50 67 L 50 70'],
     inbox: [
       'M 20 40 L 50 20 L 80 40 L 80 80 L 20 80 Z',
       'M 20 40 L 50 60 L 80 40',
@@ -72,16 +68,13 @@
     }
   }
 
-  onMount(() => { drawRoughPaths(); });
+  onMount(() => {
+    drawRoughPaths();
+  });
 </script>
 
 <div class="empty-state" data-testid="empty-state">
-  <svg
-    bind:this={svgEl}
-    viewBox="0 0 100 100"
-    class="empty-illustration"
-    aria-hidden="true"
-  ></svg>
+  <svg bind:this={svgEl} viewBox="0 0 100 100" class="empty-illustration" aria-hidden="true"></svg>
 
   <p class="empty-message">{message}</p>
 

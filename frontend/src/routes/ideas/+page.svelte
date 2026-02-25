@@ -26,11 +26,19 @@
   ];
 
   const PRIORITY_COLORS: Record<string, 'green' | 'yellow' | 'orange' | 'red'> = {
-    low: 'green', medium: 'yellow', high: 'orange', critical: 'red',
+    low: 'green',
+    medium: 'yellow',
+    high: 'orange',
+    critical: 'red',
   };
 
   const TYPE_COLORS: Record<string, 'blue' | 'red' | 'purple' | 'green' | 'orange' | 'yellow'> = {
-    feature: 'green', bug: 'red', design: 'purple', architecture: 'blue', optimization: 'orange', question: 'yellow',
+    feature: 'green',
+    bug: 'red',
+    design: 'purple',
+    architecture: 'blue',
+    optimization: 'orange',
+    question: 'yellow',
   };
 
   const filtered = $derived(
@@ -40,9 +48,8 @@
   const inboxCount = $derived(ideas.filter((i) => i.status === 'inbox').length);
 
   const statusTabsWithCount = $derived(
-    statusTabs.map((t) => t.id === 'inbox' && inboxCount > 0
-      ? { ...t, label: `Inbox (${inboxCount})` }
-      : t,
+    statusTabs.map((t) =>
+      t.id === 'inbox' && inboxCount > 0 ? { ...t, label: `Inbox (${inboxCount})` } : t,
     ),
   );
 
@@ -55,7 +62,10 @@
   }
 
   const NEON_MAP: Record<string, 'green' | 'blue' | 'purple' | 'red' | false> = {
-    green: 'green', blue: 'blue', purple: 'purple', red: 'red',
+    green: 'green',
+    blue: 'blue',
+    purple: 'purple',
+    red: 'red',
   };
 
   function getNeonForType(type: string): 'green' | 'blue' | 'purple' | 'red' | false {
@@ -67,13 +77,17 @@
     try {
       const result = await fetchIdeas();
       ideas = result.items;
-    } catch (err: unknown) { console.error('[Ideas]', err); }
-    finally { isLoading = false; }
+    } catch (err: unknown) {
+      console.error('[Ideas]', err);
+    } finally {
+      isLoading = false;
+    }
 
     try {
       unsubscribe = await pb.collection('ideas').subscribe('*', (e) => {
         if (e.action === 'create') ideas = [e.record as unknown as Idea, ...ideas];
-        else if (e.action === 'update') ideas = ideas.map((i) => i.id === e.record.id ? (e.record as unknown as Idea) : i);
+        else if (e.action === 'update')
+          ideas = ideas.map((i) => (i.id === e.record.id ? (e.record as unknown as Idea) : i));
         else if (e.action === 'delete') ideas = ideas.filter((i) => i.id !== e.record.id);
       });
     } catch (err: unknown) {
@@ -81,7 +95,9 @@
     }
   });
 
-  onDestroy(() => { unsubscribe?.(); });
+  onDestroy(() => {
+    unsubscribe?.();
+  });
 </script>
 
 <svelte:head><title>Ideas - MyTrend</title></svelte:head>
@@ -94,8 +110,22 @@
     </div>
     <div class="header-actions">
       <div class="view-toggle">
-        <button class="toggle-btn" class:active={viewMode === 'grid'} onclick={() => { viewMode = 'grid'; }} aria-label="Grid view">▦</button>
-        <button class="toggle-btn" class:active={viewMode === 'list'} onclick={() => { viewMode = 'list'; }} aria-label="List view">☰</button>
+        <button
+          class="toggle-btn"
+          class:active={viewMode === 'grid'}
+          onclick={() => {
+            viewMode = 'grid';
+          }}
+          aria-label="Grid view">▦</button
+        >
+        <button
+          class="toggle-btn"
+          class:active={viewMode === 'list'}
+          onclick={() => {
+            viewMode = 'list';
+          }}
+          aria-label="List view">☰</button
+        >
       </div>
       <a href="/ideas/new"><ComicButton variant="primary">New Idea</ComicButton></a>
     </div>
@@ -118,7 +148,11 @@
       actionHref="/ideas/new"
     />
   {:else}
-    <div class="ideas-container" class:grid-view={viewMode === 'grid'} class:list-view={viewMode === 'list'}>
+    <div
+      class="ideas-container"
+      class:grid-view={viewMode === 'grid'}
+      class:list-view={viewMode === 'list'}
+    >
       {#each filtered as idea, i (idea.id)}
         <a href="/ideas/{idea.id}" class="idea-link" style:animation-delay="{i * 30}ms">
           <ComicCard variant="standard" neon={getNeonForType(idea.type)}>
@@ -128,15 +162,28 @@
                 {#if isAutoExtracted(idea)}
                   <ComicBadge color="blue" size="sm">auto</ComicBadge>
                 {/if}
-                <ComicBadge color={TYPE_COLORS[idea.type] ?? 'blue'} size="sm">{idea.type}</ComicBadge>
-                <ComicBadge color={PRIORITY_COLORS[idea.priority] ?? 'green'} size="sm">{idea.priority}</ComicBadge>
+                <ComicBadge color={TYPE_COLORS[idea.type] ?? 'blue'} size="sm"
+                  >{idea.type}</ComicBadge
+                >
+                <ComicBadge color={PRIORITY_COLORS[idea.priority] ?? 'green'} size="sm"
+                  >{idea.priority}</ComicBadge
+                >
               </div>
             </div>
             {#if idea.content}
-              <p class="idea-preview">{stripHtml(idea.content).slice(0, 120)}{stripHtml(idea.content).length > 120 ? '...' : ''}</p>
+              <p class="idea-preview">
+                {stripHtml(idea.content).slice(0, 120)}{stripHtml(idea.content).length > 120
+                  ? '...'
+                  : ''}
+              </p>
             {/if}
             {#if Array.isArray(idea.tags) && idea.tags.length > 0}
-              <div class="tags">{#each idea.tags.filter(t => t !== 'auto-extracted').slice(0, 3) as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge>{/each}</div>
+              <div class="tags">
+                {#each idea.tags
+                  .filter((t) => t !== 'auto-extracted')
+                  .slice(0, 3) as tag (tag)}<ComicBadge color="purple" size="sm">{tag}</ComicBadge
+                  >{/each}
+              </div>
             {/if}
           </ComicCard>
         </a>
@@ -146,13 +193,32 @@
 </div>
 
 <style>
-  .page { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+  }
 
-  .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
-  .page-header a { text-decoration: none; }
-  .subtitle { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0; }
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+  }
+  .page-header a {
+    text-decoration: none;
+  }
+  .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 4px 0 0;
+  }
 
-  .header-actions { display: flex; align-items: center; gap: var(--spacing-sm); }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
 
   .view-toggle {
     display: flex;
@@ -168,7 +234,9 @@
     cursor: pointer;
     font-size: 0.9rem;
     color: var(--text-muted);
-    transition: background var(--transition-fast), color var(--transition-fast);
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast);
   }
 
   .toggle-btn.active {
@@ -200,9 +268,23 @@
     animation: sketchFadeIn 0.3s ease both;
   }
 
-  .idea-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
-  .idea-title { font-size: 0.95rem; font-weight: 700; margin: 0; }
-  .badges { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+  .idea-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+  }
+  .idea-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+  }
+  .badges {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
   .idea-preview {
     font-size: 0.8rem;
     color: var(--text-secondary);
@@ -214,10 +296,19 @@
     line-clamp: 2;
     -webkit-box-orient: vertical;
   }
-  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--spacing-xs); }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: var(--spacing-xs);
+  }
 
   @media (max-width: 768px) {
-    .page-header { flex-direction: column; }
-    .ideas-container.grid-view { grid-template-columns: 1fr; }
+    .page-header {
+      flex-direction: column;
+    }
+    .ideas-container.grid-view {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

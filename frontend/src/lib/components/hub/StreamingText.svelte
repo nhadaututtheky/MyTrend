@@ -10,6 +10,7 @@
 </script>
 
 <div class="streaming-text" data-testid="streaming-text">
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   <div class="text-content markdown-body">{@html renderMarkdown(text)}</div>
   {#if isStreaming}
     <span class="cursor" aria-hidden="true">|</span>
@@ -66,6 +67,8 @@
   }
 
   @keyframes blink {
-    50% { opacity: 0; }
+    50% {
+      opacity: 0;
+    }
   }
 </style>

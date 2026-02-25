@@ -11,12 +11,7 @@
     onremove?: (topic: Topic) => void;
   }
 
-  const {
-    selectedTopics = [],
-    maxTopics = 5,
-    onselect,
-    onremove,
-  }: Props = $props();
+  const { selectedTopics = [], maxTopics = 5, onselect, onremove }: Props = $props();
 
   let query = $state('');
   let results = $state<Topic[]>([]);
@@ -37,9 +32,7 @@
       isSearching = true;
       try {
         const items = await searchTopics(query.trim());
-        results = items.filter(
-          (t) => !selectedTopics.some((s) => s.id === t.id),
-        );
+        results = items.filter((t) => !selectedTopics.some((s) => s.id === t.id));
         isOpen = results.length > 0;
       } catch {
         results = [];
@@ -73,7 +66,9 @@
 
   function handleBlur(): void {
     // Delay to allow click on dropdown item
-    setTimeout(() => { isOpen = false; }, 200);
+    setTimeout(() => {
+      isOpen = false;
+    }, 200);
   }
 </script>
 
@@ -201,8 +196,13 @@
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 0.3; }
-    50% { opacity: 1; }
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
   }
 
   .chips {

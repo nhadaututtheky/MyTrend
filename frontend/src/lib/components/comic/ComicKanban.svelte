@@ -15,8 +15,21 @@
 
   const columns = $derived([
     { id: 'pending', label: 'Pending', color: 'yellow' as const, icon: '⏳', items: pendingTasks },
-    { id: 'in_progress', label: 'In Progress', color: 'blue' as const, icon: '🔄', items: inProgressTasks },
-    { id: 'completed', label: 'Done', color: 'green' as const, icon: '✅', items: completedTasks, extraCount: completedCount },
+    {
+      id: 'in_progress',
+      label: 'In Progress',
+      color: 'blue' as const,
+      icon: '🔄',
+      items: inProgressTasks,
+    },
+    {
+      id: 'completed',
+      label: 'Done',
+      color: 'green' as const,
+      icon: '✅',
+      items: completedTasks,
+      extraCount: completedCount,
+    },
   ]);
 </script>
 
@@ -27,13 +40,17 @@
         <span class="col-icon">{col.icon}</span>
         <span class="col-title">{col.label}</span>
         <ComicBadge color={col.color} size="sm">
-          {col.items.length}{#if col.extraCount && col.extraCount > col.items.length}+{col.extraCount - col.items.length}{/if}
+          {col.items
+            .length}{#if col.extraCount && col.extraCount > col.items.length}+{col.extraCount -
+              col.items.length}{/if}
         </ComicBadge>
       </div>
       <div class="col-body">
         {#if col.extraCount && col.extraCount > col.items.length}
           <div class="ghost-card">
-            <span class="ghost-count">{col.extraCount - col.items.length} completed tasks cleaned up</span>
+            <span class="ghost-count"
+              >{col.extraCount - col.items.length} completed tasks cleaned up</span
+            >
           </div>
         {/if}
         {#each col.items as task (task.id)}
@@ -105,7 +122,9 @@
     border: 1.5px solid var(--border-color);
     border-radius: var(--radius-sketch);
     position: relative;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    transition:
+      transform var(--transition-fast),
+      box-shadow var(--transition-fast);
     cursor: default;
   }
 
@@ -180,8 +199,13 @@
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
   }
 
   @media (max-width: 768px) {

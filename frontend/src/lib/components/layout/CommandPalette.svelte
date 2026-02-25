@@ -1,8 +1,18 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import {
-    LayoutDashboard, FolderOpen, MessageCircle, Lightbulb, ClipboardList,
-    TrendingUp, Globe, Search, Terminal, Zap, Settings, Plus,
+    LayoutDashboard,
+    FolderOpen,
+    MessageCircle,
+    Lightbulb,
+    ClipboardList,
+    TrendingUp,
+    Globe,
+    Search,
+    Terminal,
+    Zap,
+    Settings,
+    Plus,
   } from 'lucide-svelte';
   import type { ComponentType } from 'svelte';
 
@@ -28,19 +38,110 @@
   }
 
   const commands: CommandItem[] = [
-    { id: 'dashboard', label: 'Dashboard', section: 'Navigate', icon: LayoutDashboard, href: '/', keywords: 'home overview' },
-    { id: 'projects', label: 'Projects', section: 'Navigate', icon: FolderOpen, href: '/projects', keywords: 'folder' },
-    { id: 'conversations', label: 'Conversations', section: 'Navigate', icon: MessageCircle, href: '/conversations', keywords: 'chat messages' },
-    { id: 'ideas', label: 'Ideas', section: 'Navigate', icon: Lightbulb, href: '/ideas', keywords: 'brainstorm' },
-    { id: 'plans', label: 'Plans', section: 'Navigate', icon: ClipboardList, href: '/plans', keywords: 'tasks todo' },
-    { id: 'trends', label: 'Trends', section: 'Navigate', icon: TrendingUp, href: '/trends', keywords: 'analytics stats' },
-    { id: 'graph', label: 'Knowledge Graph', section: 'Navigate', icon: Globe, href: '/graph', keywords: 'network nodes' },
-    { id: 'search', label: 'Search', section: 'Navigate', icon: Search, href: '/search', keywords: 'find query' },
-    { id: 'vibe', label: 'Vibe Terminal', section: 'Tools', icon: Terminal, href: '/vibe', keywords: 'claude code cli' },
-    { id: 'hub', label: 'Claude Hub', section: 'Tools', icon: Zap, href: '/hub', keywords: 'ai chat assistant' },
-    { id: 'settings', label: 'Settings', section: 'Tools', icon: Settings, href: '/settings', keywords: 'preferences config' },
-    { id: 'new-idea', label: 'New Idea', section: 'Actions', icon: Plus, href: '/ideas/new', keywords: 'create add' },
-    { id: 'new-project', label: 'New Project', section: 'Actions', icon: Plus, href: '/projects/new', keywords: 'create add' },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      section: 'Navigate',
+      icon: LayoutDashboard,
+      href: '/',
+      keywords: 'home overview',
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      section: 'Navigate',
+      icon: FolderOpen,
+      href: '/projects',
+      keywords: 'folder',
+    },
+    {
+      id: 'conversations',
+      label: 'Conversations',
+      section: 'Navigate',
+      icon: MessageCircle,
+      href: '/conversations',
+      keywords: 'chat messages',
+    },
+    {
+      id: 'ideas',
+      label: 'Ideas',
+      section: 'Navigate',
+      icon: Lightbulb,
+      href: '/ideas',
+      keywords: 'brainstorm',
+    },
+    {
+      id: 'plans',
+      label: 'Plans',
+      section: 'Navigate',
+      icon: ClipboardList,
+      href: '/plans',
+      keywords: 'tasks todo',
+    },
+    {
+      id: 'trends',
+      label: 'Trends',
+      section: 'Navigate',
+      icon: TrendingUp,
+      href: '/trends',
+      keywords: 'analytics stats',
+    },
+    {
+      id: 'graph',
+      label: 'Knowledge Graph',
+      section: 'Navigate',
+      icon: Globe,
+      href: '/graph',
+      keywords: 'network nodes',
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      section: 'Navigate',
+      icon: Search,
+      href: '/search',
+      keywords: 'find query',
+    },
+    {
+      id: 'vibe',
+      label: 'Vibe Terminal',
+      section: 'Tools',
+      icon: Terminal,
+      href: '/vibe',
+      keywords: 'claude code cli',
+    },
+    {
+      id: 'hub',
+      label: 'Claude Hub',
+      section: 'Tools',
+      icon: Zap,
+      href: '/hub',
+      keywords: 'ai chat assistant',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      section: 'Tools',
+      icon: Settings,
+      href: '/settings',
+      keywords: 'preferences config',
+    },
+    {
+      id: 'new-idea',
+      label: 'New Idea',
+      section: 'Actions',
+      icon: Plus,
+      href: '/ideas/new',
+      keywords: 'create add',
+    },
+    {
+      id: 'new-project',
+      label: 'New Project',
+      section: 'Actions',
+      icon: Plus,
+      href: '/projects/new',
+      keywords: 'create add',
+    },
   ];
 
   const filtered = $derived(() => {
@@ -145,7 +246,9 @@
                 class="result-item"
                 class:selected={globalIndex === selectedIndex}
                 onclick={() => handleSelect(item)}
-                onmouseenter={() => { selectedIndex = globalIndex; }}
+                onmouseenter={() => {
+                  selectedIndex = globalIndex;
+                }}
               >
                 <span class="result-icon"><item.icon size={16} /></span>
                 <span class="result-label">{item.label}</span>
@@ -174,8 +277,12 @@
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .palette {
@@ -190,8 +297,14 @@
   }
 
   @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .search-row {

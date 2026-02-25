@@ -96,9 +96,7 @@
       <ComicButton variant="primary" loading={isCreating} onclick={handleCreate}>
         Create Session
       </ComicButton>
-      <ComicButton variant="outline" onclick={() => goto('/hub')}>
-        Cancel
-      </ComicButton>
+      <ComicButton variant="outline" onclick={() => goto('/hub')}>Cancel</ComicButton>
     </div>
   </ComicCard>
 </div>

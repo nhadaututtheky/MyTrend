@@ -22,7 +22,12 @@
   let fileInput: HTMLInputElement | undefined = $state();
 
   onMount(async () => {
-    try { const r = await fetchProjects(); projects = r.items; } catch { /* optional */ }
+    try {
+      const r = await fetchProjects();
+      projects = r.items;
+    } catch {
+      /* optional */
+    }
   });
 
   function handleFileSelect(event: Event): void {
@@ -37,38 +42,53 @@
     pendingFiles = pendingFiles.filter((_, i) => i !== index);
   }
 
+  async function uploadPendingFiles(ideaId: string): Promise<void> {
+    if (pendingFiles.length === 0) return;
+    let uploaded = 0;
+    for (const file of pendingFiles) {
+      try {
+        await uploadToTelegram(file, {
+          linkedCollection: 'ideas',
+          linkedRecordId: ideaId,
+        });
+        uploaded++;
+      } catch {
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
+    if (uploaded > 0) toast.info(`${uploaded} file(s) uploaded to Telegram`);
+  }
+
   async function handleSubmit(e: SubmitEvent): Promise<void> {
     e.preventDefault();
     if (!title.trim()) return;
     isCreating = true;
     try {
-      const tags = tagsStr.split(',').map((s) => s.trim()).filter(Boolean);
+      const tags = tagsStr
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
       const idea = await createIdea({
-        title, content, type: type as 'feature', priority: priority as 'medium',
-        project: projectId || null, tags, status: 'inbox', related_ideas: [],
+        title,
+        content,
+        type: type as 'feature',
+        priority: priority as 'medium',
+        project: projectId || null,
+        tags,
+        status: 'inbox',
+        related_ideas: [],
       });
 
-      // Upload pending files to Telegram
-      if (pendingFiles.length > 0) {
-        let uploaded = 0;
-        for (const file of pendingFiles) {
-          try {
-            await uploadToTelegram(file, {
-              linkedCollection: 'ideas',
-              linkedRecordId: idea.id,
-            });
-            uploaded++;
-          } catch {
-            toast.error(`Failed to upload ${file.name}`);
-          }
-        }
-        if (uploaded > 0) toast.info(`${uploaded} file(s) uploaded to Telegram`);
-      }
+      await uploadPendingFiles(idea.id);
 
       toast.success('Idea created!');
       await goto(`/ideas/${idea.id}`);
-    } catch (err: unknown) { console.error('[Ideas/New]', err); toast.error('Failed to create idea'); }
-    finally { isCreating = false; }
+    } catch (err: unknown) {
+      console.error('[Ideas/New]', err);
+      toast.error('Failed to create idea');
+    } finally {
+      isCreating = false;
+    }
   }
 </script>
 
@@ -82,15 +102,25 @@
         <ComicInput bind:value={title} label="Title" placeholder="What's the idea?" required />
         <div class="field">
           <label class="label" for="content">Description</label>
-          <textarea id="content" class="comic-input textarea" bind:value={content} rows="5" placeholder="Describe the idea..."></textarea>
+          <textarea
+            id="content"
+            class="comic-input textarea"
+            bind:value={content}
+            rows="5"
+            placeholder="Describe the idea..."
+          ></textarea>
         </div>
         <div class="row">
           <div class="field">
             <label class="label" for="type">Type</label>
             <select id="type" class="comic-input" bind:value={type}>
               <option value="feature">Feature</option><option value="bug">Bug</option>
-              <option value="design">Design</option><option value="architecture">Architecture</option>
-              <option value="optimization">Optimization</option><option value="question">Question</option>
+              <option value="design">Design</option><option value="architecture"
+                >Architecture</option
+              >
+              <option value="optimization">Optimization</option><option value="question"
+                >Question</option
+              >
             </select>
           </div>
           <div class="field">
@@ -108,7 +138,11 @@
             {#each projects as p (p.id)}<option value={p.id}>{p.icon} {p.name}</option>{/each}
           </select>
         </div>
-        <ComicInput bind:value={tagsStr} label="Tags" placeholder="svelte, performance, ux (comma-separated)" />
+        <ComicInput
+          bind:value={tagsStr}
+          label="Tags"
+          placeholder="svelte, performance, ux (comma-separated)"
+        />
 
         <!-- File attachments -->
         <div class="field">
@@ -118,7 +152,9 @@
             role="button"
             tabindex="0"
             onclick={() => fileInput?.click()}
-            onkeydown={(e) => { if (e.key === 'Enter') fileInput?.click(); }}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') fileInput?.click();
+            }}
           >
             <input
               id="file-attachments"
@@ -135,7 +171,9 @@
               {#each pendingFiles as file, i (file.name + i)}
                 <div class="pending-file">
                   <span class="pending-name">{file.name}</span>
-                  <button type="button" class="pending-remove" onclick={() => removePendingFile(i)}>x</button>
+                  <button type="button" class="pending-remove" onclick={() => removePendingFile(i)}
+                    >x</button
+                  >
                 </div>
               {/each}
             </div>
@@ -151,13 +189,40 @@
 </div>
 
 <style>
-  .new-idea-page { max-width: 550px; }
-  .fields { display: flex; flex-direction: column; gap: var(--spacing-md); margin: var(--spacing-lg) 0; }
-  .field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-  .label { font-family: var(--font-comic); font-size: 0.875rem; font-weight: 700; }
-  .textarea { resize: vertical; min-height: 80px; font-family: var(--font-comic); line-height: 1.5; }
-  .row { display: flex; gap: var(--spacing-md); }
-  .actions { display: flex; gap: var(--spacing-sm); }
+  .new-idea-page {
+    max-width: 550px;
+  }
+  .fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    margin: var(--spacing-lg) 0;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+  .label {
+    font-family: var(--font-comic);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .textarea {
+    resize: vertical;
+    min-height: 80px;
+    font-family: var(--font-comic);
+    line-height: 1.5;
+  }
+  .row {
+    display: flex;
+    gap: var(--spacing-md);
+  }
+  .actions {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
   .upload-zone {
     border: 2px dashed var(--border-color);
     border-radius: 6px;
@@ -166,15 +231,24 @@
     cursor: pointer;
     transition: border-color 0.2s;
   }
-  .upload-zone:hover { border-color: var(--accent-blue); }
-  .file-input { display: none; }
+  .upload-zone:hover {
+    border-color: var(--accent-blue);
+  }
+  .file-input {
+    display: none;
+  }
   .upload-text {
     font-family: var(--font-comic);
     font-size: 0.8rem;
     font-weight: 700;
     color: var(--text-secondary);
   }
-  .pending-files { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .pending-files {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+  }
   .pending-file {
     display: flex;
     align-items: center;

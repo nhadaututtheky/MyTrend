@@ -75,17 +75,25 @@
           <!-- Project name + model badge -->
           <div class="item-header">
             <span class="project-name">{session.project_name}</span>
-            <span class="model-badge {getModelClass(session.model)}">{getModelShort(session.model)}</span>
+            <span class="model-badge {getModelClass(session.model)}"
+              >{getModelShort(session.model)}</span
+            >
           </div>
 
           <!-- Session title -->
           {#if session.session_title && session.session_title !== 'Untitled'}
-            <p class="session-title">{session.session_title.slice(0, 50)}{session.session_title.length > 50 ? '…' : ''}</p>
+            <p class="session-title">
+              {session.session_title.slice(0, 50)}{session.session_title.length > 50 ? '…' : ''}
+            </p>
           {/if}
 
           <!-- 3-segment progress bar -->
           {#if session.total_tasks > 0}
-            <div class="progress-bar" aria-label="Progress" title="{session.completed_count}/{session.total_tasks} complete">
+            <div
+              class="progress-bar"
+              aria-label="Progress"
+              title="{session.completed_count}/{session.total_tasks} complete"
+            >
               <div
                 class="progress-done"
                 style="width: {(session.completed_count / session.total_tasks) * 100}%"
@@ -115,7 +123,9 @@
 
             <span class="stat-right">
               {#if session.context_pct > 50}
-                <span class="context-warn" title="{session.context_pct}% context used">{session.context_pct}%</span>
+                <span class="context-warn" title="{session.context_pct}% context used"
+                  >{session.context_pct}%</span
+                >
               {:else if session.total_tokens > 0}
                 <span class="stat-tokens">{formatTokens(session.total_tokens)}t</span>
               {/if}
@@ -179,7 +189,9 @@
     border-bottom: 1px solid var(--border-color);
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background 150ms ease, color 150ms ease;
+    transition:
+      background 150ms ease,
+      color 150ms ease;
   }
 
   .session-all-btn:hover,
@@ -204,7 +216,9 @@
     border: 2px solid var(--border-color);
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: border-color 200ms ease, box-shadow 200ms ease;
+    transition:
+      border-color 200ms ease,
+      box-shadow 200ms ease;
   }
 
   .session-item:hover {
@@ -252,9 +266,21 @@
     flex-shrink: 0;
   }
 
-  .model-green { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); border: 1px solid rgba(0, 210, 106, 0.3); }
-  .model-blue { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); border: 1px solid rgba(78, 205, 196, 0.3); }
-  .model-purple { background: rgba(162, 155, 254, 0.15); color: var(--accent-purple); border: 1px solid rgba(162, 155, 254, 0.3); }
+  .model-green {
+    background: rgba(0, 210, 106, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(0, 210, 106, 0.3);
+  }
+  .model-blue {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(78, 205, 196, 0.3);
+  }
+  .model-purple {
+    background: rgba(162, 155, 254, 0.15);
+    color: var(--accent-purple);
+    border: 1px solid rgba(162, 155, 254, 0.3);
+  }
 
   .session-title {
     font-size: var(--font-size-2xs);
@@ -286,8 +312,13 @@
   }
 
   @keyframes activePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
   }
 
   .progress-pending {
@@ -308,9 +339,16 @@
     align-items: center;
   }
 
-  .stat-active { color: var(--accent-orange); font-weight: 700; }
-  .stat-pending { color: var(--accent-yellow); }
-  .stat-done { color: var(--accent-green); }
+  .stat-active {
+    color: var(--accent-orange);
+    font-weight: 700;
+  }
+  .stat-pending {
+    color: var(--accent-yellow);
+  }
+  .stat-done {
+    color: var(--accent-green);
+  }
 
   .stat-right {
     display: flex;

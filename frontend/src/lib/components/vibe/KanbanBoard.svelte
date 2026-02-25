@@ -14,9 +14,7 @@
   let doneExpanded = $state(false);
 
   const COMPACT_THRESHOLD = 5;
-  const visibleDone = $derived(
-    doneExpanded ? completed : completed.slice(0, 3),
-  );
+  const visibleDone = $derived(doneExpanded ? completed : completed.slice(0, 3));
 </script>
 
 <div class="kanban" aria-label="Task kanban board">
@@ -60,7 +58,9 @@
   <div class="column column-done" aria-label="Completed tasks">
     <button
       class="column-header column-header-btn"
-      onclick={() => { doneExpanded = !doneExpanded; }}
+      onclick={() => {
+        doneExpanded = !doneExpanded;
+      }}
     >
       <span class="header-icon" aria-hidden="true"><CheckCircle size={14} /></span>
       <span class="header-title">DONE</span>
@@ -83,7 +83,12 @@
           <TaskCard {task} compact />
         {/each}
         {#if !doneExpanded && completed.length > 3}
-          <button class="show-more-btn" onclick={() => { doneExpanded = true; }}>
+          <button
+            class="show-more-btn"
+            onclick={() => {
+              doneExpanded = true;
+            }}
+          >
             +{completed.length - 3} more completed
           </button>
         {/if}
@@ -117,9 +122,15 @@
     min-height: 0;
   }
 
-  .column-pending { border-color: var(--accent-yellow); }
-  .column-active { border-color: var(--accent-orange); }
-  .column-done { border-color: var(--accent-green); }
+  .column-pending {
+    border-color: var(--accent-yellow);
+  }
+  .column-active {
+    border-color: var(--accent-orange);
+  }
+  .column-done {
+    border-color: var(--accent-green);
+  }
 
   .column-header {
     display: flex;
@@ -130,17 +141,31 @@
     background: var(--bg-elevated);
   }
 
-  .column-pending .column-header { border-bottom-color: var(--accent-yellow); background: rgba(255, 230, 109, 0.08); }
-  .column-active .column-header { border-bottom-color: var(--accent-orange); background: rgba(255, 159, 67, 0.08); }
-  .column-done .column-header { border-bottom-color: var(--accent-green); background: rgba(0, 210, 106, 0.08); }
+  .column-pending .column-header {
+    border-bottom-color: var(--accent-yellow);
+    background: rgba(255, 230, 109, 0.08);
+  }
+  .column-active .column-header {
+    border-bottom-color: var(--accent-orange);
+    background: rgba(255, 159, 67, 0.08);
+  }
+  .column-done .column-header {
+    border-bottom-color: var(--accent-green);
+    background: rgba(0, 210, 106, 0.08);
+  }
 
   .header-active {
     animation: headerPulse 2.5s ease-in-out infinite;
   }
 
   @keyframes headerPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.75; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.75;
+    }
   }
 
   .header-icon {
@@ -236,7 +261,9 @@
     font-size: var(--font-size-xs);
     font-weight: 700;
     cursor: pointer;
-    transition: color var(--transition-fast), border-color var(--transition-fast);
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast);
   }
 
   .show-more-btn:hover {

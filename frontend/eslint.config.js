@@ -50,6 +50,12 @@ export default tseslint.config(
         ResizeObserver: 'readonly',
         IntersectionObserver: 'readonly',
         crypto: 'readonly',
+        requestAnimationFrame: 'readonly',
+        HTMLSelectElement: 'readonly',
+        DOMException: 'readonly',
+        AbortSignal: 'readonly',
+        DragEvent: 'readonly',
+        confirm: 'readonly',
       },
       parserOptions: {
         extraFileExtensions: ['.svelte'],

@@ -12,13 +12,15 @@
   let { role, content, model, timestamp, toolName }: Props = $props();
 
   const time = $derived(
-    timestamp ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+    timestamp
+      ? new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '',
   );
 
   function extractText(blocks: ContentBlock[]): string {
     return blocks
       .filter((b) => b.type === 'text' && b.text)
-      .map((b) => b.text!)
+      .map((b) => b.text ?? '')
       .join('\n');
   }
 
@@ -26,44 +28,40 @@
     return blocks.filter((b) => b.type === 'tool_use');
   }
 
-  const textContent = $derived(
-    typeof content === 'string' ? content : extractText(content)
-  );
+  const textContent = $derived(typeof content === 'string' ? content : extractText(content));
 
-  const toolUses = $derived(
-    typeof content === 'string' ? [] : extractToolUses(content)
-  );
+  const toolUses = $derived(typeof content === 'string' ? [] : extractToolUses(content));
 </script>
 
 {#if textContent || toolUses.length > 0}
-<div class="msg msg-{role}" class:has-tools={toolUses.length > 0}>
-  <div class="msg-header">
-    <span class="msg-role">{role === 'user' ? 'You' : model ?? 'Claude'}</span>
-    {#if toolName}
-      <span class="msg-tool">{toolName}</span>
+  <div class="msg msg-{role}" class:has-tools={toolUses.length > 0}>
+    <div class="msg-header">
+      <span class="msg-role">{role === 'user' ? 'You' : (model ?? 'Claude')}</span>
+      {#if toolName}
+        <span class="msg-tool">{toolName}</span>
+      {/if}
+      {#if time}
+        <span class="msg-time">{time}</span>
+      {/if}
+    </div>
+
+    {#if textContent}
+      <div class="msg-body">{textContent}</div>
     {/if}
-    {#if time}
-      <span class="msg-time">{time}</span>
+
+    {#if toolUses.length > 0}
+      <div class="tool-uses">
+        {#each toolUses as tool (tool.id)}
+          <div class="tool-card">
+            <span class="tool-name">{tool.name}</span>
+            {#if tool.input}
+              <pre class="tool-input">{JSON.stringify(tool.input, null, 2).slice(0, 500)}</pre>
+            {/if}
+          </div>
+        {/each}
+      </div>
     {/if}
   </div>
-
-  {#if textContent}
-    <div class="msg-body">{textContent}</div>
-  {/if}
-
-  {#if toolUses.length > 0}
-    <div class="tool-uses">
-      {#each toolUses as tool (tool.id)}
-        <div class="tool-card">
-          <span class="tool-name">{tool.name}</span>
-          {#if tool.input}
-            <pre class="tool-input">{JSON.stringify(tool.input, null, 2).slice(0, 500)}</pre>
-          {/if}
-        </div>
-      {/each}
-    </div>
-  {/if}
-</div>
 {/if}
 
 <style>

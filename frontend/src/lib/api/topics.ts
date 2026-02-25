@@ -7,7 +7,10 @@ export async function fetchTopicTrends(
   slugs: string[],
   range: '7d' | '30d' | '90d' | '1y' = '30d',
 ): Promise<TopicTrendResponse> {
-  const pbUrl = typeof window !== 'undefined' ? pb.baseUrl : (import.meta.env.VITE_PB_URL || 'http://pocketbase:8090');
+  const pbUrl =
+    typeof window !== 'undefined'
+      ? pb.baseUrl
+      : import.meta.env.VITE_PB_URL || 'http://pocketbase:8090';
   const params = new URLSearchParams({ topics: slugs.join(','), range });
   const response = await fetch(`${pbUrl}/api/mytrend/topic-trends?${params}`, {
     headers: { Authorization: pb.authStore.token },
@@ -17,7 +20,10 @@ export async function fetchTopicTrends(
 }
 
 export async function fetchTrendingTopics(limit = 20): Promise<TrendingTopic[]> {
-  const pbUrl = typeof window !== 'undefined' ? pb.baseUrl : (import.meta.env.VITE_PB_URL || 'http://pocketbase:8090');
+  const pbUrl =
+    typeof window !== 'undefined'
+      ? pb.baseUrl
+      : import.meta.env.VITE_PB_URL || 'http://pocketbase:8090';
   const response = await fetch(`${pbUrl}/api/mytrend/trending-topics?limit=${limit}`, {
     headers: { Authorization: pb.authStore.token },
   });

@@ -49,7 +49,13 @@
       );
     }
     if (filter === 'archives') {
-      return mime.includes('zip') || mime.includes('tar') || mime.includes('rar') || mime.includes('7z') || mime.includes('gzip');
+      return (
+        mime.includes('zip') ||
+        mime.includes('tar') ||
+        mime.includes('rar') ||
+        mime.includes('7z') ||
+        mime.includes('gzip')
+      );
     }
     // 'other'
     return (
@@ -91,7 +97,9 @@
     return 'FILE';
   }
 
-  function getFileExtColor(mime: string): 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'yellow' {
+  function getFileExtColor(
+    mime: string,
+  ): 'blue' | 'green' | 'red' | 'purple' | 'orange' | 'yellow' {
     if (mime.startsWith('image/')) return 'green';
     if (mime.includes('pdf')) return 'red';
     if (mime.includes('zip') || mime.includes('tar')) return 'purple';
@@ -127,7 +135,6 @@
   async function handleDrop(event: Event): Promise<void> {
     event.preventDefault();
     isDragOver = false;
-    // eslint-disable-next-line no-undef
     const dropped = (event as DragEvent).dataTransfer?.files;
     if (!dropped || dropped.length === 0) return;
     await uploadFiles(Array.from(dropped));
@@ -221,8 +228,8 @@
       <div class="config-prompt">
         <h2 class="config-title">Telegram Storage Not Configured</h2>
         <p class="config-desc">
-          Files are stored on Telegram using a Bot + Private Channel.
-          Set up your Bot Token and Channel ID in Settings to get started.
+          Files are stored on Telegram using a Bot + Private Channel. Set up your Bot Token and
+          Channel ID in Settings to get started.
         </p>
         <a href="/settings" class="config-link">
           <ComicButton variant="primary">Go to Settings</ComicButton>
@@ -238,11 +245,18 @@
       role="button"
       tabindex="0"
       aria-label="Upload files"
-      ondragover={(e) => { e.preventDefault(); isDragOver = true; }}
-      ondragleave={() => { isDragOver = false; }}
+      ondragover={(e) => {
+        e.preventDefault();
+        isDragOver = true;
+      }}
+      ondragleave={() => {
+        isDragOver = false;
+      }}
       ondrop={handleDrop}
       onclick={() => fileInput?.click()}
-      onkeydown={(e) => { if (e.key === 'Enter') fileInput?.click(); }}
+      onkeydown={(e) => {
+        if (e.key === 'Enter') fileInput?.click();
+      }}
     >
       <input
         bind:this={fileInput}
@@ -268,7 +282,9 @@
           <button
             class="filter-btn"
             class:active={activeFilter === f.key}
-            onclick={() => { activeFilter = f.key; }}
+            onclick={() => {
+              activeFilter = f.key;
+            }}
           >
             {f.label}
             {#if f.key !== 'all'}
@@ -289,10 +305,7 @@
         illustration="inbox"
       />
     {:else if filteredFiles.length === 0}
-      <ComicEmptyState
-        message="No files match this filter"
-        illustration="search"
-      />
+      <ComicEmptyState message="No files match this filter" illustration="search" />
     {:else}
       <div class="file-grid">
         {#each filteredFiles as file (file.id)}
@@ -306,11 +319,7 @@
             >
               {#if file.mime_type.startsWith('image/')}
                 <div class="file-preview">
-                  <img
-                    src={getTelegramFileUrl(file.id)}
-                    alt={file.filename}
-                    loading="lazy"
-                  />
+                  <img src={getTelegramFileUrl(file.id)} alt={file.filename} loading="lazy" />
                 </div>
               {:else}
                 <div class="file-preview file-type-icon">
@@ -426,8 +435,13 @@
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 0.8; }
+    0%,
+    100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 0.8;
+    }
   }
 
   /* Config prompt */

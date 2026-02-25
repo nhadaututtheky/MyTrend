@@ -10,7 +10,9 @@
 
   const { dna: rawDna, projectName = 'Project' }: Props = $props();
 
-  const dna: ProjectDNA = $derived(rawDna ?? { vision: '', stack: [], phase: '', challenges: [], decisions: [] });
+  const dna: ProjectDNA = $derived(
+    rawDna ?? { vision: '', stack: [], phase: '', challenges: [], decisions: [] },
+  );
 </script>
 
 <ComicCard variant="interactive">

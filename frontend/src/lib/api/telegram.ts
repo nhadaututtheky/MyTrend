@@ -29,7 +29,11 @@ export async function getTelegramStatus(): Promise<TelegramStatus> {
   return res.json();
 }
 
-export async function testTelegramConnection(): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function testTelegramConnection(): Promise<{
+  success: boolean;
+  message?: string;
+  error?: string;
+}> {
   const res = await fetch(`${PB_URL}/api/telegram/test`, {
     method: 'POST',
     headers: authHeaders(),
@@ -111,7 +115,9 @@ export async function fetchTelegramFiles(
   return res.json();
 }
 
-export async function setupWebhook(webhookUrl: string): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function setupWebhook(
+  webhookUrl: string,
+): Promise<{ success: boolean; message?: string; error?: string }> {
   const res = await fetch(`${PB_URL}/api/telegram/webhook/setup`, {
     method: 'POST',
     headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -137,7 +143,10 @@ export async function getTelegramSettings(): Promise<TelegramSettings> {
 }
 
 export async function saveTelegramSettings(
-  settings: Pick<TelegramSettings, 'telegram_bot_token' | 'telegram_channel_id' | 'telegram_webhook_secret'>,
+  settings: Pick<
+    TelegramSettings,
+    'telegram_bot_token' | 'telegram_channel_id' | 'telegram_webhook_secret'
+  >,
 ): Promise<{ success: boolean }> {
   const res = await fetch(`${PB_URL}/api/mytrend/settings/telegram`, {
     method: 'PUT',

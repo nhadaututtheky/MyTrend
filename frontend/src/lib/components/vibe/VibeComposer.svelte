@@ -20,7 +20,7 @@
   const VI_DIACRITICS =
     /[\u0102-\u0103\u0110-\u0111\u0128-\u0129\u0168-\u0169\u01A0-\u01B0\u1EA0-\u1EF9]/;
 
-  function isVietnamese(text: string): boolean {
+  function _isVietnamese(text: string): boolean {
     return VI_DIACRITICS.test(text);
   }
 
@@ -139,7 +139,10 @@
       <button
         class="btn-translate-toggle"
         class:active={translateEnabled}
-        onclick={() => { translateEnabled = !translateEnabled; if (!translateEnabled) translatedText = ''; }}
+        onclick={() => {
+          translateEnabled = !translateEnabled;
+          if (!translateEnabled) translatedText = '';
+        }}
         aria-label="Toggle auto-translate"
         title={translateEnabled ? 'Auto-translate ON' : 'Auto-translate OFF'}
       >
@@ -147,11 +150,7 @@
       </button>
 
       {#if isBusy && oninterrupt}
-        <button
-          class="btn-interrupt"
-          onclick={oninterrupt}
-          aria-label="Interrupt Claude"
-        >
+        <button class="btn-interrupt" onclick={oninterrupt} aria-label="Interrupt Claude">
           Stop
         </button>
       {/if}
@@ -278,8 +277,13 @@
   }
 
   @keyframes dotPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.3;
+    }
   }
 
   .composer-actions {
@@ -354,8 +358,13 @@
   }
 
   @keyframes interruptPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
   }
 
   .btn-interrupt:hover {

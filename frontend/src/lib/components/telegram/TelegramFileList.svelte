@@ -60,7 +60,13 @@
     <h3 class="section-title">Attachments ({files.length})</h3>
     <div class="file-grid">
       {#each files as file (file.id)}
-        <a href={getTelegramFileUrl(file.id)} target="_blank" rel="noopener" class="file-card" title={file.filename}>
+        <a
+          href={getTelegramFileUrl(file.id)}
+          target="_blank"
+          rel="noopener"
+          class="file-card"
+          title={file.filename}
+        >
           {#if isImage(file.mime_type)}
             <div class="file-preview">
               <img src={getTelegramFileUrl(file.id)} alt={file.filename} loading="lazy" />
@@ -75,7 +81,14 @@
             <span class="file-meta">{formatSize(file.file_size)}</span>
           </div>
           {#if editable}
-            <ComicButton variant="danger" size="sm" onclick={(e: MouseEvent) => { e.preventDefault(); handleDelete(file.id); }}>
+            <ComicButton
+              variant="danger"
+              size="sm"
+              onclick={(e: MouseEvent) => {
+                e.preventDefault();
+                handleDelete(file.id);
+              }}
+            >
               x
             </ComicButton>
           {/if}

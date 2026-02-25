@@ -64,12 +64,7 @@
   });
 
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  function renderInteractiveGraph(
-    d3Force: any,
-    d3Selection: any,
-    d3Drag: any,
-    d3Zoom: any,
-  ): void {
+  function renderInteractiveGraph(d3Force: any, d3Selection: any, d3Drag: any, d3Zoom: any): void {
     if (!svgElement) return;
 
     // Prune edges: keep only top N edges per node for readability
@@ -88,10 +83,19 @@
 
     const simulation = d3Force
       .forceSimulation(simNodes)
-      .force('link', d3Force.forceLink(simLinks).id((d: SimNode) => d.id).distance(100))
+      .force(
+        'link',
+        d3Force
+          .forceLink(simLinks)
+          .id((d: SimNode) => d.id)
+          .distance(100),
+      )
       .force('charge', d3Force.forceManyBody().strength(-300))
       .force('center', d3Force.forceCenter(width / 2, height / 2))
-      .force('collide', d3Force.forceCollide().radius((d: SimNode) => (d.size ?? 14) + 6))
+      .force(
+        'collide',
+        d3Force.forceCollide().radius((d: SimNode) => (d.size ?? 14) + 6),
+      )
       .force('x', d3Force.forceX(width / 2).strength(0.05))
       .force('y', d3Force.forceY(height / 2).strength(0.05));
 
@@ -102,7 +106,8 @@
     const g = svg.append('g').attr('class', 'graph-content');
 
     // Zoom behavior
-    const zoom = d3Zoom.zoom()
+    const zoom = d3Zoom
+      .zoom()
       .scaleExtent([0.3, 3])
       .on('zoom', (event: any) => {
         g.attr('transform', event.transform);
@@ -110,14 +115,18 @@
     svg.call(zoom);
 
     // Edges
-    const link = g.append('g').attr('class', 'links')
+    const link = g
+      .append('g')
+      .attr('class', 'links')
       .selectAll('line')
       .data(simLinks)
       .join('line')
       .attr('class', 'graph-edge');
 
     // Node groups
-    const node = g.append('g').attr('class', 'nodes')
+    const node = g
+      .append('g')
+      .attr('class', 'nodes')
       .selectAll('g')
       .data(simNodes)
       .join('g')
@@ -129,7 +138,8 @@
         if (onNodeClick) onNodeClick(d);
       })
       .call(
-        d3Drag.drag()
+        d3Drag
+          .drag()
           .on('start', (event: any, d: SimNode) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
@@ -147,7 +157,8 @@
       );
 
     // Circle for each node
-    node.append('circle')
+    node
+      .append('circle')
       .attr('r', (d: SimNode) => d.size ?? 14)
       .attr('fill', (d: SimNode) => GROUP_COLORS[d.group ?? ''] ?? '#A29BFE')
       .attr('stroke', '#333')
@@ -155,16 +166,18 @@
       .attr('class', 'node-circle');
 
     // Label
-    node.append('text')
+    node
+      .append('text')
       .text((d: SimNode) => (d.label ?? d.id ?? '').slice(0, 14))
       .attr('dy', (d: SimNode) => (d.size ?? 14) + 14)
       .attr('text-anchor', 'middle')
       .attr('class', 'node-label');
 
     function updateSelection(): void {
-      node.select('.node-circle')
-        .attr('stroke', (d: SimNode) => d.id === selectedNodeId ? '#fff' : '#333')
-        .attr('stroke-width', (d: SimNode) => d.id === selectedNodeId ? 3 : 2);
+      node
+        .select('.node-circle')
+        .attr('stroke', (d: SimNode) => (d.id === selectedNodeId ? '#fff' : '#333'))
+        .attr('stroke-width', (d: SimNode) => (d.id === selectedNodeId ? 3 : 2));
 
       link.attr('class', (d: SimLink) => {
         if (!selectedNodeId) return 'graph-edge';
@@ -239,7 +252,9 @@
   .graph :global(.graph-edge) {
     stroke: rgba(255, 255, 255, 0.15);
     stroke-width: 1;
-    transition: stroke 0.2s, opacity 0.2s;
+    transition:
+      stroke 0.2s,
+      opacity 0.2s;
   }
 
   .graph :global(.graph-edge--active) {
@@ -253,7 +268,9 @@
   }
 
   .graph :global(.node-circle) {
-    transition: stroke 0.15s, filter 0.15s;
+    transition:
+      stroke 0.15s,
+      filter 0.15s;
     filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.3));
   }
 

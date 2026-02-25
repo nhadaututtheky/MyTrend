@@ -10,7 +10,14 @@
     actions?: Snippet;
   }
 
-  let { open = $bindable(false), title, mode = 'dialog', onclose, children, actions }: Props = $props();
+  let {
+    open = $bindable(false),
+    title,
+    mode = 'dialog',
+    onclose,
+    children,
+    actions,
+  }: Props = $props();
 
   function handleBackdrop(e: MouseEvent): void {
     if (e.target === e.currentTarget) {
@@ -139,8 +146,12 @@
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes slideUp {

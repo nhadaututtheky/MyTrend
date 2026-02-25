@@ -1,7 +1,8 @@
 // In browser: use nginx proxy /nm/. In SSR/server: use docker internal URL.
-const NM_URL = typeof window !== 'undefined'
-  ? '/nm'
-  : (import.meta.env.VITE_NM_URL || 'http://neural-memory:8000');
+const NM_URL =
+  typeof window !== 'undefined'
+    ? '/nm'
+    : import.meta.env.VITE_NM_URL || 'http://neural-memory:8000';
 
 interface NMQueryResult {
   id: string;

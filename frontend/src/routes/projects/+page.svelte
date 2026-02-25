@@ -63,7 +63,9 @@
     }
   });
 
-  onDestroy(() => { unsubscribe?.(); });
+  onDestroy(() => {
+    unsubscribe?.();
+  });
 </script>
 
 <svelte:head>
@@ -125,7 +127,9 @@
     gap: var(--spacing-md);
   }
 
-  .page-header a { text-decoration: none; }
+  .page-header a {
+    text-decoration: none;
+  }
 
   .subtitle {
     display: flex;
@@ -144,7 +148,11 @@
   }
 
   @media (max-width: 768px) {
-    .page-header { flex-direction: column; }
-    .projects-grid { grid-template-columns: 1fr; }
+    .page-header {
+      flex-direction: column;
+    }
+    .projects-grid {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

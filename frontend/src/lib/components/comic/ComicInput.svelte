@@ -43,21 +43,21 @@
     {#if icon}
       <span class="input-icon" aria-hidden="true">{icon}</span>
     {/if}
-  <input
-    id={inputId}
-    class="input"
-    class:has-error={error}
-    {type}
-    {placeholder}
-    {disabled}
-    {required}
-    {name}
-    bind:value
-    {oninput}
-    {onchange}
-    aria-invalid={error ? 'true' : undefined}
-    aria-describedby={error ? `${inputId}-error` : undefined}
-  />
+    <input
+      id={inputId}
+      class="input"
+      class:has-error={error}
+      {type}
+      {placeholder}
+      {disabled}
+      {required}
+      {name}
+      bind:value
+      {oninput}
+      {onchange}
+      aria-invalid={error ? 'true' : undefined}
+      aria-describedby={error ? `${inputId}-error` : undefined}
+    />
   </div>
   {#if error}
     <span id="{inputId}-error" class="error" role="alert">{error}</span>

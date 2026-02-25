@@ -60,7 +60,7 @@
   }
 
   const displayText = $derived(
-    task.status === 'in_progress' ? (task.active_form || task.content) : task.content,
+    task.status === 'in_progress' ? task.active_form || task.content : task.content,
   );
 
   const projectName = $derived(getProjectName(task.project_dir));
@@ -145,8 +145,15 @@
   }
 
   @keyframes activePulse {
-    0%, 100% { box-shadow: 2px 2px 0 var(--accent-orange); }
-    50% { box-shadow: 4px 4px 0 var(--accent-orange), 0 0 12px rgba(255, 159, 67, 0.3); }
+    0%,
+    100% {
+      box-shadow: 2px 2px 0 var(--accent-orange);
+    }
+    50% {
+      box-shadow:
+        4px 4px 0 var(--accent-orange),
+        0 0 12px rgba(255, 159, 67, 0.3);
+    }
   }
 
   .pulse-dot {
@@ -161,8 +168,15 @@
   }
 
   @keyframes dotPulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.4); }
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.4);
+    }
   }
 
   .task-content {
@@ -205,9 +219,24 @@
     font-weight: 600;
   }
 
-  .model-green { background: rgba(0, 210, 106, 0.15); color: var(--accent-green); border: 1px solid rgba(0, 210, 106, 0.3); text-transform: uppercase; }
-  .model-blue { background: rgba(78, 205, 196, 0.15); color: var(--accent-blue); border: 1px solid rgba(78, 205, 196, 0.3); text-transform: uppercase; }
-  .model-purple { background: rgba(162, 155, 254, 0.15); color: var(--accent-purple); border: 1px solid rgba(162, 155, 254, 0.3); text-transform: uppercase; }
+  .model-green {
+    background: rgba(0, 210, 106, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(0, 210, 106, 0.3);
+    text-transform: uppercase;
+  }
+  .model-blue {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--accent-blue);
+    border: 1px solid rgba(78, 205, 196, 0.3);
+    text-transform: uppercase;
+  }
+  .model-purple {
+    background: rgba(162, 155, 254, 0.15);
+    color: var(--accent-purple);
+    border: 1px solid rgba(162, 155, 254, 0.3);
+    text-transform: uppercase;
+  }
 
   .project-badge {
     background: rgba(255, 255, 255, 0.05);

@@ -111,8 +111,18 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./frontend
+          file: ./frontend/Dockerfile
           push: false
           tags: mytrend:${{ github.sha }},mytrend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  companion-check:
+    name: Companion Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd companion && bun install --frozen-lockfile
+      - run: cd companion && bunx tsc --noEmit

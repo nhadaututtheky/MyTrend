@@ -62,7 +62,11 @@
   const chips = $derived.by((): ComparisonChip[] => {
     if (!comparison) return [];
     const items = [
-      { label: 'Activities', value: comparison.activities.this_period, pct: comparison.activities.change_pct },
+      {
+        label: 'Activities',
+        value: comparison.activities.this_period,
+        pct: comparison.activities.change_pct,
+      },
       { label: 'Hours', value: comparison.hours.this_period, pct: comparison.hours.change_pct },
       { label: 'Ideas', value: comparison.ideas.this_period, pct: comparison.ideas.change_pct },
     ];
@@ -83,7 +87,8 @@
         <span class="chip-label">{chip.label}</span>
         <span class="chip-value">{chip.value}</span>
         <ComicBadge color={chip.color} size="sm">
-          {chip.arrow} {Math.abs(chip.pct)}%
+          {chip.arrow}
+          {Math.abs(chip.pct)}%
         </ComicBadge>
       </div>
     {/each}
@@ -92,7 +97,10 @@
       <div class="chip topics-chip">
         <span class="chip-label">Hot</span>
         <span class="chip-topics">
-          {topTopics.slice(0, 3).map((t) => t.name).join(', ')}
+          {topTopics
+            .slice(0, 3)
+            .map((t) => t.name)
+            .join(', ')}
         </span>
       </div>
     {/if}

@@ -70,13 +70,7 @@
 <div class="folder-picker">
   <label class="fp-label" for="fp-input">{label}</label>
   <div class="fp-input-row">
-    <input
-      id="fp-input"
-      class="comic-input fp-text"
-      type="text"
-      bind:value
-      {placeholder}
-    />
+    <input id="fp-input" class="comic-input fp-text" type="text" bind:value {placeholder} />
     <ComicButton variant="outline" onclick={openBrowser}>Browse</ComicButton>
   </div>
 
@@ -128,11 +122,14 @@
 
       <div class="fp-footer">
         {#if browseResult?.path && !browseResult?.isRoot}
-          <ComicButton variant="primary" onclick={selectCurrent}>
-            Select Current Folder
-          </ComicButton>
+          <ComicButton variant="primary" onclick={selectCurrent}>Select Current Folder</ComicButton>
         {/if}
-        <ComicButton variant="outline" onclick={() => { open = false; }}>Close</ComicButton>
+        <ComicButton
+          variant="outline"
+          onclick={() => {
+            open = false;
+          }}>Close</ComicButton
+        >
       </div>
     </div>
   {/if}

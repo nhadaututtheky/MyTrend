@@ -130,7 +130,9 @@
     box-shadow: var(--shadow-sm);
     text-decoration: none;
     text-transform: uppercase;
-    transition: transform 150ms ease, box-shadow 150ms ease;
+    transition:
+      transform 150ms ease,
+      box-shadow 150ms ease;
   }
 
   .start-btn:hover {

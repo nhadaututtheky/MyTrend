@@ -90,7 +90,12 @@ export interface AssistantMessageData {
 export type BridgeMessage =
   | { type: 'session_init'; session: CompanionSessionState }
   | { type: 'session_update'; session: Partial<CompanionSessionState> }
-  | { type: 'assistant'; message: AssistantMessageData; parent_tool_use_id: string | null; timestamp: number }
+  | {
+      type: 'assistant';
+      message: AssistantMessageData;
+      parent_tool_use_id: string | null;
+      timestamp: number;
+    }
   | { type: 'stream_event'; event: unknown; parent_tool_use_id: string | null }
   | { type: 'result'; data: { total_cost_usd: number; num_turns: number; duration_ms: number } }
   | { type: 'permission_request'; request: PermissionRequest }
@@ -189,7 +194,9 @@ export async function updateCompanionProject(
   return res.json();
 }
 
-export async function deleteCompanionProject(slug: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteCompanionProject(
+  slug: string,
+): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`${COMPANION_URL}/api/projects/${slug}`, {
     method: 'DELETE',
   });
@@ -335,7 +342,9 @@ export function connectToSession(
         const delay = RECONNECT_DELAYS[Math.min(reconnectAttempt, RECONNECT_DELAYS.length - 1)];
         reconnectAttempt++;
         onReconnecting?.(reconnectAttempt);
-        console.log(`[companion] WS closed, reconnecting in ${delay}ms (attempt ${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`);
+        console.warn(
+          `[companion] WS closed, reconnecting in ${delay}ms (attempt ${reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS})`,
+        );
         reconnectTimer = setTimeout(() => {
           ws = createWS();
         }, delay);

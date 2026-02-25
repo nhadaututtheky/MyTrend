@@ -65,9 +65,7 @@
           <p class="error" role="alert">{error}</p>
         {/if}
 
-        <ComicButton variant="primary" type="submit" {loading}>
-          Login
-        </ComicButton>
+        <ComicButton variant="primary" type="submit" {loading}>Login</ComicButton>
       </form>
 
       <p class="link">

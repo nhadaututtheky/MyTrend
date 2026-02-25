@@ -232,7 +232,8 @@ export function groupTasksBySessions(tasks: ClaudeTask[]): VibeSession[] {
       });
     }
 
-    const session = sessionMap.get(key)!;
+    const session = sessionMap.get(key);
+    if (!session) continue;
     session.tasks.push(task);
 
     // Update counts
@@ -319,7 +320,8 @@ export function suggestModel(taskContent: string): ModelSuggestion {
     if (matchedTier === tier) break;
   }
 
-  const modelInfo = MODEL_CATALOG.find((m) => m.tier === matchedTier)!;
+  const modelInfo = MODEL_CATALOG.find((m) => m.tier === matchedTier);
+  if (!modelInfo) throw new Error(`Unknown model tier: ${matchedTier}`);
   const alternatives = MODEL_CATALOG.filter((m) => m.tier !== matchedTier);
   const costNote = `~$${modelInfo.input_price}/M input, $${modelInfo.output_price}/M output`;
 

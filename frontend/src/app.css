@@ -269,12 +269,30 @@ a:hover {
 }
 
 /* Neon variant for dark mode cards */
-[data-theme='dark'] .sketch-card-neon-green:hover { box-shadow: var(--shadow-md), var(--glow-green); border-color: rgba(0, 210, 106, 0.4); }
-[data-theme='dark'] .sketch-card-neon-blue:hover { box-shadow: var(--shadow-md), var(--glow-blue); border-color: rgba(78, 205, 196, 0.4); }
-[data-theme='dark'] .sketch-card-neon-red:hover { box-shadow: var(--shadow-md), var(--glow-red); border-color: rgba(255, 71, 87, 0.4); }
-[data-theme='dark'] .sketch-card-neon-purple:hover { box-shadow: var(--shadow-md), var(--glow-purple); border-color: rgba(162, 155, 254, 0.4); }
-[data-theme='dark'] .sketch-card-neon-yellow:hover { box-shadow: var(--shadow-md), var(--glow-yellow); border-color: rgba(255, 230, 109, 0.4); }
-[data-theme='dark'] .sketch-card-neon-orange:hover { box-shadow: var(--shadow-md), var(--glow-orange); border-color: rgba(255, 159, 67, 0.4); }
+[data-theme='dark'] .sketch-card-neon-green:hover {
+  box-shadow: var(--shadow-md), var(--glow-green);
+  border-color: rgba(0, 210, 106, 0.4);
+}
+[data-theme='dark'] .sketch-card-neon-blue:hover {
+  box-shadow: var(--shadow-md), var(--glow-blue);
+  border-color: rgba(78, 205, 196, 0.4);
+}
+[data-theme='dark'] .sketch-card-neon-red:hover {
+  box-shadow: var(--shadow-md), var(--glow-red);
+  border-color: rgba(255, 71, 87, 0.4);
+}
+[data-theme='dark'] .sketch-card-neon-purple:hover {
+  box-shadow: var(--shadow-md), var(--glow-purple);
+  border-color: rgba(162, 155, 254, 0.4);
+}
+[data-theme='dark'] .sketch-card-neon-yellow:hover {
+  box-shadow: var(--shadow-md), var(--glow-yellow);
+  border-color: rgba(255, 230, 109, 0.4);
+}
+[data-theme='dark'] .sketch-card-neon-orange:hover {
+  box-shadow: var(--shadow-md), var(--glow-orange);
+  border-color: rgba(255, 159, 67, 0.4);
+}
 
 .sketch-card-skewed {
   transform: skewX(-2deg);
@@ -332,9 +350,15 @@ a:hover {
 }
 
 /* Dark mode button glow */
-[data-theme='dark'] .comic-btn-primary:hover { box-shadow: var(--shadow-md), var(--glow-green); }
-[data-theme='dark'] .comic-btn-secondary:hover { box-shadow: var(--shadow-md), var(--glow-blue); }
-[data-theme='dark'] .comic-btn-danger:hover { box-shadow: var(--shadow-md), var(--glow-red); }
+[data-theme='dark'] .comic-btn-primary:hover {
+  box-shadow: var(--shadow-md), var(--glow-green);
+}
+[data-theme='dark'] .comic-btn-secondary:hover {
+  box-shadow: var(--shadow-md), var(--glow-blue);
+}
+[data-theme='dark'] .comic-btn-danger:hover {
+  box-shadow: var(--shadow-md), var(--glow-red);
+}
 
 /* Inputs */
 .comic-input {
@@ -510,14 +534,26 @@ a:hover {
 
 /* Neon Sketch Animations */
 @keyframes sketchWobble {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-0.5deg); }
-  75% { transform: rotate(0.5deg); }
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-0.5deg);
+  }
+  75% {
+    transform: rotate(0.5deg);
+  }
 }
 
 @keyframes neonPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 @keyframes sketchFadeIn {
@@ -534,18 +570,33 @@ a:hover {
 }
 
 @keyframes sketchDraw {
-  from { stroke-dashoffset: 1000; }
-  to { stroke-dashoffset: 0; }
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes skeletonPulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.15; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.15;
+  }
 }
 
 @keyframes countUp {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fadeIn {
@@ -574,7 +625,9 @@ a:hover {
 
 /* Reduced motion: disable all animations */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
