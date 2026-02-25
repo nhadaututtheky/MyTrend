@@ -243,6 +243,21 @@ export class TelegramBridge {
       return;
     }
 
+    // channel_post: treat as research-URL-only (no Claude session interaction)
+    if (update.channel_post) {
+      const cpost = update.channel_post;
+      const chatId = cpost.chat.id;
+      if (this.config.allowedChatIds.has(chatId) && cpost.text) {
+        const detectedUrls = detectUrls(cpost.text);
+        if (detectedUrls.length > 0) {
+          const userId = process.env.MYTREND_SYNC_USER_ID ?? "";
+          this.processResearchUrls(chatId, 0, detectedUrls, cpost.text, cpost.message_id, userId)
+            .catch((err) => console.error("[research] Channel post processing error:", err));
+        }
+      }
+      return;
+    }
+
     const msg = update.message;
     if (!msg) return;
 
@@ -252,6 +267,17 @@ export class TelegramBridge {
     if (!this.config.allowedChatIds.has(chatId)) {
       console.log(`[telegram] Rejected message from unauthorized chat: ${chatId} (type=${msg.chat.type}, from=${msg.from?.username ?? msg.from?.first_name ?? "?"})`);
       return;
+    }
+
+    // In groups: capture research URLs from any message before session filter
+    if (msg.chat.type !== "private" && msg.text) {
+      const detectedUrls = detectUrls(msg.text);
+      if (detectedUrls.length > 0) {
+        const userId = process.env.MYTREND_SYNC_USER_ID ?? "";
+        const topicIdEarly = msg.message_thread_id ?? 0;
+        this.processResearchUrls(chatId, topicIdEarly, detectedUrls, msg.text, msg.message_id, userId)
+          .catch((err) => console.error("[research] Processing error:", err));
+      }
     }
 
     // In groups: allow commands, @mentions, AND any message when there's an active session
@@ -326,6 +352,23 @@ export class TelegramBridge {
     const text = msg.text?.trim();
     if (!text) return;
 
+    // Strip @botname from message in groups
+    let cleanText = text;
+    if (this.botUsername) {
+      cleanText = cleanText.replace(new RegExp(`@${this.botUsername}\\s*`, "gi"), "").trim();
+    }
+    if (!cleanText) return;
+
+    // Research URL detection for private chats (groups handled in processUpdate before session filter)
+    if (msg.chat.type === "private") {
+      const detectedUrls = detectUrls(cleanText);
+      if (detectedUrls.length > 0) {
+        const userId = process.env.MYTREND_SYNC_USER_ID ?? "";
+        this.processResearchUrls(chatId, topicId, detectedUrls, cleanText, msg.message_id, userId)
+          .catch((err) => console.error("[research] Processing error:", err));
+      }
+    }
+
     let mapping = this.chatSessions.get(chatId)?.get(topicId);
     if (!mapping) {
       if (topicId > 0) {
@@ -355,21 +398,6 @@ export class TelegramBridge {
         await this.sendToChat(chatId, "No active session. Use /start to connect.");
         return;
       }
-    }
-
-    // Strip @botname from message in groups
-    let cleanText = text;
-    if (this.botUsername) {
-      cleanText = cleanText.replace(new RegExp(`@${this.botUsername}\\s*`, "gi"), "").trim();
-    }
-    if (!cleanText) return;
-
-    // Research URL detection (fire-and-forget — never blocks message flow)
-    const detectedUrls = detectUrls(cleanText);
-    if (detectedUrls.length > 0) {
-      const userId = process.env.MYTREND_SYNC_USER_ID ?? "";
-      this.processResearchUrls(chatId, topicId, detectedUrls, cleanText, msg.message_id, userId)
-        .catch((err) => console.error("[research] Processing error:", err));
     }
 
     // Track message ID for reply-to and reaction updates
