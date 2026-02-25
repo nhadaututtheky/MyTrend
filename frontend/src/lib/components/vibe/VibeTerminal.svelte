@@ -20,6 +20,7 @@
   import VibeMessage from './VibeMessage.svelte';
   import VibePermission from './VibePermission.svelte';
   import VibeComposer from './VibeComposer.svelte';
+  import VibeOnboarding from './VibeOnboarding.svelte';
 
   // ─── State ────────────────────────────────────────────────────────────────
   let isHealthy = $state(false);
@@ -67,6 +68,13 @@
   // Session list filter
   let showEnded = $state(false);
   let isCleaningUp = $state(false);
+
+  // Onboarding
+  let onboardDismissed = $state(false);
+  const showOnboarding = $derived(
+    isHealthy && !activeSessionId && sessions.length === 0 && projects.length > 0 && !onboardDismissed
+    && (typeof localStorage !== 'undefined' && !localStorage.getItem('vibe-onboarded'))
+  );
 
   // Derived
   const isBusy = $derived(sessionState?.status === 'busy' || sessionState?.status === 'starting');
@@ -500,6 +508,21 @@
         Retry
       </button>
     </div>
+
+  {:else if showOnboarding}
+    <VibeOnboarding
+      {projects}
+      onlaunch={(slug, model) => {
+        selectedProject = slug;
+        selectedModel = model;
+        localStorage.setItem('vibe-onboarded', 'true');
+        handleCreate();
+      }}
+      ondismiss={() => {
+        onboardDismissed = true;
+        localStorage.setItem('vibe-onboarded', 'true');
+      }}
+    />
 
   {:else if !activeSessionId}
     <!-- Session selector / creator -->

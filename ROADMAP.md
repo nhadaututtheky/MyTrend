@@ -1,41 +1,7 @@
 # MyTrend Roadmap
 
-> Generated: 2026-02-24 | Source: Opus review + session analysis + Neural Memory TODOs
+> Generated: 2026-02-24 | Updated: 2026-02-25
 > Priority: P0 = next sprint, P1 = this month, P2 = backlog, P3 = nice-to-have
-
----
-
-## P0 — Immediate (Next Sprint)
-
-### 1. PWA — Mobile Install + Push Notifications
-**Why**: MyTrend is a daily-use tool but has no mobile presence beyond Telegram. No install, no offline, no push.
-**Scope**:
-- `manifest.json` + service worker for SvelteKit
-- Installable on home screen (Android/iOS)
-- Offline cache for dashboard static pages
-- Push notifications via Web Push API (new ideas, plan status changes)
-**Files**: `frontend/static/manifest.json`, `frontend/src/service-worker.ts`, `frontend/src/app.html`
-**Effort**: Low (SvelteKit has built-in service worker support)
-
-### 2. Daily/Weekly Digest via Telegram
-**Why**: User must open dashboard to see insights. "Dashboard anh phải mở" → "assistant tự tìm đến anh".
-**Scope**:
-- Hub Cron Job: daily 9am → generate digest
-- Digest content: unreviewed ideas count, stuck plans (>3 days in_progress), trending topics, cost summary
-- Weekly: activity heatmap summary, top conversations, idea→plan conversion rate
-- Send via existing Telegram bot API
-**Files**: `pocketbase/pb_hooks/digest.pb.js` (cron), `companion/src/telegram/telegram-digest.ts` (formatter + sender)
-**Effort**: Low (infra exists: Telegram bot + Hub Cron + PocketBase queries)
-
-### 3. Telegram Permission UI Redesign
-**Why**: Current permission messages are noisy and unclear. ExitPlanMode doesn't need approval but other tools flood chat.
-**Scope**:
-- Show auto-approve vs manual clearly per tool (green auto, red lock for Bash)
-- Suppress permission UI entirely for `bypassPermissions` mode sessions
-- Batch permissions in 2s window → single grouped message with [Allow all] / [Review individually]
-- Severity indicators: Read/Glob (safe) vs Bash/Write (caution)
-**Files**: `companion/src/telegram/telegram-bridge.ts`, `companion/src/telegram/telegram-formatter.ts`, `companion/src/ws-bridge.ts`
-**Effort**: Medium
 
 ---
 
@@ -52,47 +18,14 @@
 **Files**: `companion/src/telegram/telegram-bridge.ts` (URL detection in handleTextMessage), `companion/src/telegram/telegram-research.ts` (new: fetch + analyze + save), `pocketbase/pb_migrations/` (research collection), `frontend/src/routes/research/` (dashboard view)
 **Effort**: Medium-High
 
-### 5. Auto Backup SQLite
-**Why**: PocketBase SQLite is single point of failure. No scheduled backup, no export.
-**Scope**:
-- PocketBase hook: daily backup SQLite → `backups/` folder (timestamped, keep last 7)
-- Optional: upload backup to Telegram storage channel (bot already has file upload API)
-- Export endpoint: JSON/CSV for conversations, ideas, activities
-**Files**: `pocketbase/pb_hooks/backup.pb.js`, `scripts/backup.sh`
-**Effort**: Low
-
-### 6. Idea ↔ Plan Auto-Linking + Funnel
-**Why**: Ideas flow (inbox→considering→planned→done) is disconnected from Plans. No automation, no conversion metrics.
-**Scope**:
-- Auto-link: when Idea status → "planned", prompt to create/link a Plan
-- Auto-close: when Plan → "completed", mark related Ideas "done"
-- Funnel analytics: ideas→plans→done conversion rate on Dashboard
-- PocketBase hook for status change cascading
-**Files**: `pocketbase/pb_hooks/idea-plan-link.pb.js`, `frontend/src/lib/components/FunnelChart.svelte`
-**Effort**: Medium
+### 8. Natural Language Cron (deferred — needs Cron UI first)
+**Why**: Hub Cron Jobs use cron expressions — technical barrier. "Every morning at 9am, summarize yesterday" is more natural.
+**Scope**: NLP → cron parser (Claude API call), save to hub_cron_jobs collection. Requires Hub Cron CRUD UI.
+**Effort**: Medium (was Low, re-scoped: no cron UI exists yet)
 
 ---
 
 ## P2 — Backlog
-
-### 7. Discord/Slack Push Notifications
-**Why**: Dev communities live on Discord/Slack. Push activity summaries, idea notifications.
-**Scope**: Webhook integration for outbound notifications (not full 2-way chat). Reuse digest templates from #2.
-**Effort**: Medium
-
-### 8. Natural Language Cron
-**Why**: Hub Cron Jobs use cron expressions — technical barrier. "Every morning at 9am, summarize yesterday" is more natural.
-**Scope**: NLP → cron parser (Claude API call), save to hub_cron_jobs collection.
-**Effort**: Low
-
-### 9. Vibe Terminal Onboarding Wizard
-**Why**: First-run experience is complex (project profiles, session management).
-**Scope**: 3-step wizard: choose project → auto-detect directory → start session.
-**Effort**: Low
-
----
-
-## P3 — Nice-to-Have
 
 ### 10. GitHub PR/Issue Integration
 **Scope**: Webhook/gh CLI sync for PR tracking, issue→idea linking, commit→conversation correlation.
@@ -102,18 +35,20 @@
 **Scope**: Materialized views for topic trends (currently real-time aggregation). Only needed at scale.
 **Effort**: Medium
 
-### 12. Component Gallery
-**Scope**: Dev-only route `/dev/components` showing all comic components with variations.
-**Effort**: Low
-
 ### 13. Public Share Links
 **Scope**: Read-only, expiring token links for individual items (trend reports, knowledge graphs).
 **Effort**: Medium
 
 ---
 
-## Completed (2026-02-24)
+## Completed
 
+### 2026-02-25
+- [x] Vibe Terminal Onboarding Wizard: 3-step first-run wizard (welcome → project → launch)
+- [x] Component Gallery: dev route `/dev/components` with all comic components + variants
+- [x] Telegram Bridge hot-reload: save config applies immediately without restart (commit 8a09ec0)
+
+### 2026-02-24
 - [x] Model mapping: opus-1m→opus[1m], sonnet-1m→sonnet[1m], opusplan (commit f7fe464)
 - [x] Idle timeout: reset on CLI activity, increased to 60min (commit 9d5ea15)
 - [x] Telegram reply race condition: responseOriginMsg lock (commit 0a26e59)
@@ -125,3 +60,5 @@
 - [x] Daily/Weekly Digest: PocketBase cron → Telegram HTML digest (commit 1a8743c)
 - [x] NM Auto-Ingest Pipeline: smart classification, doc training, insight extraction (commits cc9b160..3eadf06)
 - [x] Auto Backup SQLite: daily cron + manual endpoint + Telegram upload + rotation (keep 7)
+- [x] Idea ↔ Plan Auto-Linking + Funnel analytics
+- [x] Telegram multi-project topics + notification group support (commit 7cb6368)
