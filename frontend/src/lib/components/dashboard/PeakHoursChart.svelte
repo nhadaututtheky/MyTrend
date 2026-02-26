@@ -7,7 +7,7 @@
   const { peakHours = [], allHourData }: Props = $props();
 
   type Zone = { label: string; icon: string; hours: number[] };
-  const ZONES: Zone[] = [
+  const ZONES: [Zone, ...Zone[]] = [
     { label: 'Night', icon: '🌙', hours: [0, 1, 2, 3, 4, 5] },
     { label: 'Morning', icon: '🌅', hours: [6, 7, 8, 9, 10, 11] },
     { label: 'Afternoon', icon: '☀️', hours: [12, 13, 14, 15, 16, 17] },
@@ -51,8 +51,7 @@
   }
 
   function peakZone(): Zone {
-    const first: Zone = ZONES[0] as Zone;
-    return ZONES.reduce((best, z) => (zoneTotal(z) > zoneTotal(best) ? z : best), first);
+    return ZONES.reduce((best, z) => (zoneTotal(z) > zoneTotal(best) ? z : best), ZONES[0]);
   }
 </script>
 
