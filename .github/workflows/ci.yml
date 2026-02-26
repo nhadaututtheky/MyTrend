@@ -90,9 +90,22 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: cd frontend && npm ci
+      - name: Check for E2E tests
+        id: check-e2e
+        run: |
+          if find frontend/tests frontend/e2e frontend/src -name '*.spec.ts' -o -name '*.test.ts' 2>/dev/null | grep -q playwright; then
+            echo "has_tests=true" >> "$GITHUB_OUTPUT"
+          elif [ -f frontend/playwright.config.ts ]; then
+            echo "has_tests=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_tests=false" >> "$GITHUB_OUTPUT"
+            echo "No E2E tests found, skipping"
+          fi
       - name: Install Playwright browsers
+        if: steps.check-e2e.outputs.has_tests == 'true'
         run: cd frontend && npx playwright install --with-deps chromium
       - name: Run E2E tests
+        if: steps.check-e2e.outputs.has_tests == 'true'
         run: cd frontend && npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
