@@ -38,18 +38,26 @@ export function loadTelegramConfig(): TelegramBridgeConfig {
         return n;
       });
 
+    // Merge optional fields from file config (editable via settings page even in env mode)
+    const fileOverrides = loadFileConfig();
+
     return {
       botToken: envToken,
       allowedChatIds: ids,
       enabled: ids.length > 0,
+      notificationGroupId: fileOverrides.notificationGroupId,
     };
   }
 
   // Fall back to file config
+  return loadFileConfig();
+}
+
+/** Load config from file only (no env). Returns EMPTY_CONFIG on error. */
+function loadFileConfig(): TelegramBridgeConfig {
   try {
     const raw = readFileSync(CONFIG_FILE, "utf-8");
     const data = JSON.parse(raw) as TelegramBridgeConfig;
-    // Validate
     if (!data.botToken || !Array.isArray(data.allowedChatIds)) {
       return EMPTY_CONFIG;
     }

@@ -8,6 +8,8 @@ export interface TelegramUser {
   first_name: string;
   last_name?: string;
   username?: string;
+  /** Bot API 9.4: true if bot has forum topic mode enabled in private chats. Returned only in getMe. */
+  has_topics_enabled?: boolean;
 }
 
 export interface TelegramChat {

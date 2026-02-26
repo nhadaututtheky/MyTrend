@@ -52,14 +52,10 @@ import {
   buildStopConfirmKeyboard,
   buildPermissionBatchKeyboard,
   buildSessionActionsKeyboard,
-  buildAutoApproveKeyboard,
   formatPermissionBatch,
-  formatAutoApproveStatus,
   extractAskUserQuestion,
   formatAskUserQuestion,
   buildAskQuestionKeyboard,
-  buildTimeoutKeyboard,
-  formatTimeoutStatus,
   formatDuration,
 } from "./telegram-formatter.js";
 
@@ -92,6 +88,7 @@ export class TelegramBridge {
   private offset = 0;
   private botName: string | null = null;
   private botUsername: string | null = null;
+  private botHasTopics = false; // Bot API 9.4: private chat forum topics
 
   // Per-session transient state (composite key, not persisted)
   private lastToolFeedAt = new Map<string, number>();
@@ -153,7 +150,8 @@ export class TelegramBridge {
       const me = await this.api.getMe();
       this.botName = me.first_name;
       this.botUsername = me.username ?? null;
-      console.log(`[telegram] Bot: @${me.username} (${me.first_name})`);
+      this.botHasTopics = me.has_topics_enabled ?? false;
+      console.log(`[telegram] Bot: @${me.username} (${me.first_name}), topics=${this.botHasTopics}`);
 
       // Remove any existing webhook so we can poll
       await this.api.deleteWebhook();
@@ -601,11 +599,13 @@ export class TelegramBridge {
 
     // Start idle timer
     this.resetIdleTimer(chatId, topicId);
+    const idleConfig = this.getIdleTimeoutConfig(chatId, topicId);
+    console.log(`[telegram] Session ${sessionId.slice(0, 8)} idle timeout: ${idleConfig.enabled ? formatDuration(idleConfig.timeoutMs) : "OFF"}`);
 
     this.saveMappings();
 
     // Notify group of session start
-    await this.notifyGroup(profile.slug, "Session started", `Model: ${model}`);
+    await this.notifyGroup(profile.slug, "Session started", `Model: ${model}`, chatId);
 
     return { ok: true };
   }
@@ -649,7 +649,7 @@ export class TelegramBridge {
     this.cleanupChatState(chatId, topicId);
 
     // Notify group of session end
-    await this.notifyGroup(mapping.projectSlug, "Session stopped");
+    await this.notifyGroup(mapping.projectSlug, "Session stopped", undefined, chatId);
 
     this.saveMappings();
   }
@@ -842,9 +842,9 @@ export class TelegramBridge {
 
         const resultMsg = msg.data as CLIResultMessage;
         const resultText = formatResult(resultMsg);
-        const webUrl = process.env.MYTREND_WEB_URL || "http://localhost:5173";
+        const webUrl = process.env.MYTREND_WEB_URL || "";
         const resultMapping = this.chatSessions.get(chatId)?.get(topicId);
-        if (!resultMsg.is_error && resultMapping) {
+        if (!resultMsg.is_error && resultMapping && webUrl.startsWith("https://")) {
           await this.sendToChatWithKeyboard(chatId, resultText, {
             inline_keyboard: [[
               { text: "🌐 Open in Web", url: `${webUrl}/vibe?session=${resultMapping.sessionId}&tab=terminal` },
@@ -885,9 +885,9 @@ export class TelegramBridge {
         this.updatePinnedStatus(chatId, topicId);
 
         // Notify group of task completion
-        const mapping = this.chatSessions.get(chatId)?.get(topicId);
-        if (mapping) {
-          await this.notifyGroup(mapping.projectSlug, "Task complete", formatResult(resultMsg));
+        const mapping2 = this.chatSessions.get(chatId)?.get(topicId);
+        if (mapping2) {
+          await this.notifyGroup(mapping2.projectSlug, "Task complete", formatResult(resultMsg), chatId);
         }
         break;
       }
@@ -1012,7 +1012,7 @@ export class TelegramBridge {
       this.destroySession(chatId, topicId).then(async () => {
         await this.sendToChat(chatId, `Session timed out after ${durationLabel} of inactivity.`, topicId).catch(() => {});
         if (mapping) {
-          await this.notifyGroup(mapping.projectSlug, `Idle timeout (${durationLabel}) — session destroyed`);
+          await this.notifyGroup(mapping.projectSlug, `Idle timeout (${durationLabel}) — session destroyed`, undefined, chatId);
         }
       });
     }, timeoutMs);
@@ -1153,17 +1153,19 @@ export class TelegramBridge {
     // Create new topic for this project (topics allow multiple concurrent sessions)
     let targetTopicId = topicId;
     if (topicId === 0) {
-      // In General topic: create a new forum topic for this project
+      // Try creating a forum topic (works in supergroups + private chats if bot has topics enabled via BotFather)
       try {
         const forumTopic = await this.api.createForumTopic(chatId, profile.name);
         targetTopicId = forumTopic.message_thread_id;
-      } catch {
-        // Forum topics may not be available (e.g., private chat)
-        // Fall back to using General topic (topicId=0)
+        console.log(`[telegram] Created topic ${targetTopicId} for ${profile.name} in chat ${chatId}`);
+      } catch (topicErr) {
+        console.log(`[telegram] Topic creation failed for chat ${chatId}: ${topicErr instanceof Error ? topicErr.message : topicErr}. Bot topics=${this.botHasTopics}`);
+        // Forum topics not available — fall back to topicId=0
         // IMPORTANT: destroy existing session first to prevent orphaned CLI processes
-        // whose disconnect events would corrupt the new session's mapping
         const existingAtZero = this.chatSessions.get(chatId)?.get(0);
         if (existingAtZero && existingAtZero.projectSlug !== slug) {
+          const prevProfile = this.deps.profiles.get(existingAtZero.projectSlug);
+          await this.sendToChat(chatId, `Switching from <b>${prevProfile?.name ?? existingAtZero.projectSlug}</b> → <b>${profile.name}</b>...`);
           await this.destroySession(chatId, 0);
         }
         targetTopicId = 0;
@@ -1362,14 +1364,31 @@ export class TelegramBridge {
         break;
       }
       case "autoapprove": {
+        // Expand Auto-Approve + Timeout controls inline on pinned message
         await this.api.answerCallbackQuery(queryId);
-        const aaConfig = this.getAutoApproveConfig(chatId);
-        await this.sendToChatWithKeyboard(
-          chatId,
-          formatAutoApproveStatus(aaConfig),
-          buildAutoApproveKeyboard(aaConfig),
-          topicId
-        );
+        const mapping = this.chatSessions.get(chatId)?.get(topicId);
+        if (mapping) {
+          const aaConfig = this.getAutoApproveConfig(chatId);
+          const toConfig = this.getIdleTimeoutConfig(chatId, topicId);
+          const session = this.getSessionState(mapping.sessionId);
+          const text = formatPinnedStatus(mapping, session, aaConfig, toConfig);
+          await this.api.editMessageText(chatId, messageId, text, {
+            replyMarkup: buildSessionActionsKeyboard(mapping.model, "auto", aaConfig, toConfig),
+          }).catch(() => {});
+        }
+        break;
+      }
+      case "collapse": {
+        // Collapse back to default pinned keyboard
+        await this.api.answerCallbackQuery(queryId);
+        const mapping = this.chatSessions.get(chatId)?.get(topicId);
+        if (mapping) {
+          const session = this.getSessionState(mapping.sessionId);
+          const text = formatPinnedStatus(mapping, session);
+          await this.api.editMessageText(chatId, messageId, text, {
+            replyMarkup: buildSessionActionsKeyboard(mapping.model),
+          }).catch(() => {});
+        }
         break;
       }
       case "projects": {
@@ -1418,10 +1437,8 @@ export class TelegramBridge {
       config.enabled ? `Auto-approve: ${config.timeoutSeconds}s` : "Auto-approve: OFF"
     );
 
-    // Update the keyboard to reflect new state
-    await this.api.editMessageText(chatId, messageId, formatAutoApproveStatus(config), {
-      replyMarkup: buildAutoApproveKeyboard(config),
-    }).catch(() => {});
+    // Refresh expanded pinned message with updated state
+    this.refreshExpandedPinned(chatId, topicId, messageId);
   }
 
   private async onTimeoutSelected(
@@ -1446,9 +1463,20 @@ export class TelegramBridge {
       updated.enabled ? `Timeout: ${formatDuration(updated.timeoutMs)}` : "Timeout: OFF"
     );
 
-    // Update keyboard to reflect new state
-    await this.api.editMessageText(chatId, messageId, formatTimeoutStatus(updated), {
-      replyMarkup: buildTimeoutKeyboard(updated),
+    // Refresh expanded pinned message with updated state
+    this.refreshExpandedPinned(chatId, topicId, messageId);
+  }
+
+  /** Refresh the expanded pinned message (Auto-Approve + Timeout inline). */
+  private refreshExpandedPinned(chatId: number, topicId: number, messageId: number): void {
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
+    if (!mapping) return;
+    const aaConfig = this.getAutoApproveConfig(chatId);
+    const toConfig = this.getIdleTimeoutConfig(chatId, topicId);
+    const session = this.getSessionState(mapping.sessionId);
+    const text = formatPinnedStatus(mapping, session, aaConfig, toConfig);
+    this.api.editMessageText(chatId, messageId, text, {
+      replyMarkup: buildSessionActionsKeyboard(mapping.model, "auto", aaConfig, toConfig),
     }).catch(() => {});
   }
 
@@ -1622,8 +1650,10 @@ export class TelegramBridge {
     return this.notificationGroupId;
   }
 
-  private async notifyGroup(projectSlug: string, event: string, details?: string): Promise<void> {
+  private async notifyGroup(projectSlug: string, event: string, details?: string, chatId?: number): Promise<void> {
     if (!this.notificationGroupId) return;
+    // Don't notify the same group that the event originated from
+    if (chatId === this.notificationGroupId) return;
     const profile = this.deps.profiles.get(projectSlug);
     const name = profile?.name ?? projectSlug;
     let text = `<b>[${name}]</b> ${event}`;

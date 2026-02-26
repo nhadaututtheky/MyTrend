@@ -336,7 +336,7 @@ Verdict guide:
       ...cmd,
       "--print",
       "--model", "haiku",
-      "--permission-mode", "default",
+      "--permission-mode", "bypassPermissions",
       "-p", prompt,
     ];
 

@@ -537,13 +537,33 @@ export function createApp(ctx: AppContext): Hono {
   });
 
   app.put("/api/telegram-bridge/config", async (c) => {
-    if (isEnvConfigured()) {
-      return c.json({ error: "Config is managed by environment variables" }, 400);
-    }
-
     const body = await c.req.json<{ botToken?: string; allowedChatIds?: number[]; enabled?: boolean; notificationGroupId?: number | null }>();
 
     const current = loadTelegramConfig();
+
+    // In env mode: only allow updating optional fields (notificationGroupId)
+    if (isEnvConfigured()) {
+      if (body.botToken || body.allowedChatIds || body.enabled !== undefined) {
+        return c.json({ error: "Bot token, chat IDs, and enabled are managed by environment variables" }, 400);
+      }
+      // Save only optional overrides to file
+      const overrides: TelegramBridgeConfig = {
+        botToken: current.botToken,
+        allowedChatIds: current.allowedChatIds,
+        enabled: current.enabled,
+        notificationGroupId: body.notificationGroupId !== undefined
+          ? (body.notificationGroupId ?? undefined)
+          : current.notificationGroupId,
+      };
+      saveTelegramConfig(overrides);
+
+      const tg = ctx.getTelegramBridge();
+      if (tg) {
+        tg.updateNotificationGroupId(overrides.notificationGroupId ?? null);
+      }
+      return c.json({ ok: true });
+    }
+
     const updated: TelegramBridgeConfig = {
       botToken: body.botToken ?? current.botToken,
       allowedChatIds: body.allowedChatIds ?? current.allowedChatIds,

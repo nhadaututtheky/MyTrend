@@ -216,7 +216,9 @@ export function formatStatus(mapping: TelegramSessionMapping, sessionStatus: str
 /** Compact pinned status message — updated in-place as session progresses. */
 export function formatPinnedStatus(
   mapping: TelegramSessionMapping,
-  session?: SessionState
+  session?: SessionState,
+  autoApprove?: AutoApproveConfig,
+  idleTimeout?: IdleTimeoutConfig,
 ): string {
   const status = session?.status ?? "starting";
   const statusEmoji =
@@ -240,6 +242,15 @@ export function formatPinnedStatus(
     const mm = String(now.getMinutes()).padStart(2, "0");
     parts.push(`Updated ${hh}:${mm}`);
     lines.push(parts.join(" · "));
+  }
+
+  // Show Auto-Approve + Timeout status when expanded
+  if (autoApprove && idleTimeout) {
+    const aaLabel = autoApprove.enabled && autoApprove.timeoutSeconds > 0
+      ? `${autoApprove.timeoutSeconds}s${autoApprove.allowBash ? " +bash" : ""}`
+      : "OFF";
+    const toLabel = idleTimeout.enabled ? formatDuration(idleTimeout.timeoutMs) : "OFF";
+    lines.push(`Auto-Approve: <b>${aaLabel}</b> · Timeout: <b>${toLabel}</b>`);
   }
 
   return lines.join("\n");
@@ -412,20 +423,77 @@ export function buildPermissionKeyboard(requestId: string): TelegramInlineKeyboa
 }
 
 /** Session action bar — quick actions for active session. */
-export function buildSessionActionsKeyboard(model: string): TelegramInlineKeyboardMarkup {
-  return {
-    inline_keyboard: [
-      [
-        { text: `Model: ${model}`, callback_data: "action:model" },
-        { text: "Status", callback_data: "action:status" },
-      ],
-      [
-        { text: "Auto ⏱", callback_data: "action:autoapprove" },
-        { text: "Cancel", callback_data: "action:cancel" },
-        { text: "Stop", callback_data: "action:stop", style: "danger" },
-      ],
+export function buildSessionActionsKeyboard(
+  model: string,
+  expanded?: "auto" | null,
+  autoApprove?: AutoApproveConfig,
+  idleTimeout?: IdleTimeoutConfig,
+): TelegramInlineKeyboardMarkup {
+  const rows: TelegramInlineKeyboardButton[][] = [
+    [
+      { text: `Model: ${model}`, callback_data: "action:model" },
+      { text: "Status", callback_data: "action:status" },
     ],
-  };
+  ];
+
+  if (expanded === "auto" && autoApprove && idleTimeout) {
+    // ── Auto-Approve row ──
+    const aaTimeouts = [
+      { label: "Off", seconds: 0 },
+      { label: "15s", seconds: 15 },
+      { label: "30s", seconds: 30 },
+      { label: "60s", seconds: 60 },
+    ];
+    const activeAA = autoApprove.enabled ? autoApprove.timeoutSeconds : 0;
+    rows.push(
+      aaTimeouts.map((t) => ({
+        text: t.seconds === activeAA ? `${t.label} ✓` : t.label,
+        callback_data: `autoapprove:timeout:${t.seconds}`,
+        style: (t.seconds === activeAA ? "success" : undefined) as "success" | undefined,
+      }))
+    );
+    rows.push([
+      {
+        text: autoApprove.allowBash ? "Bash: ON ✓" : "Bash: OFF",
+        callback_data: `autoapprove:bash:${autoApprove.allowBash ? "off" : "on"}`,
+        style: autoApprove.allowBash ? "success" : "danger",
+      },
+    ]);
+
+    // ── Idle Timeout row: ON/OFF + presets ──
+    const activeMs = idleTimeout.enabled ? idleTimeout.timeoutMs : 0;
+    rows.push([
+      {
+        text: idleTimeout.enabled ? "ON ✓" : "ON",
+        callback_data: "timeout:toggle:on",
+        style: (idleTimeout.enabled ? "success" : undefined) as "success" | undefined,
+      },
+      {
+        text: !idleTimeout.enabled ? "OFF ✓" : "OFF",
+        callback_data: "timeout:toggle:off",
+        style: (!idleTimeout.enabled ? "danger" : undefined) as "danger" | undefined,
+      },
+      ...TIMEOUT_PRESETS.slice(0, 4).map((p) => ({
+        text: idleTimeout.enabled && activeMs === p.ms ? `${p.label} ✓` : p.label,
+        callback_data: `timeout:set:${p.ms}`,
+        style: (idleTimeout.enabled && activeMs === p.ms ? "success" : undefined) as "success" | undefined,
+      })),
+    ]);
+    rows.push([
+      { text: "↩ Back", callback_data: "action:collapse" },
+      { text: "Cancel", callback_data: "action:cancel" },
+      { text: "Stop", callback_data: "action:stop", style: "danger" },
+    ]);
+  } else {
+    // Collapsed: simple controls
+    rows.push([
+      { text: "Auto ⏱", callback_data: "action:autoapprove" },
+      { text: "Cancel", callback_data: "action:cancel" },
+      { text: "Stop", callback_data: "action:stop", style: "danger" },
+    ]);
+  }
+
+  return { inline_keyboard: rows };
 }
 
 /** Auto-approve config keyboard — timeout + bash toggle. */
