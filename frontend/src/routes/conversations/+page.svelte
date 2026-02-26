@@ -122,8 +122,9 @@
             </div>
             {#if (conv.tags ?? []).length > 0}
               <div class="tags">
-                {#each (conv.tags ?? []).slice(0, 5) as tag (tag)}<ComicBadge color="purple" size="sm"
-                    >{tag}</ComicBadge
+                {#each (conv.tags ?? []).slice(0, 5) as tag (tag)}<ComicBadge
+                    color="purple"
+                    size="sm">{tag}</ComicBadge
                   >{/each}
               </div>
             {/if}

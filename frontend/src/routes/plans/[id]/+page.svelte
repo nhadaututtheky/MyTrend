@@ -2,7 +2,13 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { fetchPlanTimeline, transitionPlan, updatePlan, deletePlan, updatePlanMilestones } from '$lib/api/plans';
+  import {
+    fetchPlanTimeline,
+    transitionPlan,
+    updatePlan,
+    deletePlan,
+    updatePlanMilestones,
+  } from '$lib/api/plans';
   import RelatedContent from '$lib/components/comic/RelatedContent.svelte';
   import { buildRelatedQuery } from '$lib/api/related';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
@@ -15,7 +21,12 @@
   import ComicInput from '$lib/components/comic/ComicInput.svelte';
   import { formatDateTime, formatRelative } from '$lib/utils/date';
   import { toast } from '$lib/stores/toast';
-  import type { PlanTimelineResponse, PlanStatus, PlanStageTransition, PlanMilestone } from '$lib/types';
+  import type {
+    PlanTimelineResponse,
+    PlanStatus,
+    PlanStageTransition,
+    PlanMilestone,
+  } from '$lib/types';
 
   let data = $state<PlanTimelineResponse | null>(null);
   let isLoading = $state(true);
@@ -50,14 +61,17 @@
   }
 
   async function toggleMilestone(id: string): Promise<void> {
-    const updated = milestones.map((m) => m.id === id ? { ...m, done: !m.done } : m);
+    const updated = milestones.map((m) => (m.id === id ? { ...m, done: !m.done } : m));
     await saveMilestones(updated);
   }
 
   async function addMilestone(): Promise<void> {
     const title = newMilestoneText.trim();
     if (!title) return;
-    const updated = [...milestones, { id: crypto.randomUUID(), title, done: false, order: milestones.length }];
+    const updated = [
+      ...milestones,
+      { id: crypto.randomUUID(), title, done: false, order: milestones.length },
+    ];
     await saveMilestones(updated);
     newMilestoneText = '';
   }
@@ -68,7 +82,9 @@
   }
 
   const milestoneProgress = $derived(
-    milestones.length > 0 ? Math.round((milestones.filter((m) => m.done).length / milestones.length) * 100) : 0
+    milestones.length > 0
+      ? Math.round((milestones.filter((m) => m.done).length / milestones.length) * 100)
+      : 0,
   );
   const allMilestonesDone = $derived(milestones.length > 0 && milestones.every((m) => m.done));
 
@@ -338,10 +354,20 @@
         {#each milestones as m (m.id)}
           <li class="milestone-item">
             <label class="milestone-check">
-              <input type="checkbox" checked={m.done} onchange={() => toggleMilestone(m.id)} aria-label={m.title} />
+              <input
+                type="checkbox"
+                checked={m.done}
+                onchange={() => toggleMilestone(m.id)}
+                aria-label={m.title}
+              />
               <span class="milestone-title" class:done={m.done}>{m.title}</span>
             </label>
-            <button class="ms-del" onclick={() => deleteMilestone(m.id)} aria-label="Delete milestone" title="Delete">✕</button>
+            <button
+              class="ms-del"
+              onclick={() => deleteMilestone(m.id)}
+              aria-label="Delete milestone"
+              title="Delete">✕</button
+            >
           </li>
         {/each}
       </ul>
@@ -354,7 +380,12 @@
           onkeydown={(e) => e.key === 'Enter' && addMilestone()}
           aria-label="New milestone"
         />
-        <button class="ms-add-btn" onclick={addMilestone} disabled={isSavingMilestones || !newMilestoneText.trim()} aria-label="Add">+</button>
+        <button
+          class="ms-add-btn"
+          onclick={addMilestone}
+          disabled={isSavingMilestones || !newMilestoneText.trim()}
+          aria-label="Add">+</button
+        >
       </div>
     </ComicCard>
 
@@ -571,36 +602,123 @@
     margin-top: var(--spacing-sm);
   }
   /* Milestones */
-  .milestone-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--spacing-sm); }
-  .milestone-header .section-title { margin: 0; }
-  .milestone-progress-row { display: flex; align-items: center; gap: var(--spacing-sm); }
-  .milestone-bar-bg { width: 100px; height: 6px; background: var(--border-color); border-radius: 3px; overflow: hidden; }
-  .milestone-bar-fill { height: 100%; background: var(--accent-green); border-radius: 3px; transition: width 300ms ease; }
-  .milestone-pct { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+  .milestone-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+  }
+  .milestone-header .section-title {
+    margin: 0;
+  }
+  .milestone-progress-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  .milestone-bar-bg {
+    width: 100px;
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .milestone-bar-fill {
+    height: 100%;
+    background: var(--accent-green);
+    border-radius: 3px;
+    transition: width 300ms ease;
+  }
+  .milestone-pct {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
   .milestone-done-banner {
-    background: rgba(0,210,106,0.08); border: 1px solid rgba(0,210,106,0.3);
-    border-radius: 4px; padding: var(--spacing-sm) var(--spacing-md);
-    font-size: var(--font-size-sm); color: var(--accent-green);
-    display: flex; align-items: center; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);
+    background: rgba(0, 210, 106, 0.08);
+    border: 1px solid rgba(0, 210, 106, 0.3);
+    border-radius: 4px;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--accent-green);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
   }
   .done-btn {
-    background: var(--accent-green); color: #1a1a1a; border: none;
-    padding: 2px 10px; border-radius: 3px; cursor: pointer;
-    font-family: var(--font-comic); font-size: 11px; font-weight: 700;
+    background: var(--accent-green);
+    color: #1a1a1a;
+    border: none;
+    padding: 2px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-comic);
+    font-size: 11px;
+    font-weight: 700;
   }
-  .milestone-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; margin: 0 0 var(--spacing-sm); }
-  .milestone-item { display: flex; align-items: center; gap: var(--spacing-xs); }
-  .milestone-check { display: flex; align-items: center; gap: var(--spacing-sm); flex: 1; cursor: pointer; }
-  .milestone-title { font-size: var(--font-size-sm); }
-  .milestone-title.done { text-decoration: line-through; color: var(--text-muted); }
-  .ms-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 11px; padding: 2px 4px; transition: color 150ms; }
-  .ms-del:hover { color: var(--accent-red); }
-  .milestone-add { display: flex; gap: var(--spacing-xs); }
-  .milestone-input { flex: 1; font-size: var(--font-size-sm); padding: 6px var(--spacing-sm); }
+  .milestone-list {
+    list-style: none;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0 0 var(--spacing-sm);
+  }
+  .milestone-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+  .milestone-check {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+    cursor: pointer;
+  }
+  .milestone-title {
+    font-size: var(--font-size-sm);
+  }
+  .milestone-title.done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+  .ms-del {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+    transition: color 150ms;
+  }
+  .ms-del:hover {
+    color: var(--accent-red);
+  }
+  .milestone-add {
+    display: flex;
+    gap: var(--spacing-xs);
+  }
+  .milestone-input {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    padding: 6px var(--spacing-sm);
+  }
   .ms-add-btn {
-    background: var(--accent-green); color: #1a1a1a; border: none;
-    width: 32px; height: 32px; border-radius: 4px; cursor: pointer;
-    font-size: 1.2rem; font-weight: 700; transition: opacity 150ms;
+    background: var(--accent-green);
+    color: #1a1a1a;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-weight: 700;
+    transition: opacity 150ms;
   }
-  .ms-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ms-add-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 </style>

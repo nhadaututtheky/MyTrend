@@ -110,8 +110,8 @@
       onclick={toggleMenu}
       disabled={isActing}
       aria-label="Project actions"
-      aria-expanded={menuOpen}
-    >⋯</button>
+      aria-expanded={menuOpen}>⋯</button
+    >
 
     {#if menuOpen}
       <div class="dropdown" role="menu">

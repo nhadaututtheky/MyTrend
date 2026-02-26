@@ -176,10 +176,18 @@
     position: relative;
   }
 
-  .dir-rising { color: var(--accent-green); }
-  .dir-falling { color: var(--accent-red); }
-  .dir-stable  { color: var(--text-muted); }
-  .dir-new     { color: var(--accent-blue); }
+  .dir-rising {
+    color: var(--accent-green);
+  }
+  .dir-falling {
+    color: var(--accent-red);
+  }
+  .dir-stable {
+    color: var(--text-muted);
+  }
+  .dir-new {
+    color: var(--accent-blue);
+  }
 
   .badge-new {
     font-size: 0.62rem;

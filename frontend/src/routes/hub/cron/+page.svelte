@@ -67,13 +67,18 @@
     if (dow === '1-5') return `Weekdays at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const d = parseInt(dow);
-    if (dow !== '*' && !isNaN(d)) return `Every ${days[d] ?? dow} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
-    if (hour !== '*' && dow === '*') return `Daily at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    if (dow !== '*' && !isNaN(d))
+      return `Every ${days[d] ?? dow} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    if (hour !== '*' && dow === '*')
+      return `Daily at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     return cron;
   }
 
   async function parseNL(text: string) {
-    if (!text.trim()) { nlResult = null; return; }
+    if (!text.trim()) {
+      nlResult = null;
+      return;
+    }
     nlParsing = true;
     try {
       const res = await fetch(`${COMPANION_URL}/api/nlcron/parse`, {
@@ -103,17 +108,27 @@
 
   function openCreate() {
     editingJob = null;
-    fName = ''; fSchedule = ''; fPrompt = ''; fEnabled = true;
+    fName = '';
+    fSchedule = '';
+    fPrompt = '';
+    fEnabled = true;
     fEnv = environments[0]?.id ?? '';
-    nlText = ''; nlResult = null; nlMode = true;
+    nlText = '';
+    nlResult = null;
+    nlMode = true;
     dialogOpen = true;
   }
 
   function openEdit(job: HubCronJob) {
     editingJob = job;
-    fName = job.name; fSchedule = job.schedule; fPrompt = job.prompt;
-    fEnabled = job.enabled; fEnv = job.environment ?? '';
-    nlText = ''; nlResult = null; nlMode = false;
+    fName = job.name;
+    fSchedule = job.schedule;
+    fPrompt = job.prompt;
+    fEnabled = job.enabled;
+    fEnv = job.environment ?? '';
+    nlText = '';
+    nlResult = null;
+    nlMode = false;
     dialogOpen = true;
   }
 
@@ -124,7 +139,13 @@
     }
     isSaving = true;
     try {
-      const data = { name: fName, schedule: fSchedule, prompt: fPrompt, environment: fEnv || undefined, enabled: fEnabled };
+      const data = {
+        name: fName,
+        schedule: fSchedule,
+        prompt: fPrompt,
+        environment: fEnv || undefined,
+        enabled: fEnabled,
+      };
       if (editingJob) {
         const updated = await updateCronJob(editingJob.id, data);
         jobs = jobs.map((j) => (j.id === updated.id ? updated : j));
@@ -226,11 +247,18 @@
                 <span class="muted">× {job.run_count}</span>
               </div>
               {#if job.last_result}
-                <p class="last-result">{job.last_result.slice(0, 120)}{job.last_result.length > 120 ? '…' : ''}</p>
+                <p class="last-result">
+                  {job.last_result.slice(0, 120)}{job.last_result.length > 120 ? '…' : ''}
+                </p>
               {/if}
             </div>
             <div class="job-actions">
-              <button class="icon-btn" onclick={() => handleToggle(job)} aria-label="Toggle enabled" title={job.enabled ? 'Pause' : 'Enable'}>
+              <button
+                class="icon-btn"
+                onclick={() => handleToggle(job)}
+                aria-label="Toggle enabled"
+                title={job.enabled ? 'Pause' : 'Enable'}
+              >
                 {job.enabled ? '⏸' : '▶'}
               </button>
               <button
@@ -242,14 +270,16 @@
               >
                 {runningId === job.id ? '⏳' : '▶▶'}
               </button>
-              <button class="icon-btn" onclick={() => openEdit(job)} aria-label="Edit" title="Edit">✏️</button>
+              <button class="icon-btn" onclick={() => openEdit(job)} aria-label="Edit" title="Edit"
+                >✏️</button
+              >
               <button
                 class="icon-btn del-btn"
                 onclick={() => handleDelete(job)}
                 disabled={deletingId === job.id}
                 aria-label="Delete"
-                title="Delete"
-              >🗑</button>
+                title="Delete">🗑</button
+              >
             </div>
           </div>
         </ComicCard>
@@ -259,7 +289,14 @@
 </div>
 
 <!-- Create / Edit Drawer -->
-<ComicDialog bind:open={dialogOpen} title={editingJob ? 'Edit Cron Job' : 'New Cron Job'} mode="drawer" onclose={() => { dialogOpen = false; }}>
+<ComicDialog
+  bind:open={dialogOpen}
+  title={editingJob ? 'Edit Cron Job' : 'New Cron Job'}
+  mode="drawer"
+  onclose={() => {
+    dialogOpen = false;
+  }}
+>
   {#snippet children()}
     <div class="form">
       <ComicInput bind:value={fName} label="Name" placeholder="Daily summary at 9am" />
@@ -271,16 +308,19 @@
           <button
             class="nl-toggle"
             class:active={nlMode}
-            onclick={() => { nlMode = !nlMode; nlResult = null; }}
-            aria-label="Toggle natural language mode"
-          >NL mode</button>
+            onclick={() => {
+              nlMode = !nlMode;
+              nlResult = null;
+            }}
+            aria-label="Toggle natural language mode">NL mode</button
+          >
         </div>
 
         {#if nlMode}
           <input
             id="nl-input"
             class="comic-input"
-            placeholder='e.g. "every day at 9am" or "every Monday at 10am"'
+            placeholder="e.g. every day at 9am, every Monday at 10am"
             bind:value={nlText}
             oninput={handleNLInput}
             aria-label="Natural language schedule"
@@ -346,7 +386,12 @@
     </div>
   {/snippet}
   {#snippet actions()}
-    <ComicButton variant="outline" onclick={() => { dialogOpen = false; }}>Cancel</ComicButton>
+    <ComicButton
+      variant="outline"
+      onclick={() => {
+        dialogOpen = false;
+      }}>Cancel</ComicButton
+    >
     <ComicButton variant="primary" loading={isSaving} onclick={handleSave}>
       {editingJob ? 'Save' : 'Create'}
     </ComicButton>
@@ -384,7 +429,10 @@
     align-items: flex-start;
     gap: var(--spacing-md);
   }
-  .job-main { flex: 1; min-width: 0; }
+  .job-main {
+    flex: 1;
+    min-width: 0;
+  }
   .job-title-row {
     display: flex;
     align-items: center;
@@ -405,8 +453,13 @@
     flex-wrap: wrap;
     margin-bottom: 4px;
   }
-  .schedule { color: var(--accent-blue); font-family: var(--font-mono); }
-  .muted { color: var(--text-muted); }
+  .schedule {
+    color: var(--accent-blue);
+    font-family: var(--font-mono);
+  }
+  .muted {
+    color: var(--text-muted);
+  }
   .last-result {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
@@ -440,10 +493,22 @@
     align-items: center;
     justify-content: center;
   }
-  .icon-btn:hover:not(:disabled) { border-color: var(--accent-blue); color: var(--accent-blue); }
-  .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .run-btn:hover:not(:disabled) { border-color: var(--accent-green); color: var(--accent-green); }
-  .del-btn:hover:not(:disabled) { border-color: var(--accent-red); color: var(--accent-red); }
+  .icon-btn:hover:not(:disabled) {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .run-btn:hover:not(:disabled) {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+  .del-btn:hover:not(:disabled) {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+  }
 
   /* Form */
   .form {
@@ -451,9 +516,21 @@
     flex-direction: column;
     gap: var(--spacing-md);
   }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .label { font-family: var(--font-comic); font-size: 0.875rem; font-weight: 700; }
-  .schedule-label-row { display: flex; align-items: center; justify-content: space-between; }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .label {
+    font-family: var(--font-comic);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .schedule-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   .textarea {
     resize: vertical;
     min-height: 100px;
@@ -473,21 +550,36 @@
     cursor: pointer;
     transition: all 150ms;
   }
-  .nl-toggle.active { color: var(--accent-green); border-color: var(--accent-green); background: rgba(0,210,106,0.08); }
-  .nl-hint { font-size: 0.75rem; margin: 0; }
-  .nl-hint.error { color: var(--accent-red); }
+  .nl-toggle.active {
+    color: var(--accent-green);
+    border-color: var(--accent-green);
+    background: rgba(0, 210, 106, 0.08);
+  }
+  .nl-hint {
+    font-size: 0.75rem;
+    margin: 0;
+  }
+  .nl-hint.error {
+    color: var(--accent-red);
+  }
   .nl-result {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
     padding: 6px 10px;
-    background: rgba(0,210,106,0.06);
-    border: 1px solid rgba(0,210,106,0.2);
+    background: rgba(0, 210, 106, 0.06);
+    border: 1px solid rgba(0, 210, 106, 0.2);
     border-radius: 4px;
     font-size: 0.75rem;
   }
-  .nl-cron { font-family: var(--font-mono); font-weight: 700; color: var(--accent-green); }
-  .nl-desc { flex: 1; }
+  .nl-cron {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent-green);
+  }
+  .nl-desc {
+    flex: 1;
+  }
   .nl-accept {
     background: none;
     border: 1px solid var(--accent-green);

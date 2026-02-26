@@ -145,7 +145,8 @@
     flex-wrap: wrap;
     justify-content: center;
   }
-  .cron-btn, .settings-btn {
+  .cron-btn,
+  .settings-btn {
     display: inline-block;
     font-family: var(--font-comic);
     font-weight: 700;
@@ -159,7 +160,8 @@
     text-decoration: none;
     transition: all 150ms ease;
   }
-  .cron-btn:hover, .settings-btn:hover {
+  .cron-btn:hover,
+  .settings-btn:hover {
     color: var(--accent-blue);
     border-color: var(--accent-blue);
     box-shadow: 3px 3px 0 var(--accent-blue);

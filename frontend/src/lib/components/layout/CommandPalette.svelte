@@ -46,19 +46,110 @@
   }
 
   const commands: CommandItem[] = [
-    { id: 'dashboard', label: 'Dashboard', section: 'Navigate', icon: LayoutDashboard, href: '/', keywords: 'home overview' },
-    { id: 'projects', label: 'Projects', section: 'Navigate', icon: FolderOpen, href: '/projects', keywords: 'folder' },
-    { id: 'conversations', label: 'Conversations', section: 'Navigate', icon: MessageCircle, href: '/conversations', keywords: 'chat messages' },
-    { id: 'ideas', label: 'Ideas', section: 'Navigate', icon: Lightbulb, href: '/ideas', keywords: 'brainstorm' },
-    { id: 'plans', label: 'Plans', section: 'Navigate', icon: ClipboardList, href: '/plans', keywords: 'tasks todo' },
-    { id: 'trends', label: 'Trends', section: 'Navigate', icon: TrendingUp, href: '/trends', keywords: 'analytics stats' },
-    { id: 'graph', label: 'Knowledge Graph', section: 'Navigate', icon: Globe, href: '/graph', keywords: 'network nodes' },
-    { id: 'search', label: 'Search', section: 'Navigate', icon: Search, href: '/search', keywords: 'find query' },
-    { id: 'vibe', label: 'Vibe Terminal', section: 'Tools', icon: Terminal, href: '/vibe', keywords: 'claude code cli' },
-    { id: 'hub', label: 'Claude Hub', section: 'Tools', icon: Zap, href: '/hub', keywords: 'ai chat assistant' },
-    { id: 'settings', label: 'Settings', section: 'Tools', icon: Settings, href: '/settings', keywords: 'preferences config' },
-    { id: 'new-idea', label: 'New Idea', section: 'Actions', icon: Plus, href: '/ideas/new', keywords: 'create add' },
-    { id: 'new-project', label: 'New Project', section: 'Actions', icon: Plus, href: '/projects/new', keywords: 'create add' },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      section: 'Navigate',
+      icon: LayoutDashboard,
+      href: '/',
+      keywords: 'home overview',
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      section: 'Navigate',
+      icon: FolderOpen,
+      href: '/projects',
+      keywords: 'folder',
+    },
+    {
+      id: 'conversations',
+      label: 'Conversations',
+      section: 'Navigate',
+      icon: MessageCircle,
+      href: '/conversations',
+      keywords: 'chat messages',
+    },
+    {
+      id: 'ideas',
+      label: 'Ideas',
+      section: 'Navigate',
+      icon: Lightbulb,
+      href: '/ideas',
+      keywords: 'brainstorm',
+    },
+    {
+      id: 'plans',
+      label: 'Plans',
+      section: 'Navigate',
+      icon: ClipboardList,
+      href: '/plans',
+      keywords: 'tasks todo',
+    },
+    {
+      id: 'trends',
+      label: 'Trends',
+      section: 'Navigate',
+      icon: TrendingUp,
+      href: '/trends',
+      keywords: 'analytics stats',
+    },
+    {
+      id: 'graph',
+      label: 'Knowledge Graph',
+      section: 'Navigate',
+      icon: Globe,
+      href: '/graph',
+      keywords: 'network nodes',
+    },
+    {
+      id: 'search',
+      label: 'Search',
+      section: 'Navigate',
+      icon: Search,
+      href: '/search',
+      keywords: 'find query',
+    },
+    {
+      id: 'vibe',
+      label: 'Vibe Terminal',
+      section: 'Tools',
+      icon: Terminal,
+      href: '/vibe',
+      keywords: 'claude code cli',
+    },
+    {
+      id: 'hub',
+      label: 'Claude Hub',
+      section: 'Tools',
+      icon: Zap,
+      href: '/hub',
+      keywords: 'ai chat assistant',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      section: 'Tools',
+      icon: Settings,
+      href: '/settings',
+      keywords: 'preferences config',
+    },
+    {
+      id: 'new-idea',
+      label: 'New Idea',
+      section: 'Actions',
+      icon: Plus,
+      href: '/ideas/new',
+      keywords: 'create add',
+    },
+    {
+      id: 'new-project',
+      label: 'New Project',
+      section: 'Actions',
+      icon: Plus,
+      href: '/projects/new',
+      keywords: 'create add',
+    },
   ];
 
   const TYPE_ICON: Record<string, ComponentType> = {
@@ -83,14 +174,22 @@
 
   function getResultHref(r: SearchResult): string {
     switch (r.type) {
-      case 'conversation': return `/conversations/${r.id}`;
-      case 'idea': return `/ideas/${r.id}`;
-      case 'project': return `/projects/${r.id}`;
-      case 'plan': return `/plans/${r.id}`;
-      case 'topic': return `/trends`;
-      case 'activity': return `/`;
-      case 'claude_task': return `/vibe`;
-      default: return `/search?q=${encodeURIComponent(query)}`;
+      case 'conversation':
+        return `/conversations/${r.id}`;
+      case 'idea':
+        return `/ideas/${r.id}`;
+      case 'project':
+        return `/projects/${r.id}`;
+      case 'plan':
+        return `/plans/${r.id}`;
+      case 'topic':
+        return `/trends`;
+      case 'activity':
+        return `/`;
+      case 'claude_task':
+        return `/vibe`;
+      default:
+        return `/search?q=${encodeURIComponent(query)}`;
     }
   }
 
@@ -217,12 +316,16 @@
           <div class="section">
             <span class="section-label">{section}</span>
             {#each items as item}
-              {@const globalIndex = allItems.findIndex((i) => !('_isResult' in i) && i.id === item.id)}
+              {@const globalIndex = allItems.findIndex(
+                (i) => !('_isResult' in i) && i.id === item.id,
+              )}
               <button
                 class="result-item"
                 class:selected={globalIndex === selectedIndex}
                 onclick={() => handleSelectCommand(item)}
-                onmouseenter={() => { selectedIndex = globalIndex; }}
+                onmouseenter={() => {
+                  selectedIndex = globalIndex;
+                }}
               >
                 <span class="result-icon"><item.icon size={16} /></span>
                 <span class="result-label">{item.label}</span>
@@ -242,7 +345,9 @@
                 class="result-item result-item--search"
                 class:selected={globalIndex === selectedIndex}
                 onclick={() => handleSelectResult(result)}
-                onmouseenter={() => { selectedIndex = globalIndex; }}
+                onmouseenter={() => {
+                  selectedIndex = globalIndex;
+                }}
               >
                 <span class="result-icon"><IconComp size={16} /></span>
                 <span class="result-body">
@@ -251,7 +356,9 @@
                     <span class="result-snippet">{result.snippet.slice(0, 80)}</span>
                   {/if}
                 </span>
-                <span class="type-badge type-badge--{TYPE_BADGE[result.type] ?? 'blue'}">{result.type}</span>
+                <span class="type-badge type-badge--{TYPE_BADGE[result.type] ?? 'blue'}"
+                  >{result.type}</span
+                >
               </button>
             {/each}
           </div>
@@ -279,8 +386,12 @@
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .palette {
@@ -295,8 +406,14 @@
   }
 
   @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .search-row {
@@ -318,7 +435,9 @@
     color: var(--text-primary);
   }
 
-  .palette-input::placeholder { color: var(--text-muted); }
+  .palette-input::placeholder {
+    color: var(--text-muted);
+  }
 
   .kbd {
     font-family: var(--font-comic);
@@ -340,7 +459,9 @@
   }
 
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .results {
@@ -349,7 +470,9 @@
     padding: var(--spacing-sm) 0;
   }
 
-  .section { padding: 0 var(--spacing-sm); }
+  .section {
+    padding: 0 var(--spacing-sm);
+  }
 
   .results-section {
     border-top: 1px solid var(--border-color);
@@ -407,7 +530,9 @@
   }
 
   /* Search result layout */
-  .result-item--search { align-items: flex-start; }
+  .result-item--search {
+    align-items: flex-start;
+  }
 
   .result-body {
     flex: 1;
@@ -443,13 +568,34 @@
     align-self: center;
   }
 
-  .type-badge--blue    { background: rgba(78,205,196,0.15); color: var(--accent-blue); }
-  .type-badge--yellow  { background: rgba(255,230,109,0.15); color: #b8a020; }
-  .type-badge--green   { background: rgba(0,210,106,0.15);  color: var(--accent-green); }
-  .type-badge--purple  { background: rgba(162,155,254,0.15); color: #a29bfe; }
-  .type-badge--teal    { background: rgba(78,205,196,0.15);  color: #4ecdc4; }
-  .type-badge--orange  { background: rgba(255,159,67,0.15);  color: #ff9f43; }
-  .type-badge--red     { background: rgba(255,71,87,0.15);   color: var(--accent-red); }
+  .type-badge--blue {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--accent-blue);
+  }
+  .type-badge--yellow {
+    background: rgba(255, 230, 109, 0.15);
+    color: #b8a020;
+  }
+  .type-badge--green {
+    background: rgba(0, 210, 106, 0.15);
+    color: var(--accent-green);
+  }
+  .type-badge--purple {
+    background: rgba(162, 155, 254, 0.15);
+    color: #a29bfe;
+  }
+  .type-badge--teal {
+    background: rgba(78, 205, 196, 0.15);
+    color: #4ecdc4;
+  }
+  .type-badge--orange {
+    background: rgba(255, 159, 67, 0.15);
+    color: #ff9f43;
+  }
+  .type-badge--red {
+    background: rgba(255, 71, 87, 0.15);
+    color: var(--accent-red);
+  }
 
   .no-results {
     text-align: center;

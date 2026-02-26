@@ -50,7 +50,14 @@ function fakeId(prefix: string): string {
 
 const BASE: Pick<
   Project,
-  'collectionId' | 'collectionName' | 'user' | 'dna' | 'tech_stack' | 'github_repo' | 'github_last_synced' | 'slug'
+  | 'collectionId'
+  | 'collectionName'
+  | 'user'
+  | 'dna'
+  | 'tech_stack'
+  | 'github_repo'
+  | 'github_last_synced'
+  | 'slug'
 > = {
   collectionId: 'demo',
   collectionName: 'projects',
@@ -294,7 +301,9 @@ export const DEMO_ACTIVITIES: Activity[] = [
 export function generateDemoHeatmap(): HeatmapDay[] {
   const days: HeatmapDay[] = [];
   // Realistic pattern: active weekdays, sparse weekends, some streaks
-  const pattern = [4, 6, 5, 7, 3, 1, 0, 5, 8, 6, 4, 2, 0, 0, 7, 5, 6, 8, 4, 1, 0, 3, 6, 5, 4, 2, 0, 0, 5, 7];
+  const pattern = [
+    4, 6, 5, 7, 3, 1, 0, 5, 8, 6, 4, 2, 0, 0, 7, 5, 6, 8, 4, 1, 0, 3, 6, 5, 4, 2, 0, 0, 5, 7,
+  ];
   for (let i = 89; i >= 0; i--) {
     const base = pattern[i % pattern.length] ?? 0;
     // Add slight randomness

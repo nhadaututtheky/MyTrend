@@ -28,23 +28,29 @@
   let dupCheckTimer: ReturnType<typeof setTimeout> | undefined;
 
   async function checkDuplicates(text: string): Promise<void> {
-    if (text.trim().length < 8) { similarIdeas = []; return; }
+    if (text.trim().length < 8) {
+      similarIdeas = [];
+      return;
+    }
     try {
       const token = pb.authStore.token;
-      const res = await fetch(
-        `/api/mytrend/ideas/similar?text=${encodeURIComponent(text)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`/api/mytrend/ideas/similar?text=${encodeURIComponent(text)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = (await res.json()) as { items: SimilarIdea[] };
         similarIdeas = data.items ?? [];
       }
-    } catch { /* non-critical */ }
+    } catch {
+      /* non-critical */
+    }
   }
 
   function onTitleInput(): void {
     clearTimeout(dupCheckTimer);
-    dupCheckTimer = setTimeout(() => { void checkDuplicates(title + ' ' + content); }, 600);
+    dupCheckTimer = setTimeout(() => {
+      void checkDuplicates(title + ' ' + content);
+    }, 600);
   }
 
   onMount(async () => {
@@ -125,7 +131,13 @@
     <h1 class="comic-heading">New Idea</h1>
     <form onsubmit={handleSubmit}>
       <div class="fields">
-        <ComicInput bind:value={title} label="Title" placeholder="What's the idea?" required oninput={onTitleInput} />
+        <ComicInput
+          bind:value={title}
+          label="Title"
+          placeholder="What's the idea?"
+          required
+          oninput={onTitleInput}
+        />
         <div class="field">
           <label class="label" for="content">Description</label>
           <textarea

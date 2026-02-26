@@ -175,42 +175,37 @@
   --font-comic: -apple-system, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
 
   /* iOS System Backgrounds */
-  --bg-primary: #f2f2f7;                    /* systemGroupedBackground */
-  --bg-secondary: #e5e5ea;                  /* secondarySystemGroupedBackground */
-  --bg-card: rgba(255, 255, 255, 0.78);     /* glass surface */
+  --bg-primary: #f2f2f7; /* systemGroupedBackground */
+  --bg-secondary: #e5e5ea; /* secondarySystemGroupedBackground */
+  --bg-card: rgba(255, 255, 255, 0.78); /* glass surface */
 
   /* iOS Dynamic Text */
   --text-primary: #000000;
-  --text-secondary: rgba(60, 60, 67, 0.6);  /* label secondary */
-  --text-muted: rgba(60, 60, 67, 0.3);      /* label tertiary */
+  --text-secondary: rgba(60, 60, 67, 0.6); /* label secondary */
+  --text-muted: rgba(60, 60, 67, 0.3); /* label tertiary */
 
   --border-color: rgba(0, 0, 0, 0.1);
   --border-width: 0.5px;
 
   /* Apple HIG System Colors */
-  --accent-green: #34c759;    /* systemGreen */
-  --accent-red: #ff3b30;      /* systemRed */
-  --accent-yellow: #ff9500;   /* systemOrange */
-  --accent-blue: #007aff;     /* systemBlue */
+  --accent-green: #34c759; /* systemGreen */
+  --accent-red: #ff3b30; /* systemRed */
+  --accent-yellow: #ff9500; /* systemOrange */
+  --accent-blue: #007aff; /* systemBlue */
   --accent-orange: #ff6b00;
-  --accent-purple: #af52de;   /* systemPurple */
+  --accent-purple: #af52de; /* systemPurple */
 
   /* Liquid Glass shadows — multi-layer, inner highlight */
   --shadow-sm:
-    0 1px 3px rgba(0, 0, 0, 0.06),
-    0 1px 8px rgba(0, 0, 0, 0.03),
+    0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 8px rgba(0, 0, 0, 0.03),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.85);
   --shadow-md:
-    0 4px 16px rgba(0, 0, 0, 0.08),
-    0 1px 4px rgba(0, 0, 0, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.75);
   --shadow-lg:
-    0 8px 32px rgba(0, 0, 0, 0.10),
-    0 2px 8px rgba(0, 0, 0, 0.06),
+    0 8px 32px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  --shadow-xl:
-    0 16px 56px rgba(0, 0, 0, 0.12),
-    0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 16px 56px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08);
 
   --shadow-accent-green: 0 4px 20px rgba(52, 199, 89, 0.35);
   --shadow-accent-blue: 0 4px 20px rgba(0, 122, 255, 0.35);
@@ -253,7 +248,7 @@
 [data-theme='apple'] [data-testid='comic-card']:hover {
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.09),
-    0 14px 44px rgba(0, 0, 0, 0.10),
+    0 14px 44px rgba(0, 0, 0, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     inset 0 -0.5px 0 rgba(0, 0, 0, 0.04) !important;
   transform: translateY(-3px) !important;
@@ -284,12 +279,12 @@
   --border-width: 1px;
 
   /* Material Design A-series — electric, high saturation */
-  --accent-green: #00e676;    /* A400 — profit indicator */
-  --accent-red: #ff5252;      /* A200 — loss indicator */
-  --accent-yellow: #ffd740;   /* A200 — warning */
-  --accent-blue: #40c4ff;     /* A200 — primary action */
-  --accent-orange: #ffab40;   /* A200 */
-  --accent-purple: #b388ff;   /* A200 */
+  --accent-green: #00e676; /* A400 — profit indicator */
+  --accent-red: #ff5252; /* A200 — loss indicator */
+  --accent-yellow: #ffd740; /* A200 — warning */
+  --accent-blue: #40c4ff; /* A200 — primary action */
+  --accent-orange: #ffab40; /* A200 */
+  --accent-purple: #b388ff; /* A200 */
 
   /* Electric glows for OLED contrast */
   --glow-green: 0 0 24px rgba(0, 230, 118, 0.35);
@@ -359,15 +354,9 @@
   --accent-orange: #ff9f0a;
   --accent-purple: #bf5af2;
 
-  --shadow-sm:
-    0 1px 4px rgba(0, 0, 0, 0.3),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
-  --shadow-md:
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --shadow-lg:
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-xl: 0 16px 56px rgba(0, 0, 0, 0.6);
 }
 

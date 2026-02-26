@@ -90,14 +90,14 @@
         <a
           href="/vibe?prompt={buildDiscussPrompt(idea)}&tab=terminal"
           class="action-btn discuss-btn"
-          aria-label="Discuss this idea with Claude"
-        >💬 Discuss</a>
+          aria-label="Discuss this idea with Claude">💬 Discuss</a
+        >
         <button
           class="action-btn tg-btn"
           onclick={handleSendToTelegram}
           disabled={isSendingToTg}
-          aria-label="Send to Telegram"
-        >{isSendingToTg ? '...' : '✈️ Telegram'}</button>
+          aria-label="Send to Telegram">{isSendingToTg ? '...' : '✈️ Telegram'}</button
+        >
       </div>
     </div>
 

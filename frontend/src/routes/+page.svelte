@@ -641,7 +641,9 @@
     border-radius: var(--radius-sm);
     color: var(--text-muted);
     cursor: pointer;
-    transition: background var(--transition-fast), color var(--transition-fast);
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast);
   }
 
   .demo-dismiss:hover {

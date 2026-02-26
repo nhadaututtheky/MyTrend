@@ -13,7 +13,7 @@
   const STYLES: StyleEntry[] = [
     { id: 'comic', label: 'Comic', icon: '✏️', desc: 'Sketch + hard shadows' },
     { id: 'apple', label: 'Apple', icon: '🍎', desc: 'Liquid glass · iOS 26' },
-    { id: 'pro',   label: 'Pro',   icon: '⚡', desc: 'OLED fintech terminal' },
+    { id: 'pro', label: 'Pro', icon: '⚡', desc: 'OLED fintech terminal' },
   ];
 
   let currentStyle = $state<ThemeStyle>('comic');
@@ -21,9 +21,16 @@
   let open = $state(false);
 
   $effect(() => {
-    const u1 = themeStyle.subscribe((s) => { currentStyle = s; });
-    const u2 = colorScheme.subscribe((c) => { currentScheme = c; });
-    return () => { u1(); u2(); };
+    const u1 = themeStyle.subscribe((s) => {
+      currentStyle = s;
+    });
+    const u2 = colorScheme.subscribe((c) => {
+      currentScheme = c;
+    });
+    return () => {
+      u1();
+      u2();
+    };
   });
 
   function selectStyle(id: ThemeStyle): void {
@@ -40,12 +47,23 @@
     open = !open;
   }
 
-  const DEFAULT_STYLE: StyleEntry = { id: 'comic', label: 'Comic', icon: '✏️', desc: 'Sketch + hard shadows' };
-  const currentEntry = $derived<StyleEntry>(STYLES.find((s) => s.id === currentStyle) ?? DEFAULT_STYLE);
+  const DEFAULT_STYLE: StyleEntry = {
+    id: 'comic',
+    label: 'Comic',
+    icon: '✏️',
+    desc: 'Sketch + hard shadows',
+  };
+  const currentEntry = $derived<StyleEntry>(
+    STYLES.find((s) => s.id === currentStyle) ?? DEFAULT_STYLE,
+  );
   const schemeIcon = $derived(currentScheme === 'dark' ? '🌙' : '☀️');
 </script>
 
-<svelte:window onclick={() => { open = false; }} />
+<svelte:window
+  onclick={() => {
+    open = false;
+  }}
+/>
 
 <div class="theme-picker">
   <div class="trigger-group">
@@ -118,7 +136,9 @@
     cursor: pointer;
     color: var(--text-primary);
     box-shadow: var(--shadow-sm);
-    transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+    transition:
+      box-shadow var(--transition-fast),
+      transform var(--transition-fast);
     min-width: 34px;
     min-height: 32px;
     display: flex;
@@ -175,7 +195,9 @@
     font-family: var(--font-body);
     color: var(--text-secondary);
     text-align: left;
-    transition: background var(--transition-fast), color var(--transition-fast);
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast);
   }
 
   .option:hover {

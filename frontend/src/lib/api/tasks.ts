@@ -110,7 +110,10 @@ export async function fetchTasks(options?: {
   try {
     result = await pb
       .collection('claude_tasks')
-      .getList<ClaudeTask>(options?.page ?? 1, options?.perPage ?? 500, { sort: '-updated', filter });
+      .getList<ClaudeTask>(options?.page ?? 1, options?.perPage ?? 500, {
+        sort: '-updated',
+        filter,
+      });
   } catch (err) {
     const e = err as { status?: number };
     if (e?.status === 404) {

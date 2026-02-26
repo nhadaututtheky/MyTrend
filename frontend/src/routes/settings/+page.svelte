@@ -45,10 +45,10 @@
   let activeTab = $state('profile');
 
   const TABS = [
-    { id: 'profile',      label: '👤 Profile' },
-    { id: 'ai',           label: '🤖 AI & Projects' },
+    { id: 'profile', label: '👤 Profile' },
+    { id: 'ai', label: '🤖 AI & Projects' },
     { id: 'integrations', label: '🔌 Integrations' },
-    { id: 'data',         label: '🗄️ Data' },
+    { id: 'data', label: '🗄️ Data' },
   ];
 
   let displayName = $state('');
@@ -557,8 +557,8 @@
       <ComicCard>
         <h2 class="section-title">Appearance</h2>
         <p class="tg-hint">
-          Use the theme picker <strong>✏️</strong> in the header to switch between Comic, Apple, and
-          Pro themes in real time.
+          Use the theme picker <strong>✏️</strong> in the header to switch between Comic, Apple, and Pro
+          themes in real time.
         </p>
         <div class="theme-row">
           <span class="theme-current">Active: <strong>{currentTheme}</strong></span>
@@ -749,20 +749,24 @@
                 <ComicButton variant="primary" loading={projectSaving} onclick={handleAddProject}
                   >Add Project</ComicButton
                 >
-                <ComicButton variant="outline" onclick={() => { showAddProject = false; }}
-                  >Cancel</ComicButton
+                <ComicButton
+                  variant="outline"
+                  onclick={() => {
+                    showAddProject = false;
+                  }}>Cancel</ComicButton
                 >
               </div>
             </div>
           {:else}
             <div class="actions" style="margin-top: var(--spacing-md)">
-              <ComicButton variant="secondary" onclick={() => { showAddProject = true; }}
-                >+ Add Project</ComicButton
-              >
               <ComicButton
-                variant="outline"
-                loading={projectsLoading}
-                onclick={loadProjectProfiles}>Refresh</ComicButton
+                variant="secondary"
+                onclick={() => {
+                  showAddProject = true;
+                }}>+ Add Project</ComicButton
+              >
+              <ComicButton variant="outline" loading={projectsLoading} onclick={loadProjectProfiles}
+                >Refresh</ComicButton
               >
             </div>
           {/if}
@@ -801,11 +805,7 @@
           {#if tgEnvChannelSet}
             <p class="tg-hint tg-env-note">Channel ID: set via env variable</p>
           {:else}
-            <ComicInput
-              bind:value={tgChannelId}
-              label="Channel ID"
-              placeholder="-100123456789"
-            />
+            <ComicInput bind:value={tgChannelId} label="Channel ID" placeholder="-100123456789" />
           {/if}
           {#if !tgEnvTokenSet || !tgEnvChannelSet}
             <div class="actions">
@@ -885,9 +885,7 @@
                   loading={webhookSaving}
                   onclick={handleSetupWebhook}>Setup Webhook</ComicButton
                 >
-                <ComicButton variant="outline" onclick={handleRemoveWebhook}
-                  >Remove</ComicButton
-                >
+                <ComicButton variant="outline" onclick={handleRemoveWebhook}>Remove</ComicButton>
               </div>
             </div>
           {/if}
@@ -921,7 +919,9 @@
           </p>
         {:else if companionOnline}
           {#if cbConfig?.envConfigured}
-            <p class="tg-hint tg-env-note">Config via env vars (TELEGRAM_BOT_TOKEN + ALLOWED_CHAT_IDS)</p>
+            <p class="tg-hint tg-env-note">
+              Config via env vars (TELEGRAM_BOT_TOKEN + ALLOWED_CHAT_IDS)
+            </p>
           {:else}
             <div class="tg-credentials">
               <ComicInput

@@ -105,7 +105,9 @@
                 <ComicBadge color="blue" size="sm">{plan.plan_type}</ComicBadge>
               {/if}
               {#if plan.priority && plan.priority !== 'medium'}
-                <ComicBadge color={PRIORITY_COLORS[plan.priority] ?? 'yellow'} size="sm">{plan.priority}</ComicBadge>
+                <ComicBadge color={PRIORITY_COLORS[plan.priority] ?? 'yellow'} size="sm"
+                  >{plan.priority}</ComicBadge
+                >
               {/if}
               {#if plan.estimated_effort}
                 <span class="effort">{plan.estimated_effort}</span>
@@ -254,9 +256,13 @@
   }
 
   @media (max-width: 900px) {
-    .kanban { grid-template-columns: repeat(2, 1fr); }
+    .kanban {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
   @media (max-width: 600px) {
-    .kanban { grid-template-columns: 1fr; }
+    .kanban {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

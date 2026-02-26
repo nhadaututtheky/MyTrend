@@ -66,8 +66,10 @@
     if (dow === '1-5') return `Weekdays at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const d = parseInt(dow);
-    if (dow !== '*' && !isNaN(d)) return `Every ${days[d] ?? dow} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
-    if (hour !== '*' && dow === '*') return `Daily at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    if (dow !== '*' && !isNaN(d))
+      return `Every ${days[d] ?? dow} at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
+    if (hour !== '*' && dow === '*')
+      return `Daily at ${hour.padStart(2, '0')}:${min.padStart(2, '0')}`;
     return cron;
   }
 </script>
@@ -76,27 +78,39 @@
 
 <div class="detail-page">
   <div class="back-row">
-    <button class="back-btn" onclick={() => goto('/hub/cron')} aria-label="Back to cron jobs">← Cron Jobs</button>
+    <button class="back-btn" onclick={() => goto('/hub/cron')} aria-label="Back to cron jobs"
+      >← Cron Jobs</button
+    >
   </div>
 
   {#if isLoading}
     <ComicSkeleton variant="card" height="120px" />
     <ComicSkeleton variant="card" height="200px" />
   {:else if !job}
-    <ComicEmptyState illustration="error" message="Cron job not found" actionLabel="Back" actionHref="/hub/cron" />
+    <ComicEmptyState
+      illustration="error"
+      message="Cron job not found"
+      actionLabel="Back"
+      actionHref="/hub/cron"
+    />
   {:else}
     <ComicCard>
       <div class="job-header">
         <div>
           <h2 class="job-title">{job.name}</h2>
           <div class="job-meta">
-            <ComicBadge color={job.enabled ? 'green' : 'yellow'} size="sm">{job.enabled ? 'enabled' : 'paused'}</ComicBadge>
+            <ComicBadge color={job.enabled ? 'green' : 'yellow'} size="sm"
+              >{job.enabled ? 'enabled' : 'paused'}</ComicBadge
+            >
             <span class="schedule">⏱ {formatCron(job.schedule)}</span>
-            {#if job.last_run}<span class="muted">last ran {formatRelative(job.last_run)}</span>{/if}
+            {#if job.last_run}<span class="muted">last ran {formatRelative(job.last_run)}</span
+              >{/if}
             <span class="muted">× {job.run_count} runs</span>
           </div>
         </div>
-        <ComicButton variant="primary" loading={isRunning} onclick={handleRun}>▶ Run Now</ComicButton>
+        <ComicButton variant="primary" loading={isRunning} onclick={handleRun}
+          >▶ Run Now</ComicButton
+        >
       </div>
 
       <div class="prompt-section">
@@ -121,12 +135,16 @@
           {#each history as run (run.id)}
             <div class="history-row">
               <div class="history-meta">
-                <ComicBadge color={run.status === 'success' ? 'green' : 'red'} size="sm">{run.status}</ComicBadge>
+                <ComicBadge color={run.status === 'success' ? 'green' : 'red'} size="sm"
+                  >{run.status}</ComicBadge
+                >
                 <span class="muted">{formatDateTime(run.ran_at)}</span>
                 <span class="muted">{run.duration_ms}ms</span>
               </div>
               {#if run.output}
-                <pre class="run-output">{run.output.slice(0, 300)}{run.output.length > 300 ? '…' : ''}</pre>
+                <pre class="run-output">{run.output.slice(0, 300)}{run.output.length > 300
+                    ? '…'
+                    : ''}</pre>
               {/if}
             </div>
           {/each}
@@ -156,7 +174,9 @@
     cursor: pointer;
     padding: 0;
   }
-  .back-btn:hover { text-decoration: underline; }
+  .back-btn:hover {
+    text-decoration: underline;
+  }
   .job-header {
     display: flex;
     align-items: flex-start;
@@ -164,12 +184,35 @@
     gap: var(--spacing-md);
     margin-bottom: var(--spacing-md);
   }
-  .job-title { font-size: var(--font-size-3xl); font-weight: 700; margin: 0 0 var(--spacing-xs); }
-  .job-meta { display: flex; gap: var(--spacing-sm); align-items: center; flex-wrap: wrap; font-size: var(--font-size-sm); }
-  .schedule { color: var(--accent-blue); font-family: var(--font-mono); }
-  .muted { color: var(--text-muted); }
-  .section-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin: var(--spacing-md) 0 var(--spacing-xs); }
-  .prompt-text, .output-text, .run-output {
+  .job-title {
+    font-size: var(--font-size-3xl);
+    font-weight: 700;
+    margin: 0 0 var(--spacing-xs);
+  }
+  .job-meta {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: var(--font-size-sm);
+  }
+  .schedule {
+    color: var(--accent-blue);
+    font-family: var(--font-mono);
+  }
+  .muted {
+    color: var(--text-muted);
+  }
+  .section-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: var(--spacing-md) 0 var(--spacing-xs);
+  }
+  .prompt-text,
+  .output-text,
+  .run-output {
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
     white-space: pre-wrap;
@@ -181,14 +224,33 @@
     margin: 0;
     line-height: 1.6;
   }
-  .section-title { font-size: 0.875rem; text-transform: uppercase; margin: 0 0 var(--spacing-md); }
-  .history-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+  .section-title {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    margin: 0 0 var(--spacing-md);
+  }
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
   .history-row {
     padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--border-color);
     border-radius: 4px;
   }
-  .history-meta { display: flex; gap: var(--spacing-sm); align-items: center; margin-bottom: 6px; font-size: var(--font-size-sm); }
-  .empty { font-size: var(--font-size-sm); color: var(--text-muted); }
-  .back-row { padding-bottom: 0; }
+  .history-meta {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: var(--font-size-sm);
+  }
+  .empty {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+  }
+  .back-row {
+    padding-bottom: 0;
+  }
 </style>

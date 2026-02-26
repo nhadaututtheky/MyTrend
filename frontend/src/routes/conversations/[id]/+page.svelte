@@ -19,7 +19,12 @@
     if (!conversation || isSendingToTg) return;
     isSendingToTg = true;
     try {
-      await sendContentToTelegram('conversation', conversation.title, conversation.summary ?? '', `/conversations/${convId}`);
+      await sendContentToTelegram(
+        'conversation',
+        conversation.title,
+        conversation.summary ?? '',
+        `/conversations/${convId}`,
+      );
     } catch {
       // Non-critical
     } finally {
@@ -65,14 +70,14 @@
         <a
           href="/vibe?prompt={buildDiscussPrompt(conversation)}&tab=terminal"
           class="action-btn discuss-btn"
-          aria-label="Discuss this conversation with Claude"
-        >💬 Discuss</a>
+          aria-label="Discuss this conversation with Claude">💬 Discuss</a
+        >
         <button
           class="action-btn tg-btn"
           onclick={handleSendToTelegram}
           disabled={isSendingToTg}
-          aria-label="Send to Telegram"
-        >{isSendingToTg ? '...' : '✈️ Telegram'}</button>
+          aria-label="Send to Telegram">{isSendingToTg ? '...' : '✈️ Telegram'}</button
+        >
       </div>
     </div>
 

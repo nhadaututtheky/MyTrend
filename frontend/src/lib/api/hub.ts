@@ -1,5 +1,11 @@
 import pb from '$lib/config/pocketbase';
-import type { HubSession, HubEnvironment, HubCronJob, HubCronHistory, PBListResult } from '$lib/types';
+import type {
+  HubSession,
+  HubEnvironment,
+  HubCronJob,
+  HubCronHistory,
+  PBListResult,
+} from '$lib/types';
 
 const ITEMS_PER_PAGE = 50;
 

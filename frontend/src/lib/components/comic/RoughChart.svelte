@@ -299,11 +299,7 @@
     // Area fill under the line (SVG polygon)
     if (points.length > 1) {
       const baseY = MARGIN.top + plotH;
-      const polyPoints = [
-        [MARGIN.left, baseY],
-        ...points,
-        [points[points.length - 1]![0], baseY],
-      ]
+      const polyPoints = [[MARGIN.left, baseY], ...points, [points[points.length - 1]![0], baseY]]
         .map(([px, py]) => `${px},${py}`)
         .join(' ');
       const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');

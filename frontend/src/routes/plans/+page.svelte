@@ -157,15 +157,20 @@
         <button
           class="toggle-btn"
           class:active={viewMode === 'list'}
-          onclick={() => { viewMode = 'list'; }}
-          aria-label="List view"
-        >☰ List</button>
+          onclick={() => {
+            viewMode = 'list';
+          }}
+          aria-label="List view">☰ List</button
+        >
         <button
           class="toggle-btn"
           class:active={viewMode === 'kanban'}
-          onclick={() => { viewMode = 'kanban'; loadKanbanPlans(); }}
-          aria-label="Kanban view"
-        >⊞ Kanban</button>
+          onclick={() => {
+            viewMode = 'kanban';
+            loadKanbanPlans();
+          }}
+          aria-label="Kanban view">⊞ Kanban</button
+        >
       </div>
       <ComicButton variant="outline" disabled={isSyncing} onclick={handleSyncPlanFiles}>
         {isSyncing ? 'Syncing...' : 'Sync Claude Files'}
@@ -183,95 +188,94 @@
       <PlanKanban plans={allPlans} onStatusChange={handleKanbanStatusChange} />
     {/if}
   {:else}
+    <ComicTabs tabs={statusTabs} bind:active={statusFilter} />
 
-  <ComicTabs tabs={statusTabs} bind:active={statusFilter} />
-
-  {#if isLoading}
-    <div class="skeleton-list">
-      {#each Array(4) as _}
-        <ComicSkeleton variant="card" height="100px" />
-      {/each}
-    </div>
-  {:else if plans.length === 0}
-    <ComicEmptyState
-      illustration="inbox"
-      message="No plans found"
-      description="Create a new plan manually or import conversations to auto-extract plans."
-      actionLabel="New Plan"
-      actionHref="/plans/new"
-    />
-  {:else}
-    <div class="list">
-      {#each plans as plan, i (plan.id)}
-        <a href="/plans/{plan.id}" class="list-link" style:animation-delay="{i * 30}ms">
-          <ComicCard variant="standard">
-            <div class="plan-header">
-              <h3 class="plan-title">{plan.title}</h3>
-              <div class="plan-badges">
-                <ComicBadge color={STATUS_COLORS[plan.status]} size="sm"
-                  >{plan.status.replace('_', ' ')}</ComicBadge
-                >
-                {#if plan.plan_type}
-                  <ComicBadge color={TYPE_COLORS[plan.plan_type]} size="sm"
-                    >{plan.plan_type}</ComicBadge
+    {#if isLoading}
+      <div class="skeleton-list">
+        {#each Array(4) as _}
+          <ComicSkeleton variant="card" height="100px" />
+        {/each}
+      </div>
+    {:else if plans.length === 0}
+      <ComicEmptyState
+        illustration="inbox"
+        message="No plans found"
+        description="Create a new plan manually or import conversations to auto-extract plans."
+        actionLabel="New Plan"
+        actionHref="/plans/new"
+      />
+    {:else}
+      <div class="list">
+        {#each plans as plan, i (plan.id)}
+          <a href="/plans/{plan.id}" class="list-link" style:animation-delay="{i * 30}ms">
+            <ComicCard variant="standard">
+              <div class="plan-header">
+                <h3 class="plan-title">{plan.title}</h3>
+                <div class="plan-badges">
+                  <ComicBadge color={STATUS_COLORS[plan.status]} size="sm"
+                    >{plan.status.replace('_', ' ')}</ComicBadge
+                  >
+                  {#if plan.plan_type}
+                    <ComicBadge color={TYPE_COLORS[plan.plan_type]} size="sm"
+                      >{plan.plan_type}</ComicBadge
+                    >
+                  {/if}
+                </div>
+              </div>
+              {#if plan.trigger}
+                <p class="plan-trigger">{plan.trigger.replace(/<[^>]*>/g, '').substring(0, 150)}</p>
+              {/if}
+              <div class="plan-meta">
+                {#if plan.priority}
+                  <ComicBadge color={PRIORITY_COLORS[plan.priority] ?? 'blue'} size="sm"
+                    >{plan.priority}</ComicBadge
                   >
                 {/if}
+                {#if plan.complexity}
+                  <span class="meta-text">{plan.complexity}</span>
+                {/if}
+                {#if plan.estimated_effort}
+                  <span class="meta-text">{plan.estimated_effort}</span>
+                {/if}
+                {#if plan.extraction_source === 'auto'}
+                  <ComicBadge color="purple" size="sm">auto</ComicBadge>
+                {/if}
+                <span class="time">{formatRelative(plan.created)}</span>
               </div>
-            </div>
-            {#if plan.trigger}
-              <p class="plan-trigger">{plan.trigger.replace(/<[^>]*>/g, '').substring(0, 150)}</p>
-            {/if}
-            <div class="plan-meta">
-              {#if plan.priority}
-                <ComicBadge color={PRIORITY_COLORS[plan.priority] ?? 'blue'} size="sm"
-                  >{plan.priority}</ComicBadge
-                >
+              {#if plan.tags.length > 0}
+                <div class="tags">
+                  {#each plan.tags.slice(0, 5) as tag (tag)}
+                    <ComicBadge color="purple" size="sm">{tag}</ComicBadge>
+                  {/each}
+                </div>
               {/if}
-              {#if plan.complexity}
-                <span class="meta-text">{plan.complexity}</span>
-              {/if}
-              {#if plan.estimated_effort}
-                <span class="meta-text">{plan.estimated_effort}</span>
-              {/if}
-              {#if plan.extraction_source === 'auto'}
-                <ComicBadge color="purple" size="sm">auto</ComicBadge>
-              {/if}
-              <span class="time">{formatRelative(plan.created)}</span>
-            </div>
-            {#if plan.tags.length > 0}
-              <div class="tags">
-                {#each plan.tags.slice(0, 5) as tag (tag)}
-                  <ComicBadge color="purple" size="sm">{tag}</ComicBadge>
-                {/each}
-              </div>
-            {/if}
-          </ComicCard>
-        </a>
-      {/each}
-    </div>
-
-    {#if totalPages > 1}
-      <div class="pagination">
-        <ComicButton
-          variant="outline"
-          disabled={currentPage <= 1}
-          onclick={() => {
-            currentPage--;
-            loadPlans();
-          }}>Prev</ComicButton
-        >
-        <span class="page-info">Page {currentPage} / {totalPages}</span>
-        <ComicButton
-          variant="outline"
-          disabled={currentPage >= totalPages}
-          onclick={() => {
-            currentPage++;
-            loadPlans();
-          }}>Next</ComicButton
-        >
+            </ComicCard>
+          </a>
+        {/each}
       </div>
+
+      {#if totalPages > 1}
+        <div class="pagination">
+          <ComicButton
+            variant="outline"
+            disabled={currentPage <= 1}
+            onclick={() => {
+              currentPage--;
+              loadPlans();
+            }}>Prev</ComicButton
+          >
+          <span class="page-info">Page {currentPage} / {totalPages}</span>
+          <ComicButton
+            variant="outline"
+            disabled={currentPage >= totalPages}
+            onclick={() => {
+              currentPage++;
+              loadPlans();
+            }}>Next</ComicButton
+          >
+        </div>
+      {/if}
     {/if}
-  {/if}
   {/if}
 </div>
 
@@ -308,7 +312,9 @@
     background: var(--accent-blue);
     color: #1a1a1a;
   }
-  .toggle-btn:not(.active):hover { color: var(--text-primary); }
+  .toggle-btn:not(.active):hover {
+    color: var(--text-primary);
+  }
   .page-header a {
     text-decoration: none;
   }

@@ -75,19 +75,25 @@
     <div class="github-modes">
       <div class="mode-item">
         <strong>Polling (already active)</strong>
-        <p class="hint">Syncs every 30 min if <code>GITHUB_PAT</code> env var is set. Set <code>github_repo</code> on a project (format: <code>owner/repo</code>).</p>
+        <p class="hint">
+          Syncs every 30 min if <code>GITHUB_PAT</code> env var is set. Set <code>github_repo</code>
+          on a project (format: <code>owner/repo</code>).
+        </p>
       </div>
       <div class="mode-item">
         <strong>Webhooks (real-time)</strong>
         <p class="hint">
           Add this URL in your GitHub repo → Settings → Webhooks:<br />
           <code class="webhook-url">http://&lt;your-host&gt;:3457/api/github/webhook</code><br />
-          Set content type to <code>application/json</code>. Optionally set a secret and add <code>GITHUB_WEBHOOK_SECRET</code> to companion env. Events: <em>push, pull_request, issues</em>.
+          Set content type to <code>application/json</code>. Optionally set a secret and add
+          <code>GITHUB_WEBHOOK_SECRET</code>
+          to companion env. Events: <em>push, pull_request, issues</em>.
         </p>
       </div>
     </div>
     <p class="hint">
-      PRs are automatically matched against ideas by keyword — linked ideas appear in the activity metadata.
+      PRs are automatically matched against ideas by keyword — linked ideas appear in the activity
+      metadata.
     </p>
   </ComicCard>
 

@@ -10,7 +10,14 @@
     initialValue?: string;
   }
 
-  let { disabled = false, placeholder, onsend, oninterrupt, isBusy = false, initialValue = '' }: Props = $props();
+  let {
+    disabled = false,
+    placeholder,
+    onsend,
+    oninterrupt,
+    isBusy = false,
+    initialValue = '',
+  }: Props = $props();
 
   let inputValue = $state('');
   let textareaEl: HTMLTextAreaElement | undefined = $state();

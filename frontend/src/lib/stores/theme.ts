@@ -45,7 +45,9 @@ export function setThemeStyle(style: ThemeStyle): void {
   localStorage.setItem(STYLE_KEY, style);
   themeStyle.set(style);
   let scheme: ColorScheme = 'light';
-  colorScheme.subscribe((s) => { scheme = s; })();
+  colorScheme.subscribe((s) => {
+    scheme = s;
+  })();
   applyToDom(style, scheme);
 }
 
@@ -54,7 +56,9 @@ export function setColorScheme(scheme: ColorScheme): void {
   localStorage.setItem(SCHEME_KEY, scheme);
   colorScheme.set(scheme);
   let style: ThemeStyle = 'comic';
-  themeStyle.subscribe((s) => { style = s; })();
+  themeStyle.subscribe((s) => {
+    style = s;
+  })();
   applyToDom(style, scheme);
 }
 
@@ -64,7 +68,9 @@ export function toggleColorScheme(): void {
     const next: ColorScheme = current === 'light' ? 'dark' : 'light';
     localStorage.setItem(SCHEME_KEY, next);
     let style: ThemeStyle = 'comic';
-    themeStyle.subscribe((s) => { style = s; })();
+    themeStyle.subscribe((s) => {
+      style = s;
+    })();
     applyToDom(style, next);
     return next;
   });
@@ -89,7 +95,9 @@ export const theme = {
   subscribe: (run: (value: string) => void) => {
     return themeStyle.subscribe((s) => {
       let sc: ColorScheme = 'light';
-      colorScheme.subscribe((c) => { sc = c as ColorScheme; })();
+      colorScheme.subscribe((c) => {
+        sc = c as ColorScheme;
+      })();
       run(themeDisplayValue(s, sc));
     });
   },
@@ -97,10 +105,19 @@ export const theme = {
 
 /** Legacy setTheme — maps old flat values to new dual system */
 export function setTheme(value: string): void {
-  if (value === 'light') { setThemeStyle('comic'); setColorScheme('light'); }
-  else if (value === 'dark') { setThemeStyle('comic'); setColorScheme('dark'); }
-  else if (value === 'apple') { setThemeStyle('apple'); setColorScheme('light'); }
-  else if (value === 'pro') { setThemeStyle('pro'); setColorScheme('dark'); }
+  if (value === 'light') {
+    setThemeStyle('comic');
+    setColorScheme('light');
+  } else if (value === 'dark') {
+    setThemeStyle('comic');
+    setColorScheme('dark');
+  } else if (value === 'apple') {
+    setThemeStyle('apple');
+    setColorScheme('light');
+  } else if (value === 'pro') {
+    setThemeStyle('pro');
+    setColorScheme('dark');
+  }
 }
 
 /** Legacy toggleTheme */
