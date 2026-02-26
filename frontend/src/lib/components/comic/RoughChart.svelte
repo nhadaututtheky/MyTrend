@@ -299,7 +299,8 @@
     // Area fill under the line (SVG polygon)
     if (points.length > 1) {
       const baseY = MARGIN.top + plotH;
-      const polyPoints = [[MARGIN.left, baseY], ...points, [points[points.length - 1]![0], baseY]]
+      const lastPt = points[points.length - 1] ?? [MARGIN.left, baseY];
+      const polyPoints = [[MARGIN.left, baseY], ...points, [lastPt[0], baseY]]
         .map(([px, py]) => `${px},${py}`)
         .join(' ');
       const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
@@ -324,7 +325,7 @@
     const maxIdx = chartData.values.indexOf(Math.max(...chartData.values));
     const showDotAt = new Set([0, n - 1, maxIdx]);
     for (let i = 0; i < points.length; i++) {
-      const [px, py] = points[i]!;
+      const [px, py] = points[i] ?? [0, 0];
       if (showDotAt.has(i)) {
         svgElement.appendChild(
           rc.circle(px, py, 7, {

@@ -40,7 +40,7 @@
   function onDragStart(e: DragEvent, planId: string) {
     draggingId = planId;
     e.dataTransfer?.setData('planId', planId);
-    e.dataTransfer && (e.dataTransfer.effectAllowed = 'move');
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   }
 
   function onDragEnd() {
@@ -51,7 +51,7 @@
   function onDragOver(e: DragEvent, colId: PlanStatus) {
     e.preventDefault();
     dragOverCol = colId;
-    e.dataTransfer && (e.dataTransfer.dropEffect = 'move');
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
   }
 
   function onDragLeave() {

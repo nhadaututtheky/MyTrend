@@ -41,7 +41,7 @@ function daysAgo(n: number): string {
 function dateStr(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0]!;
+  return d.toISOString().split('T')[0] ?? '';
 }
 
 function fakeId(prefix: string): string {
@@ -309,7 +309,12 @@ export function generateDemoHeatmap(): HeatmapDay[] {
     // Add slight randomness
     const jitter = Math.floor(Math.random() * 3) - 1;
     const count = Math.max(0, base + jitter);
-    const level = count === 0 ? 0 : count <= 2 ? 1 : count <= 4 ? 2 : count <= 6 ? 3 : 4;
+    let level: 0 | 1 | 2 | 3 | 4;
+    if (count === 0) level = 0;
+    else if (count <= 2) level = 1;
+    else if (count <= 4) level = 2;
+    else if (count <= 6) level = 3;
+    else level = 4;
     days.push({
       date: dateStr(i),
       count,

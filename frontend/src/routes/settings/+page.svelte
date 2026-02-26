@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import pb from '$lib/config/pocketbase';
   import { currentUser } from '$lib/stores/auth';
-  import { theme, toggleTheme } from '$lib/stores/theme';
+  import { theme } from '$lib/stores/theme';
   import { getDeviceName, setDeviceName } from '$lib/stores/sync';
   import { toast } from '$lib/stores/toast';
   import { getHubSettings, saveHubApiKey } from '$lib/api/hub';

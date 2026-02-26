@@ -51,7 +51,10 @@
   }
 
   function peakZone(): Zone {
-    return ZONES.reduce((best, z) => (zoneTotal(z) > zoneTotal(best) ? z : best), ZONES[0]!);
+    return ZONES.reduce(
+      (best, z) => (zoneTotal(z) > zoneTotal(best) ? z : best),
+      ZONES[0] ?? ZONES[1],
+    );
   }
 </script>
 
