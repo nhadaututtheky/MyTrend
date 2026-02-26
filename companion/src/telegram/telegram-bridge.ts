@@ -9,7 +9,9 @@ import type {
   TelegramMessage,
   TelegramCallbackQuery,
   TelegramInlineKeyboardMarkup,
+  IdleTimeoutConfig,
 } from "./telegram-types.js";
+import { DEFAULT_IDLE_TIMEOUT_MS } from "./telegram-types.js";
 import type {
   AutoApproveConfig,
   BrowserIncomingMessage,
@@ -56,9 +58,12 @@ import {
   extractAskUserQuestion,
   formatAskUserQuestion,
   buildAskQuestionKeyboard,
+  buildTimeoutKeyboard,
+  formatTimeoutStatus,
+  formatDuration,
 } from "./telegram-formatter.js";
 
-const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60min
+const IDLE_TIMEOUT_MS = DEFAULT_IDLE_TIMEOUT_MS; // default, overridden per-session
 const TYPING_INTERVAL_MS = 4_000;
 const POLLING_TIMEOUT = 30; // seconds
 const DATA_DIR = join(import.meta.dir, "..", "..", "data");
@@ -107,6 +112,9 @@ export class TelegramBridge {
 
   // Idle warning timers (warn at 55min before destroying at 60min)
   private idleWarningTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  // Per-session idle timeout config (keyed by "chatId:topicId")
+  private idleTimeoutConfigs = new Map<string, IdleTimeoutConfig>();
 
   // Per-chat settings (keyed by chatId only — shared across topics)
   private lastProjectSlug = new Map<number, string>();
@@ -637,6 +645,7 @@ export class TelegramBridge {
 
     this.stopTyping(chatId, topicId);
     this.clearIdleTimer(chatId, topicId);
+    this.idleTimeoutConfigs.delete(this.key(chatId, topicId));
     this.cleanupChatState(chatId, topicId);
 
     // Notify group of session end
@@ -979,23 +988,34 @@ export class TelegramBridge {
     this.clearIdleTimer(chatId, topicId);
     const k = this.key(chatId, topicId);
 
-    // Warning at 55 minutes
-    const warningTimer = setTimeout(() => {
-      this.sendToChat(chatId, "⏰ Session idle for 55 min. Send any message to keep alive.", topicId).catch(() => {});
-    }, IDLE_TIMEOUT_MS - 5 * 60 * 1000); // 55 min
-    this.idleWarningTimers.set(k, warningTimer);
+    const config = this.getIdleTimeoutConfig(chatId, topicId);
 
-    // Destroy at 60 minutes
+    // If disabled, don't set any timers — session runs indefinitely
+    if (!config.enabled) return;
+
+    const timeoutMs = config.timeoutMs;
+    const durationLabel = formatDuration(timeoutMs);
+
+    // Warning 5min before timeout (skip if timeout <= 5min)
+    if (timeoutMs > 5 * 60 * 1000) {
+      const warningTimer = setTimeout(() => {
+        const warnMin = Math.round((timeoutMs - 5 * 60 * 1000) / 60_000);
+        this.sendToChat(chatId, `⏰ Session idle for ${warnMin}min. Send any message to keep alive.`, topicId).catch(() => {});
+      }, timeoutMs - 5 * 60 * 1000);
+      this.idleWarningTimers.set(k, warningTimer);
+    }
+
+    // Destroy at timeout
     const timer = setTimeout(() => {
-      console.log(`[telegram] Chat ${chatId} topic ${topicId} idle timeout, destroying session`);
+      console.log(`[telegram] Chat ${chatId} topic ${topicId} idle timeout (${durationLabel}), destroying session`);
       const mapping = this.chatSessions.get(chatId)?.get(topicId);
       this.destroySession(chatId, topicId).then(async () => {
-        await this.sendToChat(chatId, "Session timed out after 60 minutes of inactivity.", topicId).catch(() => {});
+        await this.sendToChat(chatId, `Session timed out after ${durationLabel} of inactivity.`, topicId).catch(() => {});
         if (mapping) {
-          await this.notifyGroup(mapping.projectSlug, "Idle timeout — session destroyed");
+          await this.notifyGroup(mapping.projectSlug, `Idle timeout (${durationLabel}) — session destroyed`);
         }
       });
-    }, IDLE_TIMEOUT_MS);
+    }, timeoutMs);
     this.idleTimers.set(k, timer);
   }
 
@@ -1010,6 +1030,40 @@ export class TelegramBridge {
     if (warningTimer) {
       clearTimeout(warningTimer);
       this.idleWarningTimers.delete(k);
+    }
+  }
+
+  // ── Idle timeout config (public) ────────────────────────────────────
+
+  /** Get idle timeout config for a session. */
+  getIdleTimeoutConfig(chatId: number, topicId: number = 0): IdleTimeoutConfig {
+    const k = this.key(chatId, topicId);
+    return this.idleTimeoutConfigs.get(k) ?? { enabled: true, timeoutMs: IDLE_TIMEOUT_MS };
+  }
+
+  /** Set idle timeout config and reset/clear timers accordingly. */
+  setIdleTimeout(chatId: number, topicId: number = 0, enabled: boolean, timeoutMs?: number): void {
+    const k = this.key(chatId, topicId);
+    const current = this.getIdleTimeoutConfig(chatId, topicId);
+    const config: IdleTimeoutConfig = {
+      enabled,
+      timeoutMs: timeoutMs ?? current.timeoutMs,
+    };
+    this.idleTimeoutConfigs.set(k, config);
+
+    // Persist to mapping
+    const mapping = this.chatSessions.get(chatId)?.get(topicId);
+    if (mapping) {
+      mapping.idleTimeoutEnabled = config.enabled;
+      mapping.idleTimeoutMs = config.timeoutMs;
+      this.saveMappings();
+    }
+
+    // Reset or clear timers
+    if (config.enabled) {
+      this.resetIdleTimer(chatId, topicId);
+    } else {
+      this.clearIdleTimer(chatId, topicId);
     }
   }
 
@@ -1062,6 +1116,9 @@ export class TelegramBridge {
           break;
         case "ask":
           await this.onAskResponse(chatId, messageId!, query.id, value, topicId);
+          break;
+        case "timeout":
+          await this.onTimeoutSelected(chatId, messageId!, query.id, value, topicId);
           break;
         default:
           await this.api.answerCallbackQuery(query.id, "Unknown action");
@@ -1367,6 +1424,34 @@ export class TelegramBridge {
     }).catch(() => {});
   }
 
+  private async onTimeoutSelected(
+    chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
+  ): Promise<void> {
+    // value format: "toggle:<on|off>" or "set:<ms>"
+    const [subtype, subvalue] = value.split(":");
+
+    if (subtype === "toggle") {
+      const enabled = subvalue === "on";
+      this.setIdleTimeout(chatId, topicId, enabled);
+    } else if (subtype === "set") {
+      const ms = parseInt(subvalue, 10);
+      if (!isNaN(ms) && ms > 0) {
+        this.setIdleTimeout(chatId, topicId, true, ms);
+      }
+    }
+
+    const updated = this.getIdleTimeoutConfig(chatId, topicId);
+    await this.api.answerCallbackQuery(
+      queryId,
+      updated.enabled ? `Timeout: ${formatDuration(updated.timeoutMs)}` : "Timeout: OFF"
+    );
+
+    // Update keyboard to reflect new state
+    await this.api.editMessageText(chatId, messageId, formatTimeoutStatus(updated), {
+      replyMarkup: buildTimeoutKeyboard(updated),
+    }).catch(() => {});
+  }
+
   private async onAskResponse(
     chatId: number, messageId: number, queryId: string, value: string, topicId: number = 0
   ): Promise<void> {
@@ -1399,6 +1484,7 @@ export class TelegramBridge {
         { command: "model", description: "Switch model" },
         { command: "status", description: "Session info" },
         { command: "autoapprove", description: "Auto-approve settings" },
+        { command: "timeout", description: "Idle timeout settings" },
         { command: "translate", description: "Toggle Vi→En auto-translate" },
         { command: "cancel", description: "Interrupt Claude" },
         { command: "stop", description: "End session" },
@@ -1926,6 +2012,14 @@ export class TelegramBridge {
             this.chatSessions.set(m.chatId, new Map());
           }
           this.chatSessions.get(m.chatId)!.set(topicId, m);
+          // Restore per-session timeout config from persisted mapping
+          if (m.idleTimeoutEnabled !== undefined || m.idleTimeoutMs !== undefined) {
+            const k = this.key(m.chatId, topicId);
+            this.idleTimeoutConfigs.set(k, {
+              enabled: m.idleTimeoutEnabled ?? true,
+              timeoutMs: m.idleTimeoutMs ?? IDLE_TIMEOUT_MS,
+            });
+          }
           this.subscribeToSession(m.chatId, topicId, m.sessionId);
           this.resetIdleTimer(m.chatId, topicId);
           console.log(`[telegram] Restored mapping: chat=${m.chatId} topic=${topicId} → session=${m.sessionId.slice(0, 8)}`);

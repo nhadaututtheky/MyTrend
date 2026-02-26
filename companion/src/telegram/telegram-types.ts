@@ -107,7 +107,18 @@ export interface TelegramSessionMapping {
   pinnedMessageId?: number;
   /** Forum topic thread ID for this project's topic (0 = General/no topic) */
   topicId?: number;
+  /** Whether idle timeout auto-close is enabled (default true) */
+  idleTimeoutEnabled?: boolean;
+  /** Idle timeout duration in ms (default 60min = 3_600_000) */
+  idleTimeoutMs?: number;
 }
+
+export interface IdleTimeoutConfig {
+  enabled: boolean;
+  timeoutMs: number;
+}
+
+export const DEFAULT_IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 min
 
 // ─── Forum Topics (Bot API 9.3/9.4) ─────────────────────────────────────────
 

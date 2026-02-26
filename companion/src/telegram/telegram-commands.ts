@@ -10,12 +10,15 @@ import {
   formatWelcome,
   formatConnected,
   formatAutoApproveStatus,
+  formatTimeoutStatus,
+  formatDuration,
   buildProjectKeyboard,
   buildModelKeyboard,
   buildStopConfirmKeyboard,
   buildNewConfirmKeyboard,
   buildSessionActionsKeyboard,
   buildAutoApproveKeyboard,
+  buildTimeoutKeyboard,
 } from "./telegram-formatter.js";
 
 type CommandHandler = (bridge: TelegramBridge, msg: TelegramMessage, args: string) => Promise<void>;
@@ -34,6 +37,7 @@ const commands: Record<string, CommandHandler> = {
   new: handleNew,
   autoapprove: handleAutoApprove,
   translate: handleTranslate,
+  timeout: handleTimeout,
 };
 
 /** Extract topicId from message (0 = General/no topic) */
@@ -450,6 +454,79 @@ async function handleTranslate(bridge: TelegramBridge, msg: TelegramMessage): Pr
     ? "Auto-translate: <b>ON</b>\nVietnamese messages will be translated to English before sending to Claude."
     : "Auto-translate: <b>OFF</b>\nMessages sent as-is.";
   await bridge.sendToChat(chatId, status, topicId);
+}
+
+async function handleTimeout(bridge: TelegramBridge, msg: TelegramMessage, args: string): Promise<void> {
+  const chatId = msg.chat.id;
+  const topicId = getTopicId(msg);
+  const mapping = bridge.getMapping(chatId, topicId);
+
+  if (!mapping) {
+    await bridge.sendToChat(chatId, "No active session.", topicId);
+    return;
+  }
+
+  const config = bridge.getIdleTimeoutConfig(chatId, topicId);
+  const arg = args.trim().toLowerCase();
+
+  // No args: show current config + keyboard
+  if (!arg) {
+    await bridge.sendToChatWithKeyboard(
+      chatId,
+      formatTimeoutStatus(config),
+      buildTimeoutKeyboard(config),
+      topicId
+    );
+    return;
+  }
+
+  // "off" or "0": disable timeout
+  if (arg === "off" || arg === "0") {
+    bridge.setIdleTimeout(chatId, topicId, false);
+    await bridge.sendToChat(chatId, "⏱ Idle timeout: <b>OFF</b> — session runs indefinitely.", topicId);
+    return;
+  }
+
+  // "on": re-enable with current duration
+  if (arg === "on") {
+    bridge.setIdleTimeout(chatId, topicId, true);
+    const updated = bridge.getIdleTimeoutConfig(chatId, topicId);
+    await bridge.sendToChat(chatId, `⏱ Idle timeout: <b>ON</b> (${formatDuration(updated.timeoutMs)})`, topicId);
+    return;
+  }
+
+  // Parse duration: 30m, 1h, 4h, 12h, 24h, 3d
+  const ms = parseDuration(arg);
+  if (ms === null) {
+    await bridge.sendToChat(chatId, "Invalid format. Use: <code>30m</code>, <code>1h</code>, <code>4h</code>, <code>12h</code>, <code>24h</code>, <code>3d</code>, <code>on</code>, <code>off</code>", topicId);
+    return;
+  }
+
+  bridge.setIdleTimeout(chatId, topicId, true, ms);
+  await bridge.sendToChat(chatId, `⏱ Idle timeout set to <b>${formatDuration(ms)}</b>`, topicId);
+}
+
+/** Parse human duration string to ms. Returns null if invalid. */
+function parseDuration(s: string): number | null {
+  const match = s.match(/^(\d+)\s*(m|min|h|hr|d|day)s?$/i);
+  if (!match) return null;
+
+  const num = parseInt(match[1], 10);
+  const unit = match[2].toLowerCase();
+
+  switch (unit) {
+    case "m":
+    case "min":
+      return num * 60 * 1000;
+    case "h":
+    case "hr":
+      return num * 60 * 60 * 1000;
+    case "d":
+    case "day":
+      return num * 24 * 60 * 60 * 1000;
+    default:
+      return null;
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────

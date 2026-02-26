@@ -5,7 +5,9 @@ import type {
   TelegramSessionMapping,
   TelegramInlineKeyboardMarkup,
   TelegramInlineKeyboardButton,
+  IdleTimeoutConfig,
 } from "./telegram-types.js";
+// DEFAULT_IDLE_TIMEOUT_MS used by telegram-bridge.ts directly
 import type { ProjectProfile } from "../session-types.js";
 
 // ─── Markdown to Telegram HTML ──────────────────────────────────────────────
@@ -266,6 +268,7 @@ export function formatHelp(): string {
     "/model - Change model",
     "/status - Session info (all sessions in General)",
     "/autoapprove - Auto-approve settings",
+    "/timeout - Idle timeout (30m/1h/4h/12h/24h/3d/off)",
     "/translate - Toggle Vi→En auto-translate",
     "/cancel - Interrupt Claude",
     "/stop - End session (this topic)",
@@ -677,6 +680,72 @@ export function formatNotification(
   let text = `<b>[${escapeHTML(projectName)}]</b> ${escapeHTML(event)}`;
   if (details) text += `\n${escapeHTML(details)}`;
   return text;
+}
+
+// ─── Idle Timeout ─────────────────────────────────────────────────────────────
+
+const TIMEOUT_PRESETS = [
+  { label: "30m", ms: 30 * 60 * 1000 },
+  { label: "1h", ms: 60 * 60 * 1000 },
+  { label: "4h", ms: 4 * 60 * 60 * 1000 },
+  { label: "12h", ms: 12 * 60 * 60 * 1000 },
+  { label: "24h", ms: 24 * 60 * 60 * 1000 },
+  { label: "3d", ms: 3 * 24 * 60 * 60 * 1000 },
+] as const;
+
+/** Human-readable duration from ms. */
+export function formatDuration(ms: number): string {
+  if (ms <= 0) return "off";
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return `${days}d`;
+}
+
+/** Build timeout config keyboard (On/Off toggle + duration presets). */
+export function buildTimeoutKeyboard(config: IdleTimeoutConfig): TelegramInlineKeyboardMarkup {
+  // Row 1: ON/OFF toggle
+  const toggleRow: TelegramInlineKeyboardButton[] = [
+    {
+      text: config.enabled ? "ON ✓" : "ON",
+      callback_data: "timeout:toggle:on",
+      style: config.enabled ? "success" : undefined,
+    },
+    {
+      text: !config.enabled ? "OFF ✓" : "OFF",
+      callback_data: "timeout:toggle:off",
+      style: !config.enabled ? "danger" : undefined,
+    },
+  ];
+
+  // Row 2-3: duration presets
+  const row2: TelegramInlineKeyboardButton[] = TIMEOUT_PRESETS.slice(0, 3).map((p) => ({
+    text: config.enabled && config.timeoutMs === p.ms ? `${p.label} ✓` : p.label,
+    callback_data: `timeout:set:${p.ms}`,
+    style: config.enabled && config.timeoutMs === p.ms ? "success" : undefined,
+  }));
+
+  const row3: TelegramInlineKeyboardButton[] = TIMEOUT_PRESETS.slice(3).map((p) => ({
+    text: config.enabled && config.timeoutMs === p.ms ? `${p.label} ✓` : p.label,
+    callback_data: `timeout:set:${p.ms}`,
+    style: config.enabled && config.timeoutMs === p.ms ? "success" : undefined,
+  }));
+
+  return { inline_keyboard: [toggleRow, row2, row3] };
+}
+
+/** Format current timeout config as status text. */
+export function formatTimeoutStatus(config: IdleTimeoutConfig): string {
+  if (!config.enabled) {
+    return "<b>⏱ Idle Timeout: OFF</b>\nSession will run indefinitely until manually stopped.";
+  }
+  return [
+    `<b>⏱ Idle Timeout: ${formatDuration(config.timeoutMs)}</b>`,
+    `Session auto-closes after ${formatDuration(config.timeoutMs)} of inactivity.`,
+    `Warning at ${formatDuration(Math.max(config.timeoutMs - 5 * 60 * 1000, 0))}.`,
+  ].join("\n");
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
