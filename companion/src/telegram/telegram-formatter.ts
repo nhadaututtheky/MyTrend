@@ -247,7 +247,7 @@ export function formatPinnedStatus(
   // Show Auto-Approve + Timeout status when expanded
   if (autoApprove && idleTimeout) {
     const aaLabel = autoApprove.enabled && autoApprove.timeoutSeconds > 0
-      ? `${autoApprove.timeoutSeconds}s${autoApprove.allowBash ? " +bash" : ""}`
+      ? `${autoApprove.timeoutSeconds}s · ${autoApprove.allowBash ? "full" : "safe"}`
       : "OFF";
     const toLabel = idleTimeout.enabled ? formatDuration(idleTimeout.timeoutMs) : "OFF";
     lines.push(`Auto-Approve: <b>${aaLabel}</b> · Timeout: <b>${toLabel}</b>`);
@@ -437,7 +437,7 @@ export function buildSessionActionsKeyboard(
   ];
 
   if (expanded === "auto" && autoApprove && idleTimeout) {
-    // ── Auto-Approve row ──
+    // ── Auto-Approve: Off/15s/30s/60s + Bash toggle ──
     const aaTimeouts = [
       { label: "Off", seconds: 0 },
       { label: "15s", seconds: 15 },
@@ -445,33 +445,27 @@ export function buildSessionActionsKeyboard(
       { label: "60s", seconds: 60 },
     ];
     const activeAA = autoApprove.enabled ? autoApprove.timeoutSeconds : 0;
-    rows.push(
-      aaTimeouts.map((t) => ({
+    const bashBtn = {
+      text: autoApprove.allowBash ? "⚡ Full ✓" : "🛡 Safe ✓",
+      callback_data: `autoapprove:bash:${autoApprove.allowBash ? "off" : "on"}`,
+      style: "success" as "success" | undefined,
+    };
+    rows.push([
+      ...aaTimeouts.map((t) => ({
         text: t.seconds === activeAA ? `${t.label} ✓` : t.label,
         callback_data: `autoapprove:timeout:${t.seconds}`,
         style: (t.seconds === activeAA ? "success" : undefined) as "success" | undefined,
-      }))
-    );
-    rows.push([
-      {
-        text: autoApprove.allowBash ? "Bash: ON ✓" : "Bash: OFF",
-        callback_data: `autoapprove:bash:${autoApprove.allowBash ? "off" : "on"}`,
-        style: autoApprove.allowBash ? "success" : "danger",
-      },
+      })),
+      bashBtn,
     ]);
 
-    // ── Idle Timeout row: ON/OFF + presets ──
+    // ── Idle Timeout: Never + duration presets ──
     const activeMs = idleTimeout.enabled ? idleTimeout.timeoutMs : 0;
     rows.push([
       {
-        text: idleTimeout.enabled ? "ON ✓" : "ON",
-        callback_data: "timeout:toggle:on",
-        style: (idleTimeout.enabled ? "success" : undefined) as "success" | undefined,
-      },
-      {
-        text: !idleTimeout.enabled ? "OFF ✓" : "OFF",
+        text: !idleTimeout.enabled ? "Never ✓" : "Never",
         callback_data: "timeout:toggle:off",
-        style: (!idleTimeout.enabled ? "danger" : undefined) as "danger" | undefined,
+        style: (!idleTimeout.enabled ? "success" : undefined) as "success" | undefined,
       },
       ...TIMEOUT_PRESETS.slice(0, 4).map((p) => ({
         text: idleTimeout.enabled && activeMs === p.ms ? `${p.label} ✓` : p.label,
@@ -496,7 +490,7 @@ export function buildSessionActionsKeyboard(
   return { inline_keyboard: rows };
 }
 
-/** Auto-approve config keyboard — timeout + bash toggle. */
+/** Auto-approve config keyboard — timeout options + bash toggle in one row. */
 export function buildAutoApproveKeyboard(config: AutoApproveConfig): TelegramInlineKeyboardMarkup {
   const timeouts = [
     { label: "Off", seconds: 0 },
@@ -507,21 +501,20 @@ export function buildAutoApproveKeyboard(config: AutoApproveConfig): TelegramInl
 
   const activeSeconds = config.enabled ? config.timeoutSeconds : 0;
 
-  const timeoutRow: TelegramInlineKeyboardButton[] = timeouts.map((t) => ({
-    text: t.seconds === activeSeconds ? `${t.label} ✓` : t.label,
-    callback_data: `autoapprove:timeout:${t.seconds}`,
-    style: t.seconds === activeSeconds ? "success" : undefined,
-  }));
-
-  const bashRow: TelegramInlineKeyboardButton[] = [
+  const row: TelegramInlineKeyboardButton[] = [
+    ...timeouts.map((t) => ({
+      text: t.seconds === activeSeconds ? `${t.label} ✓` : t.label,
+      callback_data: `autoapprove:timeout:${t.seconds}`,
+      style: (t.seconds === activeSeconds ? "success" : undefined) as "success" | undefined,
+    })),
     {
-      text: config.allowBash ? "Bash: ON ✓" : "Bash: OFF",
+      text: config.allowBash ? "⚡ Full ✓" : "🛡 Safe ✓",
       callback_data: `autoapprove:bash:${config.allowBash ? "off" : "on"}`,
-      style: config.allowBash ? "success" : "danger",
+      style: "success" as "success" | undefined,
     },
   ];
 
-  return { inline_keyboard: [timeoutRow, bashRow] };
+  return { inline_keyboard: [row] };
 }
 
 /** Format current auto-approve config as status text. */
@@ -529,10 +522,10 @@ export function formatAutoApproveStatus(config: AutoApproveConfig): string {
   if (!config.enabled || config.timeoutSeconds <= 0) {
     return "<b>Auto-Approve: OFF</b>\nPermissions require manual approval.";
   }
-  const bashStatus = config.allowBash ? "included" : "excluded (manual)";
+  const modeLabel = config.allowBash ? "Full (all tools)" : "Safe (no terminal)";
   return [
-    `<b>Auto-Approve: ${config.timeoutSeconds}s</b>`,
-    `Bash: ${bashStatus}`,
+    `<b>Auto-Approve: ${config.timeoutSeconds}s · ${config.allowBash ? "full" : "safe"}</b>`,
+    `Mode: ${modeLabel}`,
     "Permissions auto-approve after timeout.",
   ].join("\n");
 }
@@ -772,36 +765,30 @@ export function formatDuration(ms: number): string {
   return `${days}d`;
 }
 
-/** Build timeout config keyboard (On/Off toggle + duration presets). */
+/** Build timeout config keyboard — Never + duration presets. */
 export function buildTimeoutKeyboard(config: IdleTimeoutConfig): TelegramInlineKeyboardMarkup {
-  // Row 1: ON/OFF toggle
-  const toggleRow: TelegramInlineKeyboardButton[] = [
+  // Row 1: Never + short presets
+  const row1: TelegramInlineKeyboardButton[] = [
     {
-      text: config.enabled ? "ON ✓" : "ON",
-      callback_data: "timeout:toggle:on",
-      style: config.enabled ? "success" : undefined,
-    },
-    {
-      text: !config.enabled ? "OFF ✓" : "OFF",
+      text: !config.enabled ? "Never ✓" : "Never",
       callback_data: "timeout:toggle:off",
-      style: !config.enabled ? "danger" : undefined,
+      style: (!config.enabled ? "success" : undefined) as "success" | undefined,
     },
+    ...TIMEOUT_PRESETS.slice(0, 3).map((p) => ({
+      text: config.enabled && config.timeoutMs === p.ms ? `${p.label} ✓` : p.label,
+      callback_data: `timeout:set:${p.ms}`,
+      style: (config.enabled && config.timeoutMs === p.ms ? "success" : undefined) as "success" | undefined,
+    })),
   ];
 
-  // Row 2-3: duration presets
-  const row2: TelegramInlineKeyboardButton[] = TIMEOUT_PRESETS.slice(0, 3).map((p) => ({
+  // Row 2: long presets
+  const row2: TelegramInlineKeyboardButton[] = TIMEOUT_PRESETS.slice(3).map((p) => ({
     text: config.enabled && config.timeoutMs === p.ms ? `${p.label} ✓` : p.label,
     callback_data: `timeout:set:${p.ms}`,
-    style: config.enabled && config.timeoutMs === p.ms ? "success" : undefined,
+    style: (config.enabled && config.timeoutMs === p.ms ? "success" : undefined) as "success" | undefined,
   }));
 
-  const row3: TelegramInlineKeyboardButton[] = TIMEOUT_PRESETS.slice(3).map((p) => ({
-    text: config.enabled && config.timeoutMs === p.ms ? `${p.label} ✓` : p.label,
-    callback_data: `timeout:set:${p.ms}`,
-    style: config.enabled && config.timeoutMs === p.ms ? "success" : undefined,
-  }));
-
-  return { inline_keyboard: [toggleRow, row2, row3] };
+  return { inline_keyboard: [row1, row2] };
 }
 
 /** Format current timeout config as status text. */
