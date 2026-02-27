@@ -86,7 +86,18 @@ async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promis
       );
       return;
     }
-    await bridge.sendToChat(chatId, "No active session in this topic.", topicId);
+    // No session in this topic — offer project selection so user can reconnect
+    const topicProfiles = bridge.getProfiles();
+    if (topicProfiles.length > 0) {
+      await bridge.sendToChatWithKeyboard(
+        chatId,
+        "No active session. Select a project to connect:",
+        buildProjectKeyboard(topicProfiles),
+        topicId
+      );
+    } else {
+      await bridge.sendToChat(chatId, "No active session and no projects configured.", topicId);
+    }
     return;
   }
 

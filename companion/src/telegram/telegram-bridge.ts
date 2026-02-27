@@ -91,8 +91,10 @@ export class TelegramBridge {
   private botHasTopics = false; // Bot API 9.4: private chat forum topics
 
   // Per-session transient state (composite key, not persisted)
-  private lastToolFeedAt = new Map<string, number>();
   private lastUserMsgId = new Map<string, number>();
+  // Single editable tool-feed message per turn (replaces spammy new messages)
+  private toolFeedMsgId = new Map<string, number>();
+  private toolFeedLines = new Map<string, string[]>();
   private costAlertsShown = new Map<string, Set<number>>();
   private streamingMsg = new Map<string, { msgId: number; lastText: string; lastEditAt: number }>();
   private readonly STREAM_EDIT_INTERVAL_MS = 1_500; // min interval between edits
@@ -704,7 +706,7 @@ export class TelegramBridge {
         const text = extractText(content);
         if (!text && !askQuestions) {
           const toolFeed = formatToolFeed(content);
-          if (toolFeed) this.sendThrottledToolFeed(chatId, topicId, toolFeed);
+          if (toolFeed) this.upsertToolFeed(chatId, topicId, toolFeed);
 
           // Show Bash tool_result output so results aren't silently swallowed
           for (const block of content) {
@@ -817,13 +819,18 @@ export class TelegramBridge {
             const input = block.input as Record<string, unknown>;
             const filePath = typeof input.file_path === "string" ? input.file_path : null;
             const fileContent = typeof input.content === "string" ? input.content : null;
-            if (filePath && fileContent && filePath.toLowerCase().endsWith(".md")) {
-              const list = this.pendingMdFiles.get(k) ?? [];
-              // Deduplicate by path (last write wins)
-              const idx = list.findIndex((f) => f.path === filePath);
-              if (idx >= 0) list[idx] = { path: filePath, content: fileContent };
-              else list.push({ path: filePath, content: fileContent });
-              this.pendingMdFiles.set(k, list);
+            if (filePath && filePath.toLowerCase().endsWith(".md")) {
+              if (fileContent) {
+                console.log(`[telegram] Detected .md write: ${filePath} (${fileContent.length} chars)`);
+                const list = this.pendingMdFiles.get(k) ?? [];
+                // Deduplicate by path (last write wins)
+                const idx = list.findIndex((f) => f.path === filePath);
+                if (idx >= 0) list[idx] = { path: filePath, content: fileContent };
+                else list.push({ path: filePath, content: fileContent });
+                this.pendingMdFiles.set(k, list);
+              } else {
+                console.log(`[telegram] Detected .md write but content is null (partial message?): ${filePath}`);
+              }
             }
           }
         }
@@ -833,8 +840,11 @@ export class TelegramBridge {
       case "result": {
         this.stopTyping(chatId, topicId);
 
-        // Finalize streaming: remove cursor, send final text if it changed
+        // Capture last streaming text before cleanup (for group notification)
         const streamState = this.streamingMsg.get(k);
+        const lastResponseText = streamState?.lastText ?? null;
+
+        // Finalize streaming: remove cursor, send final text if it changed
         if (streamState) {
           this.api.editMessageText(chatId, streamState.msgId, streamState.lastText).catch(() => {});
           this.streamingMsg.delete(k);
@@ -864,6 +874,8 @@ export class TelegramBridge {
         this.responseOriginMsg.delete(k);
         this.lastUserMsgId.delete(k);
         this.bashToolIds.delete(k); // Clear per-turn; rebuilt fresh on next turn
+        this.toolFeedMsgId.delete(k);
+        this.toolFeedLines.delete(k);
 
         // Auto-send any .md files written during this turn
         const mdFiles = this.pendingMdFiles.get(k);
@@ -872,6 +884,7 @@ export class TelegramBridge {
           for (const { path: filePath, content: fileContent } of mdFiles) {
             const fileName = filePath.split(/[/\\]/).pop() ?? "file.md";
             const caption = `📄 <code>${fileName}</code>`;
+            console.log(`[telegram] Sending .md file: ${fileName} (${fileContent.length} chars)`);
             this.api
               .sendDocument(chatId, fileName, fileContent, caption, topicId > 0 ? topicId : undefined)
               .catch((err) => console.error(`[telegram] Failed to send .md file ${fileName}:`, err));
@@ -884,10 +897,20 @@ export class TelegramBridge {
         // Update pinned status
         this.updatePinnedStatus(chatId, topicId);
 
-        // Notify group of task completion
+        // Notify group of task completion + forward result summary
         const mapping2 = this.chatSessions.get(chatId)?.get(topicId);
         if (mapping2) {
-          await this.notifyGroup(mapping2.projectSlug, "Task complete", formatResult(resultMsg), chatId);
+          // Build group notification with response snippet
+          let groupDetails = resultText;
+          if (lastResponseText) {
+            // Strip HTML tags for a clean snippet, truncate to 500 chars
+            const plainSnippet = lastResponseText.replace(/<[^>]+>/g, "").trim();
+            const truncated = plainSnippet.length > 500
+              ? plainSnippet.slice(0, 497) + "..."
+              : plainSnippet;
+            groupDetails = `${truncated}\n\n${resultText}`;
+          }
+          await this.notifyGroup(mapping2.projectSlug, "Task complete", groupDetails, chatId);
         }
         break;
       }
@@ -1667,14 +1690,37 @@ export class TelegramBridge {
 
   // ── Helper methods (tool feed, cost alerts, pinned status) ──────────
 
-  private sendThrottledToolFeed(chatId: number, topicId: number, text: string): void {
+  /** Send the initial "Thinking…" message once per turn and save its message ID. */
+  private async initToolFeedIfNeeded(chatId: number, topicId: number): Promise<void> {
     const k = this.key(chatId, topicId);
-    const now = Date.now();
-    const last = this.lastToolFeedAt.get(k) ?? 0;
-    if (now - last < 5_000) return; // Max 1 tool feed per 5 seconds
+    if (this.toolFeedMsgId.has(k)) return; // Already initialized for this turn
 
-    this.lastToolFeedAt.set(k, now);
-    this.sendToChat(chatId, text, topicId).catch(() => {});
+    const replyTo = this.lastUserMsgId.get(k);
+    try {
+      const msgId = await this.api.sendMessage(chatId, "🤔 <i>Thinking…</i>", {
+        replyTo,
+        messageThreadId: topicId > 0 ? topicId : undefined,
+      });
+      this.toolFeedMsgId.set(k, msgId);
+      this.toolFeedLines.set(k, ["🤔 <i>Thinking…</i>"]);
+    } catch { /* ignore */ }
+  }
+
+  /** Append a tool activity line to the single per-turn feed message (edit, not new message). */
+  private async upsertToolFeed(chatId: number, topicId: number, newLine: string): Promise<void> {
+    const k = this.key(chatId, topicId);
+    // Ensure the feed message exists
+    await this.initToolFeedIfNeeded(chatId, topicId);
+
+    const lines = this.toolFeedLines.get(k) ?? [];
+    lines.push(newLine);
+    const trimmed = lines.slice(-15); // Keep last 15 lines to stay under Telegram 4096-char limit
+    this.toolFeedLines.set(k, trimmed);
+
+    const existingMsgId = this.toolFeedMsgId.get(k);
+    if (!existingMsgId) return;
+
+    this.api.editMessageText(chatId, existingMsgId, trimmed.join("\n")).catch(() => {});
   }
 
   private checkCostAlert(chatId: number, topicId: number, cost: number): void {
@@ -1709,7 +1755,8 @@ export class TelegramBridge {
 
   private cleanupChatState(chatId: number, topicId: number = 0): void {
     const k = this.key(chatId, topicId);
-    this.lastToolFeedAt.delete(k);
+    this.toolFeedMsgId.delete(k);
+    this.toolFeedLines.delete(k);
     this.lastUserMsgId.delete(k);
     this.responseOriginMsg.delete(k);
     this.costAlertsShown.delete(k);
