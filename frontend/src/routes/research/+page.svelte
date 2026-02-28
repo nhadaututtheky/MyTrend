@@ -13,6 +13,7 @@
   let items = $state<Research[]>([]);
   let stats = $state<ResearchStats | null>(null);
   let isLoading = $state(true);
+  let loadError = $state('');
   let verdictFilter = $state('all');
   let unsubscribe: (() => void) | undefined;
 
@@ -45,11 +46,13 @@
   const fitCount = $derived(items.filter((r) => r.verdict === 'fit').length);
 
   const verdictTabsWithCount = $derived(
-    verdictTabs.map((t) => {
-      if (t.id === 'all') return { ...t, label: `All (${items.length})` };
-      if (t.id === 'fit' && fitCount > 0) return { ...t, label: `Fit (${fitCount})` };
-      return t;
-    }),
+    isLoading
+      ? verdictTabs
+      : verdictTabs.map((t) => {
+          if (t.id === 'all') return { ...t, label: `All (${items.length})` };
+          if (t.id === 'fit' && fitCount > 0) return { ...t, label: `Fit (${fitCount})` };
+          return t;
+        }),
   );
 
   onMount(async () => {
@@ -58,7 +61,7 @@
       if (result.status === 'fulfilled') items = result.value.items;
       if (statsData.status === 'fulfilled') stats = statsData.value;
     } catch (err: unknown) {
-      console.error('[Research]', err);
+      loadError = err instanceof Error ? err.message : 'Failed to load research';
     } finally {
       isLoading = false;
     }
@@ -70,8 +73,8 @@
           items = items.map((r) => (r.id === e.record.id ? (e.record as unknown as Research) : r));
         else if (e.action === 'delete') items = items.filter((r) => r.id !== e.record.id);
       });
-    } catch (err: unknown) {
-      console.error('[Research] Realtime subscribe failed:', err);
+    } catch {
+      // Realtime subscription failed — page still works with static data
     }
   });
 
@@ -79,8 +82,26 @@
     unsubscribe?.();
   });
 
-  // Track which research items already have ideas created
-  let createdIdeaIds = $state(new Set<string>());
+  // Track which research items already have ideas created (persisted to localStorage)
+  const CREATED_IDEAS_KEY = 'research-created-idea-ids';
+  function loadCreatedIds(): Set<string> {
+    if (typeof localStorage === 'undefined') return new Set();
+    try {
+      const raw = localStorage.getItem(CREATED_IDEAS_KEY);
+      if (!raw) return new Set();
+      const arr: unknown = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr.filter((v): v is string => typeof v === 'string'));
+    } catch {
+      // corrupted — reset
+    }
+    return new Set();
+  }
+  function saveCreatedIds(ids: Set<string>) {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(CREATED_IDEAS_KEY, JSON.stringify([...ids]));
+  }
+
+  let createdIdeaIds = $state(loadCreatedIds());
   let creatingIdeaId = $state<string | null>(null);
 
   async function handleCreateIdea(e: MouseEvent, item: Research) {
@@ -91,8 +112,9 @@
     try {
       await createIdeaFromResearch(item);
       createdIdeaIds = new Set([...createdIdeaIds, item.id]);
-    } catch (err: unknown) {
-      console.error('[Research] Create idea failed:', err);
+      saveCreatedIds(createdIdeaIds);
+    } catch {
+      // Idea creation failed — button stays enabled for retry
     } finally {
       creatingIdeaId = null;
     }
@@ -134,7 +156,9 @@
 
   <ComicTabs tabs={verdictTabsWithCount} bind:active={verdictFilter} />
 
-  {#if isLoading}
+  {#if loadError}
+    <ComicEmptyState illustration="error" message="Failed to load" description={loadError} />
+  {:else if isLoading}
     <div class="research-grid">
       {#each Array(6) as _}
         <ComicSkeleton variant="card" />

@@ -57,7 +57,11 @@ export async function fetchResearchStats(): Promise<ResearchStats> {
     headers: { Authorization: pb.authStore.token },
   });
   if (!res.ok) throw new Error(`Stats fetch failed: ${res.status}`);
-  return res.json() as Promise<ResearchStats>;
+  const data: unknown = await res.json();
+  if (!data || typeof data !== 'object' || !('total' in data) || !('by_source' in data)) {
+    throw new Error('Invalid stats response shape');
+  }
+  return data as ResearchStats;
 }
 
 export async function fetchResearchByProject(
@@ -86,7 +90,18 @@ export async function fetchResearchTrends(): Promise<ResearchTrends> {
     headers: { Authorization: pb.authStore.token },
   });
   if (!res.ok) throw new Error(`Trends fetch failed: ${res.status}`);
-  return res.json() as Promise<ResearchTrends>;
+  const data: unknown = await res.json();
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !('tag_trends' in data) ||
+    !('source_trends' in data) ||
+    !('rising' in data) ||
+    !('top_patterns' in data)
+  ) {
+    throw new Error('Invalid trends response shape');
+  }
+  return data as ResearchTrends;
 }
 
 export async function deleteResearch(id: string): Promise<boolean> {

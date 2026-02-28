@@ -174,8 +174,8 @@
         if (tasksRes.status === 'fulfilled') tasks = tasksRes.value.items;
         if (researchRes.status === 'fulfilled') researchItems = researchRes.value.items;
       }
-    } catch (err: unknown) {
-      console.error('[Project]', err);
+    } catch {
+      // Project load failed — shows "not found" state
     } finally {
       isLoading = false;
     }

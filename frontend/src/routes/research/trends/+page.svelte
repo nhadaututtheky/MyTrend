@@ -9,6 +9,7 @@
 
   let trends = $state<ResearchTrends | null>(null);
   let isLoading = $state(true);
+  let loadError = $state('');
 
   // Source donut data
   const sourceChartData = $derived.by(() => {
@@ -61,7 +62,7 @@
     try {
       trends = await fetchResearchTrends();
     } catch (err: unknown) {
-      console.error('[ResearchTrends]', err);
+      loadError = err instanceof Error ? err.message : 'Failed to load trends';
     } finally {
       isLoading = false;
     }
@@ -81,7 +82,9 @@
     <a href="/research" class="back-link">&larr; Research Feed</a>
   </div>
 
-  {#if isLoading}
+  {#if loadError}
+    <ComicEmptyState illustration="error" message="Failed to load" description={loadError} />
+  {:else if isLoading}
     <div class="grid">
       {#each Array(4) as _}
         <ComicSkeleton variant="card" height="250px" />

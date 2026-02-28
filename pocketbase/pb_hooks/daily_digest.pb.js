@@ -351,6 +351,12 @@ cronAdd('daily_digest', '0 * * * *', function () {
 
   var fullMessage = dailyText + weeklyText;
 
+  // Telegram message limit is 4096 chars — truncate if exceeded
+  var TG_MAX_LEN = 4096;
+  if (fullMessage.length > TG_MAX_LEN) {
+    fullMessage = fullMessage.substring(0, TG_MAX_LEN - 20) + '\n\n<i>...truncated</i>';
+  }
+
   // --- Send to Telegram ---
   try {
     $http.send({
