@@ -54,6 +54,77 @@ routerAdd('POST', '/api/telegram/webhook', (c) => {
     } catch (e) { /* no settings record */ }
   }
 
+  // --- Handle /start command → Magic Link Login ---
+  if (text === '/start' || text.indexOf('/start') === 0) {
+    var webUrl = $os.getenv('MYTREND_WEB_URL') || 'http://localhost:3000';
+    var internalSecret = $os.getenv('COMPANION_INTERNAL_SECRET') || '';
+    var tgUser = msg.from || {};
+
+    if (!botToken) {
+      // Try to resolve bot token for reply
+      try {
+        var settingsRec2 = dao.findFirstRecordByFilter('user_settings', '1=1', '', 1, 0);
+        botToken = settingsRec2.getString('telegram_bot_token') || '';
+      } catch (e) {}
+    }
+
+    try {
+      // Call internal endpoint to create magic token
+      var authRes = $http.send({
+        url: 'http://localhost:8090/api/auth/telegram/request',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': internalSecret,
+        },
+        body: JSON.stringify({
+          telegram_user_id: tgUser.id,
+          telegram_username: tgUser.username || '',
+          telegram_display_name: tgUser.first_name || tgUser.username || '',
+        }),
+        timeout: 10,
+      });
+
+      var authData = JSON.parse(authRes.raw);
+      var loginUrl = webUrl + '/auth/telegram?token=' + authData.token;
+
+      // Send inline keyboard with login button
+      if (botToken && chatId) {
+        $http.send({
+          url: 'https://api.telegram.org/bot' + botToken + '/sendMessage',
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: 'Welcome to MyTrend!\n\nClick below to login (link expires in 5 minutes):',
+            reply_markup: {
+              inline_keyboard: [[{ text: 'Open MyTrend', url: loginUrl }]],
+            },
+          }),
+          timeout: 10,
+        });
+      }
+    } catch (e) {
+      console.log('[TelegramWebhook] Magic link error: ' + e);
+      // Fallback message
+      if (botToken && chatId) {
+        try {
+          $http.send({
+            url: 'https://api.telegram.org/bot' + botToken + '/sendMessage',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: 'Could not generate login link. Please use email login at ' + webUrl,
+            }),
+            timeout: 10,
+          });
+        } catch (e2) {}
+      }
+    }
+    return c.json(200, { ok: true });
+  }
+
   // --- Handle file attachments ---
   var hasFile = !!(msg.document || (msg.photo && msg.photo.length > 0) || msg.audio || msg.video || msg.voice);
   var fileRecord = null;

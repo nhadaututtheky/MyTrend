@@ -68,6 +68,14 @@
         <ComicButton variant="primary" type="submit" {loading}>Login</ComicButton>
       </form>
 
+      <div class="divider">
+        <span>or</span>
+      </div>
+
+      <p class="telegram-hint">
+        Send <code>/start</code> to your Telegram bot to get a magic login link
+      </p>
+
       <p class="link">
         Don't have an account? <a href="/auth/register">Register</a>
       </p>
@@ -121,6 +129,41 @@
     font-size: 0.875rem;
     font-weight: 700;
     text-align: center;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: var(--spacing-md);
+  }
+
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: var(--border-color);
+  }
+
+  .telegram-hint {
+    text-align: center;
+    font-size: 0.813rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .telegram-hint code {
+    font-family: 'Comic Mono', monospace;
+    font-weight: 700;
+    color: var(--accent-blue);
+    background: var(--bg-secondary);
+    padding: 1px 6px;
+    border-radius: 4px;
   }
 
   .link {

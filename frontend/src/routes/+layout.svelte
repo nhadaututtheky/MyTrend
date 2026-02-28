@@ -19,7 +19,7 @@
   let loggedIn = $derived($isLoggedIn);
   let currentPath = $derived($page.url.pathname);
 
-  const PUBLIC_ROUTES = ['/auth/login', '/auth/register'];
+  const PUBLIC_ROUTES = ['/auth/login', '/auth/register', '/auth/telegram'];
 
   $effect(() => {
     if (!loggedIn && !PUBLIC_ROUTES.includes(currentPath)) {
