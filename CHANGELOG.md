@@ -6,6 +6,132 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [0.4.0] - 2026-03-01
+
+### Added
+
+#### Telegram Magic Link Login
+- `/start` bot command generates magic link with inline keyboard button
+- `auth_tokens` collection (64-char token, 5-min expiry, single-use)
+- `telegram_user_id` field on users collection for account linking
+- `/api/auth/telegram/request` (internal) + `/api/auth/telegram/verify` (public) endpoints
+- Frontend `/auth/telegram` page with auto-verify → redirect flow
+- `loginWithTelegramToken()` auth store helper
+- Daily cron cleanup for expired/used tokens
+- "Login with Telegram" hint on login page
+
+#### Research Data Pipeline
+- Research knowledge graph with URL auto-capture from Telegram
+- Claude CLI analysis for research items (no API key needed)
+- Channel post detection for research URL ingestion
+- Actionable research insights extraction
+
+#### Security Hardening
+- SQL injection prevention in PB hooks (parameterized queries)
+- XSS prevention (HTML sanitization in Telegram formatter)
+- Filter validation across all API endpoints
+- Auth hardening (localStorage persist, char limits)
+
+### Fixed
+- Goja JSVM `Intl` crash — replaced with static 'UTC' for timezone
+- Vibe Terminal plan mode getting stuck (ExitPlanMode handling)
+- Thinking-only assistant messages rendering as empty bubbles
+- Telegram bot /start UX and group notification flow
+
+---
+
+## [0.3.0] - 2026-02-26
+
+### Added
+
+#### Hub Cron Management (v3 Sprint 1)
+- Full CRUD UI for hub cron jobs at `/hub/cron` + `/hub/cron/[id]`
+- Natural language cron schedule parser
+- Cron execution history with duration and output tracking
+
+#### Plans Kanban (v3 Sprint 2)
+- 3-column Kanban board (PlanKanban.svelte) for plan lifecycle
+- Milestones checklist with completion tracking
+- Related content linking (ideas, conversations, research)
+
+#### GitHub Integration (v3 Sprint 3)
+- Webhook receiver in companion for push/PR/issue events
+- PB ingest hook for GitHub activity records
+- PR → Idea auto-linking with conversion tracking
+
+#### Smart Ideas (v3 Sprint 4)
+- Duplicate idea detection via `/api/mytrend/ideas/similar`
+- Smart auto-tags from existing topics on idea creation
+- Yellow warning banner for potential duplicates in UI
+
+### Fixed
+- Migration Goja pointer issue with `.all()` — use SQLite JSON functions
+- Migration `db.saveCollection` → `Dao(db).saveCollection`
+- Null-safe tags, task 404 handling, research auth headers
+- Telegram bot inline URLs, menu UX, pinned controls
+- CI/CD: prettier smart quotes, ESLint errors, PeakHoursChart types
+
+---
+
+## [0.2.0] - 2026-02-24
+
+### Added
+
+#### Vibe Terminal
+- Browser-based Claude Code control via WebSocket bridge
+- Companion service (Bun + Hono, port 3457) with stdin/stdout pipe transport
+- Session management with create/select/reconnect
+- VibeComposer with Vi→En auto-translate
+- Permission request cards (approve/deny)
+- KanbanBoard for claude_tasks (pending/in-progress/done)
+- ContextMeter for token usage tracking
+- ModelRouter with keyword → model suggestion
+- Onboarding wizard and component gallery
+
+#### Telegram Claude Bridge
+- Mobile Claude Code access via Telegram bot
+- Multi-project support with /switch command
+- Inline keyboards for permissions, model selection
+- Auto-translate Vi→En for messages ≥ 30 chars
+- Tool result display (Bash output, file diffs)
+- .md file auto-send as Telegram documents
+- Cost alerts and pinned status messages
+- /timeout command for per-session idle control
+
+#### Comic Neobrutalism Design System
+- Colored panels, display font, stagger animations
+- Sidebar hard shadows, stat color-blocks, logo font
+- Icons overhaul, compact dashboard, command palette
+- Dark mode tuning across all components
+
+#### Agent & User Experience (ROADMAP v2)
+- Sprint 1: Cmd+K FTS5 search, project health signals, auto session summary to NM
+- Sprint 2: Daily context snapshot for CLI sessions, demo data mode
+- Sprint 3: Large Bash output as file attachment, cross-collection related content
+- Sprint 4: Bi-directional Telegram ↔ Web sync
+
+#### Infrastructure
+- Daily/weekly digest via Telegram cron job
+- Auto-backup SQLite with daily cron + manual endpoint + Telegram upload
+- PWA setup with icons and Apple meta tags
+- Portable setup: publish NM image, project config via Settings UI
+- Folder browser for project directory picker
+- GitHub sync hook (PAT polling every 30min)
+- NM sync hub with Docker bridge IP patch
+- Smart memory classification in neural bridge
+
+### Fixed
+- Companion reverted to native (Docker sandboxed MCP/skills/filesystem)
+- Idle timeout tracks CLI activity, increased to 60min
+- Telegram reply race condition with `responseOriginMsg` lock
+- Model name mapping (opus-1m → opus[1m], etc.)
+- Permission mode alignment with Claude Code SDK
+- ExitPlanMode auto-approval flow
+- Project detail crash when tech_stack/dna is null
+- Private chat session jumping between Project and HQ
+
+---
+
 ## [0.1.0] - 2026-02-18
 
 ### Added

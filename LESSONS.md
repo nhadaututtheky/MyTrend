@@ -36,6 +36,18 @@
 - **Fix**: MODEL_MAP in ws-bridge.ts and cli-launcher.ts translates display names → CLI aliases.
 - **Rule**: Always check upstream API/CLI docs before inventing identifier names.
 
+### PocketBase Goja has no Intl API (2026-03-01)
+- **Context**: `telegram_auth.pb.js` used `Intl.DateTimeFormat().resolvedOptions().timeZone` to set user timezone
+- **Problem**: Goja JSVM doesn't implement `Intl`. Crashes at runtime when creating new Telegram user.
+- **Fix**: Replace with static `'UTC'` string
+- **Rule**: Never use browser/Node APIs in PB hooks: no `Intl`, no `crypto`, no `fetch`, no `Buffer`. Check Goja docs.
+
+### Magic link auth uses authWithPassword, not custom tokens (2026-03-01)
+- **Context**: Wanted to issue PocketBase auth tokens directly via `$tokens.recordAuthToken()`
+- **Problem**: JSVM doesn't reliably expose token generation. Custom token auth also requires frontend changes.
+- **Decision**: Generate one-time password on verify, return `{email, password}`, let frontend call `pb.authWithPassword()`. Password changes every login → no security risk over HTTPS.
+- **Rule**: When PB JSVM doesn't support an API, find a workaround using existing battle-tested APIs.
+
 ## Workflow
 
 ### "Fix chaining" anti-pattern (2026-02-24)
