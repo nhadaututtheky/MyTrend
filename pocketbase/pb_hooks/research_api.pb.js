@@ -148,6 +148,113 @@ routerAdd('GET', '/api/mytrend/research/stats', function (c) {
   }
 });
 
+// GET /api/mytrend/research/trends — monthly tag/source trends for radar visualization
+routerAdd('GET', '/api/mytrend/research/trends', function (c) {
+  try {
+    var authRecord = c.get('authRecord');
+    if (!authRecord) return c.json(401, { error: 'Unauthorized' });
+    var userId = authRecord.getId();
+
+    var dao = $app.dao();
+
+    // Fetch last 6 months of research
+    var sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    var startStr = sixMonthsAgo.toISOString().replace('T', ' ');
+
+    var records = [];
+    try {
+      records = dao.findRecordsByFilter(
+        'research',
+        'user = {:uid} && created >= {:start}',
+        '-created', 0, 0,
+        { uid: userId, start: startStr }
+      );
+    } catch (e) {}
+
+    // Group by month
+    var monthlyTags = {};   // { "2026-01": { svelte: 2, react: 1 } }
+    var monthlySources = {}; // { "2026-01": { github: 3, npm: 1 } }
+    var allTagCounts = {};   // overall tag counts for current + previous month comparison
+    var allPatterns = {};    // pattern → count
+
+    for (var i = 0; i < records.length; i++) {
+      var rec = records[i];
+      var created = rec.getString('created');
+      var month = created.substring(0, 7); // "2026-01"
+
+      // Source
+      var src = rec.getString('source');
+      if (!monthlySources[month]) monthlySources[month] = {};
+      monthlySources[month][src] = (monthlySources[month][src] || 0) + 1;
+
+      // Tags
+      var tags = rec.get('tech_tags') || [];
+      if (!monthlyTags[month]) monthlyTags[month] = {};
+      for (var j = 0; j < tags.length; j++) {
+        monthlyTags[month][tags[j]] = (monthlyTags[month][tags[j]] || 0) + 1;
+        allTagCounts[tags[j]] = (allTagCounts[tags[j]] || 0) + 1;
+      }
+
+      // Patterns
+      var patterns = rec.get('patterns_extracted') || [];
+      for (var p = 0; p < patterns.length; p++) {
+        allPatterns[patterns[p]] = (allPatterns[patterns[p]] || 0) + 1;
+      }
+    }
+
+    // Build sorted month keys
+    var months = Object.keys(monthlyTags).concat(Object.keys(monthlySources));
+    var monthSet = {};
+    for (var m = 0; m < months.length; m++) monthSet[months[m]] = true;
+    var sortedMonths = Object.keys(monthSet).sort();
+
+    // Tag trends: array of { month, tags: {} }
+    var tagTrends = [];
+    for (var mi = 0; mi < sortedMonths.length; mi++) {
+      tagTrends.push({ month: sortedMonths[mi], tags: monthlyTags[sortedMonths[mi]] || {} });
+    }
+
+    // Source trends
+    var sourceTrends = [];
+    for (var si = 0; si < sortedMonths.length; si++) {
+      sourceTrends.push({ month: sortedMonths[si], sources: monthlySources[sortedMonths[si]] || {} });
+    }
+
+    // Rising tags: compare current month vs previous month
+    var rising = [];
+    if (sortedMonths.length >= 2) {
+      var curMonth = sortedMonths[sortedMonths.length - 1];
+      var prevMonth = sortedMonths[sortedMonths.length - 2];
+      var curTags = monthlyTags[curMonth] || {};
+      var prevTags = monthlyTags[prevMonth] || {};
+      var allCurKeys = Object.keys(curTags);
+      for (var ri = 0; ri < allCurKeys.length; ri++) {
+        var tag = allCurKeys[ri];
+        if ((curTags[tag] || 0) > (prevTags[tag] || 0)) {
+          rising.push(tag);
+        }
+      }
+    }
+
+    // Top patterns (sorted by count)
+    var topPatterns = Object.keys(allPatterns)
+      .map(function (p) { return { pattern: p, count: allPatterns[p] }; })
+      .sort(function (a, b) { return b.count - a.count; })
+      .slice(0, 15);
+
+    return c.json(200, {
+      tag_trends: tagTrends,
+      source_trends: sourceTrends,
+      rising: rising.slice(0, 10),
+      top_patterns: topPatterns,
+    });
+  } catch (e) {
+    console.error('[ResearchAPI] Trends error:', String(e));
+    return c.json(500, { error: String(e) });
+  }
+});
+
 console.log(
-  '[ResearchAPI] Registered: POST /api/mytrend/research/internal, GET /api/mytrend/research/internal/check, GET /api/mytrend/research/stats',
+  '[ResearchAPI] Registered: POST /api/mytrend/research/internal, GET check, GET stats, GET trends',
 );

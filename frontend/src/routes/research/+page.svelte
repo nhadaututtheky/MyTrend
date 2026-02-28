@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import pb from '$lib/config/pocketbase';
   import { fetchResearch, fetchResearchStats } from '$lib/api/research';
+  import { createIdeaFromResearch } from '$lib/api/ideas';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
   import ComicTabs from '$lib/components/comic/ComicTabs.svelte';
   import ComicBadge from '$lib/components/comic/ComicBadge.svelte';
@@ -77,6 +78,25 @@
   onDestroy(() => {
     unsubscribe?.();
   });
+
+  // Track which research items already have ideas created
+  let createdIdeaIds = $state(new Set<string>());
+  let creatingIdeaId = $state<string | null>(null);
+
+  async function handleCreateIdea(e: MouseEvent, item: Research) {
+    e.preventDefault(); // Don't follow the <a> link
+    e.stopPropagation();
+    if (createdIdeaIds.has(item.id) || creatingIdeaId === item.id) return;
+    creatingIdeaId = item.id;
+    try {
+      await createIdeaFromResearch(item);
+      createdIdeaIds = new Set([...createdIdeaIds, item.id]);
+    } catch (err: unknown) {
+      console.error('[Research] Create idea failed:', err);
+    } finally {
+      creatingIdeaId = null;
+    }
+  }
 
   function formatDate(dateStr: string): string {
     const d = new Date(dateStr);
@@ -172,6 +192,21 @@
               {#if item.applicable_projects.length > 0}
                 <p class="item-projects">📂 {item.applicable_projects.join(', ')}</p>
               {/if}
+
+              <div class="item-actions">
+                {#if createdIdeaIds.has(item.id)}
+                  <span class="idea-created-badge">&#9989; Idea created</span>
+                {:else}
+                  <button
+                    class="btn-create-idea"
+                    disabled={creatingIdeaId === item.id}
+                    onclick={(e) => handleCreateIdea(e, item)}
+                    aria-label="Create idea from {item.title}"
+                  >
+                    {creatingIdeaId === item.id ? 'Creating...' : '&#128161; Create Idea'}
+                  </button>
+                {/if}
+              </div>
             </div>
           </ComicCard>
         </a>
@@ -306,6 +341,43 @@
     font-size: var(--font-size-xs);
     color: var(--text-muted);
     margin: 0;
+  }
+
+  .item-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .btn-create-idea {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    padding: 2px var(--spacing-sm);
+    background: rgba(255, 230, 109, 0.15);
+    border: 2px solid var(--accent-yellow);
+    border-radius: var(--radius-sm);
+    color: var(--accent-yellow);
+    cursor: pointer;
+    transition: all 150ms ease;
+  }
+
+  .btn-create-idea:hover:not(:disabled) {
+    background: var(--accent-yellow);
+    color: #1a1a1a;
+    transform: translateY(-1px);
+  }
+
+  .btn-create-idea:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .idea-created-badge {
+    font-family: var(--font-comic);
+    font-size: var(--font-size-xs);
+    color: var(--accent-green);
+    font-weight: 700;
   }
 
   @media (max-width: 768px) {

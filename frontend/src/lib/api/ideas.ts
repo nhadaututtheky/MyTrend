@@ -1,5 +1,5 @@
 import pb from '$lib/config/pocketbase';
-import type { Idea, PBListResult } from '$lib/types';
+import type { Idea, Research, PBListResult } from '$lib/types';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -44,4 +44,36 @@ export async function deleteIdea(id: string): Promise<boolean> {
 
 export async function promoteIdeaToPlan(id: string): Promise<Idea> {
   return pb.collection('ideas').update<Idea>(id, { status: 'planned' });
+}
+
+/**
+ * Create an idea pre-filled from a research item.
+ * Resolves project name → ID from applicable_projects[0].
+ */
+export async function createIdeaFromResearch(research: Research): Promise<Idea> {
+  let projectId: string | null = null;
+  const projectName = research.applicable_projects[0];
+  if (projectName) {
+    try {
+      const proj = await pb.collection('projects').getFirstListItem(`name = "${projectName}"`);
+      projectId = proj.id;
+    } catch {
+      // Project not found — create without linking
+    }
+  }
+
+  const patterns =
+    research.patterns_extracted.length > 0
+      ? `\n\nPatterns: ${research.patterns_extracted.join(', ')}`
+      : '';
+
+  return createIdea({
+    title: research.title,
+    content: `From research: ${research.url}\n\n${research.ai_summary}${patterns}`,
+    type: 'feature',
+    status: 'inbox',
+    priority: research.verdict === 'fit' ? 'medium' : 'low',
+    tags: [...research.tech_tags],
+    project: projectId,
+  });
 }

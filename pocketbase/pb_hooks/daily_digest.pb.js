@@ -315,6 +315,34 @@ cronAdd('daily_digest', '0 * * * *', function () {
       wLines.push('  • Funnel: ' + weekIdeas + ' → ' + ideasPlanned + ' planned → ' + ideasDone + ' done');
     }
 
+    // Research highlights (fit/partial added this week)
+    var weekResearch = [];
+    try {
+      weekResearch = dao.findRecordsByFilter(
+        'research',
+        'created >= {:start} && (verdict = "fit" || verdict = "partial")',
+        '-created',
+        5,
+        0,
+        { start: weekStartStr }
+      );
+    } catch (e) {}
+    if (weekResearch.length > 0) {
+      var sourceIcons = { github: '🐙', npm: '📦', blog: '📝', docs: '📝', other: '🔗' };
+      wLines.push('');
+      wLines.push('<b>🔬 Research Added</b>');
+      for (var ri = 0; ri < weekResearch.length; ri++) {
+        var rr = weekResearch[ri];
+        var rSource = rr.getString('source');
+        var rIcon = sourceIcons[rSource] || '🔗';
+        var rVerdict = rr.getString('verdict');
+        var vBadge = rVerdict === 'fit' ? '✅' : '🟡';
+        var rTitle = escHtml(rr.getString('title')).substring(0, 50);
+        var rUrl = escHtml(rr.getString('url'));
+        wLines.push('  ' + rIcon + ' ' + vBadge + ' <a href="' + rUrl + '">' + rTitle + '</a>');
+      }
+    }
+
     weeklyText = wLines.join('\n');
   }
 

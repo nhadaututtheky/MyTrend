@@ -35,6 +35,34 @@ export async function fetchResearchStats(): Promise<ResearchStats> {
   return res.json() as Promise<ResearchStats>;
 }
 
+export async function fetchResearchByProject(
+  projectName: string,
+  page = 1,
+  verdict?: string,
+): Promise<PBListResult<Research>> {
+  const filters = [`applicable_projects ~ "${projectName}"`];
+  if (verdict) filters.push(`verdict = "${verdict}"`);
+  return pb.collection('research').getList<Research>(page, 20, {
+    sort: '-created',
+    filter: filters.join(' && '),
+  });
+}
+
+export interface ResearchTrends {
+  tag_trends: Array<{ month: string; tags: Record<string, number> }>;
+  source_trends: Array<{ month: string; sources: Record<string, number> }>;
+  rising: string[];
+  top_patterns: Array<{ pattern: string; count: number }>;
+}
+
+export async function fetchResearchTrends(): Promise<ResearchTrends> {
+  const res = await fetch('/api/mytrend/research/trends', {
+    headers: { Authorization: pb.authStore.token },
+  });
+  if (!res.ok) throw new Error(`Trends fetch failed: ${res.status}`);
+  return res.json() as Promise<ResearchTrends>;
+}
+
 export async function deleteResearch(id: string): Promise<boolean> {
   return pb.collection('research').delete(id);
 }

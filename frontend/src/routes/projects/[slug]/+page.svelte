@@ -7,6 +7,7 @@
   import { fetchPlans } from '$lib/api/plans';
   import { fetchActivities, fetchAggregates } from '$lib/api/activity';
   import { fetchTasks } from '$lib/api/tasks';
+  import { fetchResearchByProject } from '$lib/api/research';
   import BentoGrid from '$lib/components/comic/BentoGrid.svelte';
   import ComicBentoCard from '$lib/components/comic/ComicBentoCard.svelte';
   import ComicCard from '$lib/components/comic/ComicCard.svelte';
@@ -26,6 +27,7 @@
     Activity,
     ActivityAggregate,
     ClaudeTask,
+    Research,
   } from '$lib/types';
 
   let project = $state<Project | null>(null);
@@ -35,10 +37,11 @@
   let activities = $state<Activity[]>([]);
   let tasks = $state<ClaudeTask[]>([]);
   let aggregates = $state<ActivityAggregate[]>([]);
+  let researchItems = $state<Research[]>([]);
   let isLoading = $state(true);
   let activeTab = $state('overview');
 
-  const tabs = [
+  const tabs = $derived([
     { id: 'overview', label: 'Overview' },
     { id: 'conversations', label: 'Conversations' },
     { id: 'ideas', label: 'Ideas' },
@@ -46,7 +49,11 @@
     { id: 'plans', label: 'Plans' },
     { id: 'tasks', label: 'Tasks' },
     { id: 'dna', label: 'DNA' },
-  ];
+    {
+      id: 'research',
+      label: `Research${researchItems.length ? ` (${researchItems.length})` : ''}`,
+    },
+  ]);
 
   let slug = $derived($page.params['slug'] ?? '');
 
@@ -85,6 +92,21 @@
     completed: 'green',
     abandoned: 'red',
     superseded: 'red',
+  };
+
+  const VERDICT_COLORS: Record<string, 'green' | 'yellow' | 'blue' | 'purple'> = {
+    fit: 'green',
+    partial: 'yellow',
+    'concept-only': 'blue',
+    irrelevant: 'purple',
+  };
+
+  const SOURCE_ICONS: Record<string, string> = {
+    github: '\uD83D\uDC19',
+    npm: '\uD83D\uDCE6',
+    blog: '\uD83D\uDCDD',
+    docs: '\uD83D\uDCDD',
+    other: '\uD83D\uDD17',
   };
 
   const TASK_STATUS_COLORS: Record<string, 'green' | 'yellow' | 'orange'> = {
@@ -134,20 +156,23 @@
       const raw = await fetchProjectBySlug(slug);
       project = raw ? safeProject(raw) : null;
       if (project) {
-        const [convRes, ideasRes, plansRes, actRes, aggRes, tasksRes] = await Promise.allSettled([
-          fetchConversations(1, project.id),
-          fetchIdeas(1, project.id),
-          fetchPlans(1, { projectId: project.id }),
-          fetchActivities(1, project.id),
-          fetchAggregates('day', project.id),
-          fetchTasks({ projectDir: project.name, perPage: 100 }),
-        ]);
+        const [convRes, ideasRes, plansRes, actRes, aggRes, tasksRes, researchRes] =
+          await Promise.allSettled([
+            fetchConversations(1, project.id),
+            fetchIdeas(1, project.id),
+            fetchPlans(1, { projectId: project.id }),
+            fetchActivities(1, project.id),
+            fetchAggregates('day', project.id),
+            fetchTasks({ projectDir: project.name, perPage: 100 }),
+            fetchResearchByProject(project.name),
+          ]);
         if (convRes.status === 'fulfilled') conversations = convRes.value.items;
         if (ideasRes.status === 'fulfilled') ideas = ideasRes.value.items;
         if (plansRes.status === 'fulfilled') plans = plansRes.value.items;
         if (actRes.status === 'fulfilled') activities = actRes.value.items;
         if (aggRes.status === 'fulfilled') aggregates = aggRes.value;
         if (tasksRes.status === 'fulfilled') tasks = tasksRes.value.items;
+        if (researchRes.status === 'fulfilled') researchItems = researchRes.value.items;
       }
     } catch (err: unknown) {
       console.error('[Project]', err);
@@ -415,6 +440,62 @@
             {/if}
           {/each}
         {/if}
+      {:else if activeTab === 'research'}
+        {#if researchItems.length === 0}
+          <ComicEmptyState
+            illustration="empty"
+            message="No research"
+            description="Send URLs via Telegram to auto-analyze and link research to this project."
+          />
+        {:else}
+          <div class="list">
+            {#each researchItems as item, i (item.id)}
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="list-item"
+                style:animation-delay="{i * 30}ms"
+              >
+                <ComicCard variant="standard">
+                  <div class="research-header">
+                    <span class="research-source"
+                      >{SOURCE_ICONS[item.source] ?? '\uD83D\uDD17'}</span
+                    >
+                    <strong class="research-title">{item.title}</strong>
+                    <ComicBadge color={VERDICT_COLORS[item.verdict] ?? 'blue'} size="sm"
+                      >{item.verdict}</ComicBadge
+                    >
+                  </div>
+                  {#if item.ai_summary}
+                    <p class="research-summary">
+                      {item.ai_summary.length > 150
+                        ? item.ai_summary.slice(0, 150) + '...'
+                        : item.ai_summary}
+                    </p>
+                  {/if}
+                  <div class="research-tags">
+                    {#each item.tech_tags.slice(0, 5) as tag (tag)}
+                      <ComicBadge color="blue" size="sm">{tag}</ComicBadge>
+                    {/each}
+                    {#if item.tech_tags.length > 5}
+                      <span class="meta">+{item.tech_tags.length - 5}</span>
+                    {/if}
+                    {#if item.stars > 0}
+                      <span class="research-stat">&#9733; {item.stars.toLocaleString()}</span>
+                    {/if}
+                    {#if item.npm_downloads > 0}
+                      <span class="research-stat"
+                        >&#8595; {item.npm_downloads.toLocaleString()}/wk</span
+                      >
+                    {/if}
+                  </div>
+                </ComicCard>
+              </a>
+            {/each}
+          </div>
+          <a href="/research" class="view-all-link">View all research &#8594;</a>
+        {/if}
       {:else if activeTab === 'dna'}
         <DNACard dna={project.dna} projectName={project.name} />
       {/if}
@@ -603,6 +684,55 @@
     color: var(--text-muted);
     text-align: center;
     padding: var(--spacing-md);
+  }
+
+  .research-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+  .research-source {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .research-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .research-summary {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin: 4px 0;
+    line-height: 1.5;
+  }
+  .research-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .research-stat {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .view-all-link {
+    display: block;
+    text-align: center;
+    font-family: var(--font-comic);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--accent-blue);
+    text-decoration: none;
+    padding: var(--spacing-sm);
+  }
+  .view-all-link:hover {
+    text-decoration: underline;
   }
 
   /* Responsive: 4 columns → 2 on mobile */

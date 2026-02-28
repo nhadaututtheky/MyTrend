@@ -13,6 +13,7 @@
     Globe,
     Search,
     BookOpen,
+    Radar,
     Terminal,
     Zap,
     Settings,
@@ -48,6 +49,7 @@
         { label: 'Graph', href: '/graph', icon: '', lucideIcon: Globe },
         { label: 'Search', href: '/search', icon: '', lucideIcon: Search },
         { label: 'Research', href: '/research', icon: '', lucideIcon: BookOpen },
+        { label: 'Tech Radar', href: '/research/trends', icon: '', lucideIcon: Radar },
       ],
     },
     {
