@@ -91,7 +91,7 @@ routerAdd('POST', '/api/auth/telegram/verify', function (c) {
     user.set('email', 'tg_' + tgUserId + '@telegram.local');
     user.set('display_name', tgDisplayName || tgUsername || 'Telegram User');
     user.set('verified', true);
-    user.set('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+    user.set('timezone', 'UTC');
     user.set('preferences', { theme: 'comic', defaultProject: null, sidebarCollapsed: false });
   }
 
@@ -107,4 +107,32 @@ routerAdd('POST', '/api/auth/telegram/verify', function (c) {
   });
 });
 
-console.log('[TelegramAuth] Hooks registered: request, verify');
+// ---------------------------------------------------------------------------
+// Cron: Clean up expired/used tokens (daily at 3am)
+// ---------------------------------------------------------------------------
+cronAdd('auth_tokens_cleanup', '0 3 * * *', function () {
+  var dao = $app.dao();
+  var cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000); // older than 24h
+  var cutoffStr = cutoff.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
+
+  try {
+    var records = dao.findRecordsByFilter(
+      'auth_tokens',
+      'used = true || expires_at < {:cutoff}',
+      '',
+      500,
+      0,
+      { cutoff: cutoffStr },
+    );
+    for (var i = 0; i < records.length; i++) {
+      dao.deleteRecord(records[i]);
+    }
+    if (records.length > 0) {
+      console.log('[TelegramAuth] Cleaned up ' + records.length + ' expired/used tokens');
+    }
+  } catch (e) {
+    // No tokens to clean or collection not ready
+  }
+});
+
+console.log('[TelegramAuth] Hooks registered: request, verify, cleanup cron');
