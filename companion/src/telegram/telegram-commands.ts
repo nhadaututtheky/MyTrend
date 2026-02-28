@@ -1,7 +1,8 @@
 // Telegram command handlers — topic-aware for multi-session support
 
-import type { TelegramMessage } from "./telegram-types.js";
+import type { TelegramMessage, TelegramInlineKeyboardMarkup } from "./telegram-types.js";
 import type { TelegramBridge } from "./telegram-bridge.js";
+import type { ProjectProfile } from "../session-types.js";
 import {
   formatHelp,
   formatProjectList,
@@ -66,6 +67,68 @@ export async function dispatchCommand(
   return true;
 }
 
+// ── Magic Link Login ──────────────────────────────────────────────────────
+
+const PB_URL = process.env.PB_URL || process.env.POCKETBASE_URL || "http://localhost:8090";
+const INTERNAL_SECRET = process.env.COMPANION_INTERNAL_SECRET || "";
+const WEB_URL = process.env.MYTREND_WEB_URL || "http://localhost:3000";
+
+interface MagicLinkResult {
+  url: string;
+  error?: undefined;
+}
+
+interface MagicLinkError {
+  url?: undefined;
+  error: string;
+}
+
+async function generateMagicLink(
+  tgUserId: number,
+  tgUsername: string,
+  tgDisplayName: string,
+): Promise<MagicLinkResult | MagicLinkError> {
+  if (!INTERNAL_SECRET) return { error: "COMPANION_INTERNAL_SECRET not configured" };
+
+  try {
+    const res = await fetch(`${PB_URL}/api/auth/telegram/request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": INTERNAL_SECRET,
+      },
+      body: JSON.stringify({
+        telegram_user_id: tgUserId,
+        telegram_username: tgUsername,
+        telegram_display_name: tgDisplayName,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string };
+      return { error: data.error ?? `HTTP ${res.status}` };
+    }
+
+    const data = (await res.json()) as { token: string };
+    return { url: `${WEB_URL}/auth/telegram?token=${data.token}` };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+/** Build project keyboard with an optional login button row at the bottom. */
+function buildProjectKeyboardWithLogin(
+  profiles: ProjectProfile[],
+  loginUrl?: string,
+): TelegramInlineKeyboardMarkup {
+  const keyboard = buildProjectKeyboard(profiles);
+  if (loginUrl) {
+    keyboard.inline_keyboard.push([{ text: "Open MyTrend", url: loginUrl }]);
+  }
+  return keyboard;
+}
+
 // ── Command implementations ───────────────────────────────────────────────
 
 async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promise<void> {
@@ -101,6 +164,12 @@ async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promis
     return;
   }
 
+  // Generate magic login link (fire in parallel, don't block)
+  const tgUser = msg.from;
+  const linkPromise = tgUser
+    ? generateMagicLink(tgUser.id, tgUser.username ?? "", tgUser.first_name ?? tgUser.username ?? "")
+    : Promise.resolve({ error: "No user info" } as MagicLinkError);
+
   // General topic: show all active sessions overview + project keyboard
   const allMappings = bridge.getMappings(chatId);
   if (allMappings && allMappings.size > 0) {
@@ -112,23 +181,32 @@ async function handleStart(bridge: TelegramBridge, msg: TelegramMessage): Promis
       lines.push(`  ${m.projectSlug}${topicLabel} — ${status} | $${session?.total_cost_usd.toFixed(3) ?? "0.000"}`);
     }
     lines.push("\nUse /project &lt;slug&gt; to open another project.");
+
+    const linkResult = await linkPromise;
     await bridge.sendToChatWithKeyboard(
       chatId,
       lines.join("\n"),
-      buildProjectKeyboard(bridge.getProfiles())
+      buildProjectKeyboardWithLogin(bridge.getProfiles(), linkResult.url)
     );
     return;
   }
 
-  // No sessions: onboarding + project selection
+  // No sessions: onboarding + project selection + login link
   const botName = bridge.getBotName() ?? "Vibe Bot";
   const profiles = bridge.getProfiles();
+  const linkResult = await linkPromise;
 
   if (profiles.length > 0) {
     await bridge.sendToChatWithKeyboard(
       chatId,
       formatWelcome(botName),
-      buildProjectKeyboard(profiles)
+      buildProjectKeyboardWithLogin(profiles, linkResult.url)
+    );
+  } else if (linkResult.url) {
+    await bridge.sendToChatWithKeyboard(
+      chatId,
+      formatWelcome(botName),
+      { inline_keyboard: [[{ text: "Open MyTrend", url: linkResult.url }]] }
     );
   } else {
     await bridge.sendToChat(chatId, formatWelcome(botName));
