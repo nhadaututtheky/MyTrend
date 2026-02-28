@@ -149,13 +149,15 @@
   {:else}
     <div class="research-grid">
       {#each filtered as item (item.id)}
-        <a href={item.url} target="_blank" rel="noopener noreferrer" class="research-link">
+        <div class="research-card-wrapper">
           <ComicCard variant="standard" neon={item.verdict === 'fit' ? 'green' : false}>
             <div class="item-content">
-              <div class="item-header">
-                <span class="source-icon">{SOURCE_EMOJI[item.source] ?? '🔗'}</span>
-                <h3 class="item-title">{item.title}</h3>
-              </div>
+              <a href={item.url} target="_blank" rel="noopener noreferrer" class="item-link">
+                <div class="item-header">
+                  <span class="source-icon">{SOURCE_EMOJI[item.source] ?? '🔗'}</span>
+                  <h3 class="item-title">{item.title}</h3>
+                </div>
+              </a>
 
               <div class="item-meta">
                 <ComicBadge color={VERDICT_COLOR[item.verdict] ?? 'blue'} size="sm">
@@ -209,7 +211,7 @@
               </div>
             </div>
           </ComicCard>
-        </a>
+        </div>
       {/each}
     </div>
   {/if}
@@ -267,10 +269,13 @@
     gap: var(--spacing-md);
   }
 
-  .research-link {
+  .item-link {
     text-decoration: none;
     color: inherit;
     display: block;
+  }
+  .item-link:hover .item-title {
+    color: var(--accent-blue);
   }
 
   .item-content {

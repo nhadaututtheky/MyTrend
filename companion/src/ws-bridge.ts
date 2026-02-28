@@ -781,9 +781,23 @@ export class WsBridge {
 
   // ── Auto-approve timer ──────────────────────────────────────────────────
 
+  // Tools that should NEVER be auto-approved — they require user to read and respond.
+  private static readonly NEVER_AUTO_APPROVE_TOOLS = new Set([
+    "ExitPlanMode",
+    "AskUserQuestion",
+  ]);
+
   private startAutoApproveTimer(session: ActiveSession, perm: PermissionRequest): void {
     const config = session.autoApproveConfig;
     if (!config.enabled || config.timeoutSeconds <= 0) return;
+
+    // Never auto-approve tools that require user decision
+    if (WsBridge.NEVER_AUTO_APPROVE_TOOLS.has(perm.tool_name)) {
+      console.log(
+        `[ws-bridge] Auto-approve skipped for ${perm.tool_name} (requires user decision), request ${perm.request_id.slice(0, 8)}`
+      );
+      return;
+    }
 
     // Skip Bash if allowBash is false
     if (perm.tool_name === "Bash" && !config.allowBash) {

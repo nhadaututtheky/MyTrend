@@ -338,7 +338,10 @@ cronAdd('daily_digest', '0 * * * *', function () {
         var rVerdict = rr.getString('verdict');
         var vBadge = rVerdict === 'fit' ? '✅' : '🟡';
         var rTitle = escHtml(rr.getString('title')).substring(0, 50);
-        var rUrl = escHtml(rr.getString('url'));
+        var rawUrl = rr.getString('url');
+        var rUrl = (rawUrl.indexOf('https://') === 0 || rawUrl.indexOf('http://') === 0)
+          ? escHtml(rawUrl)
+          : '#';
         wLines.push('  ' + rIcon + ' ' + vBadge + ' <a href="' + rUrl + '">' + rTitle + '</a>');
       }
     }

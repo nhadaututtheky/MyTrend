@@ -7,13 +7,12 @@
 // POST /api/mytrend/research/internal — save a research record
 routerAdd('POST', '/api/mytrend/research/internal', function (c) {
   try {
-    // Auth check (inline — no top-level vars accessible in routerAdd scope)
+    // Auth check (inline — fail-closed: reject if secret not configured)
     var secret = $os.getenv('COMPANION_INTERNAL_SECRET') || '';
-    if (secret) {
-      var headerSecret = '';
-      try { headerSecret = c.request().header.get('X-Internal-Secret') || ''; } catch (e) {}
-      if (headerSecret !== secret) return c.json(401, { error: 'Unauthorized' });
-    }
+    if (!secret) return c.json(503, { error: 'Internal secret not configured' });
+    var headerSecret = '';
+    try { headerSecret = c.request().header.get('X-Internal-Secret') || ''; } catch (e) {}
+    if (headerSecret !== secret) return c.json(401, { error: 'Unauthorized' });
 
     var body = $apis.requestInfo(c).data;
     var userId = body.userId || '';
@@ -22,9 +21,9 @@ routerAdd('POST', '/api/mytrend/research/internal', function (c) {
 
     var dao = $app.dao();
 
-    // Dedup: check if URL already exists
+    // Dedup: check if URL already exists (parameterized to prevent injection)
     try {
-      var existing = dao.findRecordsByFilter('research', "url = '" + body.url.replace(/'/g, "''") + "'", '', 1, 0);
+      var existing = dao.findRecordsByFilter('research', 'url = {:url}', '', 1, 0, { url: body.url });
       if (existing.length > 0) {
         return c.json(200, { id: existing[0].getId(), action: 'exists' });
       }
@@ -60,13 +59,12 @@ routerAdd('POST', '/api/mytrend/research/internal', function (c) {
 // GET /api/mytrend/research/internal/check?url=... — dedup check
 routerAdd('GET', '/api/mytrend/research/internal/check', function (c) {
   try {
-    // Auth check (inline)
+    // Auth check (inline — fail-closed)
     var secret = $os.getenv('COMPANION_INTERNAL_SECRET') || '';
-    if (secret) {
-      var headerSecret = '';
-      try { headerSecret = c.request().header.get('X-Internal-Secret') || ''; } catch (e) {}
-      if (headerSecret !== secret) return c.json(401, { error: 'Unauthorized' });
-    }
+    if (!secret) return c.json(503, { error: 'Internal secret not configured' });
+    var headerSecret = '';
+    try { headerSecret = c.request().header.get('X-Internal-Secret') || ''; } catch (e) {}
+    if (headerSecret !== secret) return c.json(401, { error: 'Unauthorized' });
 
     var url = c.queryParam('url');
     if (!url) return c.json(400, { error: 'url required' });
@@ -74,8 +72,9 @@ routerAdd('GET', '/api/mytrend/research/internal/check', function (c) {
     try {
       var records = $app.dao().findRecordsByFilter(
         'research',
-        "url = '" + url.replace(/'/g, "''") + "'",
+        'url = {:url}',
         '', 1, 0,
+        { url: url }
       );
       if (records.length > 0) {
         return c.json(200, { id: records[0].getId() });
@@ -160,14 +159,14 @@ routerAdd('GET', '/api/mytrend/research/trends', function (c) {
     // Fetch last 6 months of research
     var sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    var startStr = sixMonthsAgo.toISOString().replace('T', ' ');
+    var startStr = sixMonthsAgo.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '');
 
     var records = [];
     try {
       records = dao.findRecordsByFilter(
         'research',
         'user = {:uid} && created >= {:start}',
-        '-created', 0, 0,
+        '-created', 1000, 0,
         { uid: userId, start: startStr }
       );
     } catch (e) {}

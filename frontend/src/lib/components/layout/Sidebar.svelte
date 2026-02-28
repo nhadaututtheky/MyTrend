@@ -66,7 +66,7 @@
 
   function isActive(href: string): boolean {
     if (href === '/') return currentPath === '/';
-    return currentPath.startsWith(href);
+    return currentPath === href || currentPath.startsWith(href + '/');
   }
 </script>
 

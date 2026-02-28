@@ -210,6 +210,8 @@
     isCreating = true;
     errorMsg = '';
     messages = [];
+    permissions = [];
+    streamingText = '';
     seenIds.clear();
     msgCounter = 0;
 

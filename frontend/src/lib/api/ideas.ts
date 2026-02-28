@@ -55,7 +55,8 @@ export async function createIdeaFromResearch(research: Research): Promise<Idea> 
   const projectName = research.applicable_projects[0];
   if (projectName) {
     try {
-      const proj = await pb.collection('projects').getFirstListItem(`name = "${projectName}"`);
+      const safe = projectName.replace(/['"\\]/g, '');
+      const proj = await pb.collection('projects').getFirstListItem(`name = "${safe}"`);
       projectId = proj.id;
     } catch {
       // Project not found — create without linking

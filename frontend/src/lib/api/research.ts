@@ -1,7 +1,32 @@
 import pb from '$lib/config/pocketbase';
-import type { Research, ResearchStats, PBListResult } from '$lib/types';
+import type {
+  Research,
+  ResearchSource,
+  ResearchVerdict,
+  ResearchStats,
+  PBListResult,
+} from '$lib/types';
 
 const ITEMS_PER_PAGE = 50;
+
+const VALID_SOURCES: ReadonlySet<string> = new Set<ResearchSource>([
+  'github',
+  'npm',
+  'blog',
+  'docs',
+  'other',
+]);
+const VALID_VERDICTS: ReadonlySet<string> = new Set<ResearchVerdict>([
+  'fit',
+  'partial',
+  'concept-only',
+  'irrelevant',
+]);
+
+/** Sanitize a string for use in PocketBase filter values (strip quotes). */
+function sanitize(val: string): string {
+  return val.replace(/['"\\]/g, '');
+}
 
 export async function fetchResearch(
   page = 1,
@@ -9,8 +34,8 @@ export async function fetchResearch(
   verdict?: string,
 ): Promise<PBListResult<Research>> {
   const filters: string[] = [];
-  if (source) filters.push(`source = "${source}"`);
-  if (verdict) filters.push(`verdict = "${verdict}"`);
+  if (source && VALID_SOURCES.has(source)) filters.push(`source = "${source}"`);
+  if (verdict && VALID_VERDICTS.has(verdict)) filters.push(`verdict = "${verdict}"`);
   const filter = filters.join(' && ');
 
   return pb.collection('research').getList<Research>(page, ITEMS_PER_PAGE, {
@@ -40,8 +65,9 @@ export async function fetchResearchByProject(
   page = 1,
   verdict?: string,
 ): Promise<PBListResult<Research>> {
-  const filters = [`applicable_projects ~ "${projectName}"`];
-  if (verdict) filters.push(`verdict = "${verdict}"`);
+  const safe = sanitize(projectName);
+  const filters = [`applicable_projects ~ "${safe}"`];
+  if (verdict && VALID_VERDICTS.has(verdict)) filters.push(`verdict = "${verdict}"`);
   return pb.collection('research').getList<Research>(page, 20, {
     sort: '-created',
     filter: filters.join(' && '),
