@@ -486,7 +486,7 @@ export async function saveToNeuralMemory(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Brain-ID": "laptop-brain",
+        "X-Brain-ID": process.env.NEURALMEMORY_BRAIN || "laptop-brain",
       },
       body: JSON.stringify({
         content: `[RESEARCH] ${record.title}\n\nURL: ${record.url}\nSource: ${record.source}\nVerdict: ${record.verdict}\n\n${analysis.summary}`,

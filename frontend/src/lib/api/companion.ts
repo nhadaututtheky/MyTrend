@@ -110,12 +110,30 @@ export type BridgeMessage =
 
 // ─── REST API ────────────────────────────────────────────────────────────────
 
+export interface CompanionHealthResponse {
+  status: string;
+  version: string;
+  uptime: number;
+  sessions: number;
+  nm_brain: string;
+}
+
 export async function checkCompanionHealth(): Promise<boolean> {
   try {
     const res = await fetch(`${COMPANION_URL}/api/health`, { signal: AbortSignal.timeout(3000) });
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+export async function getCompanionHealth(): Promise<CompanionHealthResponse | null> {
+  try {
+    const res = await fetch(`${COMPANION_URL}/api/health`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
   }
 }
 

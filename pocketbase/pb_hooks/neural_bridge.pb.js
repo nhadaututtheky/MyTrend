@@ -287,7 +287,7 @@ function encodeToNeuralMemory(collection, record) {
           $http.send({
             url: endpoint,
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'laptop-brain' },
+            headers: { 'Content-Type': 'application/json', 'X-Brain-ID': ($os.getenv('NEURALMEMORY_BRAIN') || 'laptop-brain') },
             body: JSON.stringify(insightPayload),
             timeout: 5,
           });
@@ -529,7 +529,7 @@ function encodeToNeuralMemory(collection, record) {
     var res = $http.send({
       url: endpoint,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'laptop-brain' },
+      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': ($os.getenv('NEURALMEMORY_BRAIN') || 'laptop-brain') },
       body: JSON.stringify(payload),
       timeout: 5,
     });

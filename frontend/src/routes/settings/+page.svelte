@@ -24,6 +24,7 @@
     startTelegramBridge,
     stopTelegramBridge,
     checkCompanionHealth,
+    getCompanionHealth,
     listProjects,
     createCompanionProject,
     updateCompanionProject,
@@ -58,6 +59,8 @@
   let isSaving = $state(false);
   let user = $state<User | null>(null);
   let isSeeding = $state(false);
+  let nmBrain = $state<string | null>(null);
+  let nmOnline = $state(false);
 
   // Hub API Key state
   let hubSettings = $state<HubSettings | null>(null);
@@ -133,7 +136,23 @@
     loadTelegramSettings();
     loadClaudeBridge();
     loadProjectProfiles();
+    loadNmStatus();
   });
+
+  async function loadNmStatus(): Promise<void> {
+    const health = await getCompanionHealth();
+    if (health) {
+      nmBrain = health.nm_brain;
+    }
+
+    // Also check NM service directly
+    try {
+      const res = await fetch('/nm/health', { signal: AbortSignal.timeout(3000) });
+      nmOnline = res.ok;
+    } catch {
+      nmOnline = false;
+    }
+  }
 
   async function saveProfile(): Promise<void> {
     if (!user) return;
@@ -985,6 +1004,29 @@
   {#if activeTab === 'data'}
     <div class="tab-stack">
       <ComicCard>
+        <h2 class="section-title">Neural Memory</h2>
+        <div class="nm-status">
+          <div class="nm-row">
+            <span class="nm-label">Status</span>
+            <ComicBadge color={nmOnline ? 'green' : 'red'} size="sm">
+              {nmOnline ? 'Online' : 'Offline'}
+            </ComicBadge>
+          </div>
+          <div class="nm-row">
+            <span class="nm-label">Brain ID</span>
+            <code class="nm-brain">{nmBrain ?? 'unknown'}</code>
+          </div>
+        </div>
+        {#if nmBrain}
+          <p class="nm-hint">
+            Brain ID is configured via <code>NEURALMEMORY_BRAIN</code> env var. Change it in
+            <code>.env</code>
+            or <code>docker-compose.yml</code> and restart.
+          </p>
+        {/if}
+      </ComicCard>
+
+      <ComicCard>
         <h2 class="section-title">Data Management</h2>
         <div class="data-actions">
           <ComicButton variant="outline" onclick={handleSeedProjects} loading={isSeeding}>
@@ -1090,6 +1132,51 @@
     font-size: 0.75rem;
     color: var(--text-muted);
     margin: var(--spacing-xs) 0 0;
+  }
+
+  /* Neural Memory */
+  .nm-status {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .nm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+  }
+
+  .nm-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  .nm-brain {
+    font-family: 'Comic Mono', monospace;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--accent-blue);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .nm-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: var(--spacing-sm) 0 0;
+    line-height: 1.5;
+  }
+
+  .nm-hint code {
+    font-family: 'Comic Mono', monospace;
+    font-size: 0.7rem;
+    background: var(--bg-secondary);
+    padding: 1px 4px;
+    border-radius: 3px;
   }
 
   /* Telegram / stats */

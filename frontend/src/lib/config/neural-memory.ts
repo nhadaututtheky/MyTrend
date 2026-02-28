@@ -4,6 +4,8 @@ const NM_URL =
     ? '/nm'
     : import.meta.env.VITE_NM_URL || 'http://neural-memory:8000';
 
+const NM_BRAIN = import.meta.env.VITE_NM_BRAIN || 'laptop-brain';
+
 interface NMQueryResult {
   id: string;
   content: string;
@@ -30,7 +32,7 @@ async function nmFetch<T>(path: string, options?: RequestInit): Promise<T | null
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'X-Brain-ID': 'mytrend',
+        'X-Brain-ID': NM_BRAIN,
         ...options?.headers,
       },
     });

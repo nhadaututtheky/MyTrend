@@ -148,6 +148,7 @@ export function createApp(ctx: AppContext): Hono {
       version: "0.1.0",
       uptime: process.uptime(),
       sessions: ctx.bridge.getAllSessions().length,
+      nm_brain: process.env.NEURALMEMORY_BRAIN || "laptop-brain",
     });
   });
 
@@ -683,7 +684,7 @@ export function createApp(ctx: AppContext): Hono {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Brain-ID": "laptop-brain",
+            "X-Brain-ID": process.env.NEURALMEMORY_BRAIN || "laptop-brain",
           },
           body: JSON.stringify({
             content: `[${doc.tag.toUpperCase()}] ${basename(doc.file)}\n\n${content}`,

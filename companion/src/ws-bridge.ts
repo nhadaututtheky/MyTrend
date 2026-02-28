@@ -926,7 +926,7 @@ export class WsBridge {
 
     await fetch(`${nmUrl}/memory/encode`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Brain-ID": "laptop-brain" },
+      headers: { "Content-Type": "application/json", "X-Brain-ID": process.env.NEURALMEMORY_BRAIN || "laptop-brain" },
       body: JSON.stringify({
         content: summary,
         tags: ["session", `project:${projectName}`, "auto-summary"],

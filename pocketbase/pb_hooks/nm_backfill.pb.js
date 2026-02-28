@@ -330,7 +330,7 @@ routerAdd('POST', '/api/mytrend/nm-backfill', (c) => {
     var res = $http.send({
       url: endpoint,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': 'laptop-brain' },
+      headers: { 'Content-Type': 'application/json', 'X-Brain-ID': ($os.getenv('NEURALMEMORY_BRAIN') || 'laptop-brain') },
       body: JSON.stringify(payload),
       timeout: 10,
     });
