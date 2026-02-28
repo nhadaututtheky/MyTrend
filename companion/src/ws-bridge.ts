@@ -70,8 +70,8 @@ interface ActiveSession {
   autoApproveConfig: AutoApproveConfig;
   /** Active auto-approve timers keyed by request_id. */
   autoApproveTimers: Map<string, ReturnType<typeof setTimeout>>;
-  /** Flag: auto-send plan approval after next result (set when ExitPlanMode is auto-approved). */
-  pendingPlanApproval: boolean;
+  /** @deprecated No longer used — ExitPlanMode now shows permission UI instead of auto-approving. */
+  pendingPlanApproval?: boolean;
 }
 
 // ─── Bridge ──────────────────────────────────────────────────────────────────
@@ -122,7 +122,6 @@ export class WsBridge {
       subscribers: new Map(),
       autoApproveConfig: { enabled: false, timeoutSeconds: 0, allowBash: false },
       autoApproveTimers: new Map(),
-      pendingPlanApproval: false,
     };
 
     this.sessions.set(sessionId, session);
@@ -555,17 +554,6 @@ export class WsBridge {
       this.saveSessionSummary(session, msg).catch(() => {});
     }
 
-    // Auto-approve plan after ExitPlanMode completes
-    if (session.pendingPlanApproval) {
-      session.pendingPlanApproval = false;
-      console.log(
-        `[ws-bridge] Auto-approving plan for session ${session.id.slice(0, 8)} — sending approval message`
-      );
-      // Small delay to let the CLI fully settle before sending next input
-      setTimeout(() => {
-        this.handleUserMessage(session, "Approved. Proceed with implementation.");
-      }, 500);
-    }
   }
 
   private handleStreamEvent(
@@ -581,9 +569,9 @@ export class WsBridge {
   }
 
   // Tools that are safe state transitions and should never require manual approval.
+  // NOTE: ExitPlanMode is NOT here — it needs user to see and approve the plan.
   // NOTE: AskUserQuestion is NOT here — it requires the user to see and answer the question.
   private static readonly ALWAYS_APPROVE_TOOLS = new Set([
-    "ExitPlanMode",
     "EnterPlanMode",
   ]);
 
@@ -603,46 +591,12 @@ export class WsBridge {
         request_id: msg.request_id,
         behavior: "allow",
       });
-
-      // When ExitPlanMode is auto-approved, flag session to auto-send plan approval
-      // after the CLI finishes processing and sends the result.
-      if (toolName === "ExitPlanMode") {
-        session.pendingPlanApproval = true;
-        console.log(
-          `[ws-bridge] Flagged session ${session.id.slice(0, 8)} for auto plan approval`
-        );
-      }
       return;
     }
 
-    // Fallback: auto-approve plan mode requests even if tool_name field is missing/different.
-    // CLI may send plan approval as subtype or description instead of tool_name.
-    // Also detect ExitPlanMode by checking for allowedPrompts in input (unique to ExitPlanMode).
     const desc = msg.request.description ?? "";
-    const input = msg.request.input ?? {};
-    const hasAllowedPrompts = "allowedPrompts" in input || Array.isArray(input.allowedPrompts);
-    const isExitPlanByName = toolName.toLowerCase().includes("exitplan")
-      || toolName.toLowerCase().includes("planmode");
-    const isPlanRelated =
-      subtype === "plan_mode_response" ||
-      subtype === "exit_plan_mode" ||
-      desc.toLowerCase().includes("exitplanmode") ||
-      desc.toLowerCase().includes("plan mode") ||
-      hasAllowedPrompts ||
-      isExitPlanByName;
-    if (isPlanRelated) {
-      console.log(
-        `[ws-bridge] Auto-approving plan-related request (subtype=${subtype}, desc=${desc.slice(0, 60)}, request ${msg.request_id.slice(0, 8)})`
-      );
-      this.handlePermissionResponse(session, {
-        request_id: msg.request_id,
-        behavior: "allow",
-      });
-      session.pendingPlanApproval = true;
-      return;
-    }
 
-    // Debug: log unrecognized control_request for troubleshooting
+    // Debug: log control_request for troubleshooting
     console.log(
       `[ws-bridge] control_request: tool_name=${toolName}, subtype=${subtype}, desc=${desc.slice(0, 80)}, request_id=${msg.request_id.slice(0, 8)}, keys=${Object.keys(msg.request).join(",")}`
     );

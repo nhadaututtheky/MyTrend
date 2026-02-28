@@ -341,6 +341,36 @@
           if (!hasVisible) break;
         }
 
+        // Preserve streaming text as a "thinking" message if it differs from final content.
+        // This keeps the thinking process visible instead of silently replacing it.
+        if (streamingText.trim()) {
+          const finalText = Array.isArray(blocks)
+            ? blocks
+                .filter((b: ContentBlock) => b.type === 'text' && b.text?.trim())
+                .map((b: ContentBlock) => b.text ?? '')
+                .join('\n')
+            : '';
+          // Only snapshot if streaming text is meaningfully different from the final message
+          // (when they're identical, no need for a duplicate thinking bubble)
+          const isDuplicate =
+            finalText.trim() === streamingText.trim() ||
+            finalText.trim().startsWith(streamingText.trim());
+          if (!isDuplicate) {
+            const thinkingId = `thinking-${++msgCounter}`;
+            messages = [
+              ...messages,
+              {
+                id: thinkingId,
+                role: 'assistant',
+                content: streamingText,
+                model: msg.message.model,
+                timestamp: Date.now(),
+                toolName: 'thinking',
+              },
+            ];
+          }
+        }
+
         seenIds.add(aId);
         messages = [
           ...messages,
